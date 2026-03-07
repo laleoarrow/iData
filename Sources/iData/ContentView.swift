@@ -334,10 +334,16 @@ private struct SessionStageView: View {
 }
 
 private struct HelpView: View {
+    private let onboardingTips: [QuickTip] = [
+        QuickTip(keys: "Open… / Drag File", title: "Open Data", detail: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData."),
+        QuickTip(keys: "Recent + Pin", title: "Keep Key Files", detail: "Click a recent item to reopen it. Pin important files so they stay fixed at the top of the sidebar."),
+        QuickTip(keys: "⌘,", title: "Settings", detail: "Adjust the `vd` path, automatic update behavior, or run a manual update check."),
+    ]
+
     private let softwareTips: [QuickTip] = [
-        QuickTip(keys: "Open… / Drag File", title: "Load Data", detail: "Open a file from the toolbar or drag any regular table-like file into the window."),
-        QuickTip(keys: "Recent + Pin", title: "Organize Files", detail: "Click a recent file to reopen it, pin important files to keep them fixed at the top, and use × only to remove the history record."),
-        QuickTip(keys: "⌘,", title: "Settings", detail: "Set a custom `vd` executable path, tune update behavior, or trigger a manual update check."),
+        QuickTip(keys: ".csv / .tsv / .ma", title: "Direct Open", detail: "Most regular text-like table files open directly, including unusual bioinformatics suffixes such as `.ma`."),
+        QuickTip(keys: ".gz / .bgz", title: "Stream Compression", detail: "Compressed files are streamed into VisiData without extracting them to disk first."),
+        QuickTip(keys: "Excel", title: "About `.xlsx`", detail: "VisiData can read Excel, but that depends on the Python environment having the required loader installed. If Excel fails, install the missing VisiData dependency in the same Python environment as `vd`."),
     ]
 
     private let visiDataTips: [QuickTip] = [
@@ -352,20 +358,15 @@ private struct HelpView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("iData Help")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-
-                Text("iData is a native macOS shell around real VisiData. The outer app handles opening files, recent history, updates, and settings. The main table view remains actual VisiData, so normal VisiData shortcuts still apply.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                helpSection(title: "Using iData", tips: softwareTips)
+                helpHero
+                helpSection(title: "Using iData", tips: onboardingTips)
+                helpSection(title: "File Loading Notes", tips: softwareTips)
                 helpSection(title: "Common VisiData Shortcuts", tips: visiDataTips)
             }
-            .padding(24)
+            .padding(28)
         }
-        .frame(width: 620, height: 540)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: 700, height: 620)
+        .background(detailBackground.ignoresSafeArea())
     }
 
     @ViewBuilder
@@ -400,6 +401,51 @@ private struct HelpView: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
         )
+    }
+
+    private var helpHero: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 18) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 92, height: 92)
+                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .shadow(color: .black.opacity(0.16), radius: 20, y: 8)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("iData Help")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+
+                    Text("iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        StatusPill(title: "Native macOS shell", tint: .white.opacity(0.12), icon: "macwindow")
+                        StatusPill(title: "Real VisiData core", tint: Color.accentColor.opacity(0.20), icon: "terminal")
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.18),
+                    Color.white.opacity(0.05),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10))
+        )
+        .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
     }
 }
 
