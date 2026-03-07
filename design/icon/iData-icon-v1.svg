@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="120" x2="860" y2="920" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#121A2B"/>
+      <stop offset="0.55" stop-color="#0B1120"/>
+      <stop offset="1" stop-color="#070B16"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(292 236) rotate(39) scale(340 254)">
+      <stop stop-color="#60A5FA" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(748 806) rotate(-135) scale(336 248)">
+      <stop stop-color="#A78BFA" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#A78BFA" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="stroke" x1="254" y1="220" x2="760" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D7F7FF"/>
+      <stop offset="0.40" stop-color="#87D8FF"/>
+      <stop offset="0.72" stop-color="#72A9FF"/>
+      <stop offset="1" stop-color="#D4A8FF"/>
+    </linearGradient>
+    <filter id="softGlow" x="210" y="150" width="720" height="720" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="13" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="226" fill="url(#bg)"/>
+  <rect x="24" y="24" width="976" height="976" rx="202" stroke="white" stroke-opacity="0.08" stroke-width="2"/>
+  <rect x="66" y="66" width="892" height="892" rx="184" stroke="white" stroke-opacity="0.05" stroke-width="1.5"/>
+  <rect width="1024" height="1024" rx="226" fill="url(#glowA)"/>
+  <rect width="1024" height="1024" rx="226" fill="url(#glowB)"/>
+
+  <g filter="url(#softGlow)">
+    <circle cx="306" cy="226" r="48" fill="url(#stroke)"/>
+    <path
+      d="M390 780C338 736 322 666 340 594C368 488 468 422 592 408C678 398 752 418 808 462L858 422"
+      stroke="url(#stroke)"
+      stroke-width="32"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

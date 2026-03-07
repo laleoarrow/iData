@@ -1,0 +1,279 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000000000000000000021 /* iDataApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* iDataApp.swift */; };
+		A00000000000000000000022 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* ContentView.swift */; };
+		A00000000000000000000023 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000033 /* AppModel.swift */; };
+		A00000000000000000000024 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000034 /* PreferencesView.swift */; };
+		A00000000000000000000025 /* VisiDataLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000035 /* VisiDataLauncher.swift */; };
+		A00000000000000000000026 /* ExecutableChecking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* ExecutableChecking.swift */; };
+		A00000000000000000000027 /* RecentFilesStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000037 /* RecentFilesStore.swift */; };
+		A00000000000000000000028 /* TerminalCommandBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* TerminalCommandBuilder.swift */; };
+		A00000000000000000000029 /* VDExecutableLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000039 /* VDExecutableLocator.swift */; };
+		A0000000000000000000002A /* VisiDataSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003C /* VisiDataSessionController.swift */; };
+		A0000000000000000000002B /* EmbeddedTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003D /* EmbeddedTerminalView.swift */; };
+		A0000000000000000000002C /* TerminalAssets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003E /* TerminalAssets */; };
+		A0000000000000000000002D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003F /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000000000000000000031 /* iDataApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/iDataApp.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000032 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/ContentView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000033 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/AppModel.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000034 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/PreferencesView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000035 /* VisiDataLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/VisiDataLauncher.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000036 /* ExecutableChecking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iDataCore/ExecutableChecking.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000037 /* RecentFilesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iDataCore/RecentFilesStore.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000038 /* TerminalCommandBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iDataCore/TerminalCommandBuilder.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000039 /* VDExecutableLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iDataCore/VDExecutableLocator.swift; sourceTree = SOURCE_ROOT; };
+		A0000000000000000000003A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = iDataApp/Info.plist; sourceTree = SOURCE_ROOT; };
+		A0000000000000000000003B /* iData.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iData.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0000000000000000000003C /* VisiDataSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/VisiDataSessionController.swift; sourceTree = SOURCE_ROOT; };
+		A0000000000000000000003D /* EmbeddedTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/EmbeddedTerminalView.swift; sourceTree = SOURCE_ROOT; };
+		A0000000000000000000003E /* TerminalAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = iDataApp/Resources/TerminalAssets; sourceTree = SOURCE_ROOT; };
+		A0000000000000000000003F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = iDataApp/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000000000000000000012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000000000000000000041 = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000042 /* App Sources */,
+				A00000000000000000000043 /* Core Sources */,
+				A00000000000000000000044 /* App Config */,
+				A00000000000000000000045 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000000000000000000042 /* App Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000031 /* iDataApp.swift */,
+				A00000000000000000000032 /* ContentView.swift */,
+				A00000000000000000000033 /* AppModel.swift */,
+				A00000000000000000000034 /* PreferencesView.swift */,
+				A00000000000000000000035 /* VisiDataLauncher.swift */,
+				A0000000000000000000003C /* VisiDataSessionController.swift */,
+				A0000000000000000000003D /* EmbeddedTerminalView.swift */,
+			);
+			name = "App Sources";
+			sourceTree = "<group>";
+		};
+		A00000000000000000000043 /* Core Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000036 /* ExecutableChecking.swift */,
+				A00000000000000000000037 /* RecentFilesStore.swift */,
+				A00000000000000000000038 /* TerminalCommandBuilder.swift */,
+				A00000000000000000000039 /* VDExecutableLocator.swift */,
+			);
+			name = "Core Sources";
+			sourceTree = "<group>";
+		};
+		A00000000000000000000044 /* App Config */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000003A /* Info.plist */,
+				A0000000000000000000003F /* Assets.xcassets */,
+				A0000000000000000000003E /* TerminalAssets */,
+			);
+			name = "App Config";
+			sourceTree = "<group>";
+		};
+		A00000000000000000000045 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A0000000000000000000003B /* iData.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000000000000000000011 /* iDataApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000000000000000000062 /* Build configuration list for PBXNativeTarget "iDataApp" */;
+			buildPhases = (
+				A00000000000000000000013 /* Sources */,
+				A00000000000000000000012 /* Frameworks */,
+				A00000000000000000000014 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = iDataApp;
+			productName = iData;
+			productReference = A0000000000000000000003B /* iData.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					A00000000000000000000011 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+				};
+			};
+			buildConfigurationList = A00000000000000000000061 /* Build configuration list for PBXProject "iData" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00000000000000000000041;
+			productRefGroup = A00000000000000000000045 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00000000000000000000011 /* iDataApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00000000000000000000014 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0000000000000000000002D /* Assets.xcassets in Resources */,
+				A0000000000000000000002C /* TerminalAssets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00000000000000000000013 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000021 /* iDataApp.swift in Sources */,
+				A00000000000000000000022 /* ContentView.swift in Sources */,
+				A00000000000000000000023 /* AppModel.swift in Sources */,
+				A00000000000000000000024 /* PreferencesView.swift in Sources */,
+				A00000000000000000000025 /* VisiDataLauncher.swift in Sources */,
+				A00000000000000000000026 /* ExecutableChecking.swift in Sources */,
+				A00000000000000000000027 /* RecentFilesStore.swift in Sources */,
+				A00000000000000000000028 /* TerminalCommandBuilder.swift in Sources */,
+				A00000000000000000000029 /* VDExecutableLocator.swift in Sources */,
+				A0000000000000000000002A /* VisiDataSessionController.swift in Sources */,
+				A0000000000000000000002B /* EmbeddedTerminalView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000000000000000000051 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000052 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A00000000000000000000053 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iDataApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.leoarrow.idata.dev;
+				PRODUCT_NAME = iData;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A00000000000000000000054 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = iDataApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.leoarrow.idata;
+				PRODUCT_NAME = iData;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000000000000000000061 /* Build configuration list for PBXProject "iData" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000051 /* Debug */,
+				A00000000000000000000052 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000000000000000000062 /* Build configuration list for PBXNativeTarget "iDataApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000000000000000000053 /* Debug */,
+				A00000000000000000000054 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A00000000000000000000001 /* Project object */;
+}

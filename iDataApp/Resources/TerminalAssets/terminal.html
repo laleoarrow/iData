@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="xterm.css">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0b1020;
+      border-radius: 24px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    }
+    #terminal-shell {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      padding: 14px;
+      overflow: hidden;
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(59,130,246,0.18), transparent 30%),
+        radial-gradient(circle at top right, rgba(168,85,247,0.14), transparent 24%),
+        linear-gradient(180deg, #111827 0%, #0b1020 100%);
+    }
+    #terminal {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+      background: rgba(2, 6, 23, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .xterm {
+      padding: 14px;
+      height: 100%;
+    }
+    .xterm-viewport {
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="terminal-shell">
+    <div id="terminal"></div>
+  </div>
+  <script src="xterm.js"></script>
+  <script>
+    const terminalRoot = document.getElementById('terminal');
+    const term = new Terminal({
+      cursorBlink: true,
+      allowTransparency: true,
+      macOptionIsMeta: true,
+      rightClickSelectsWord: true,
+      scrollback: 20000,
+      fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
+      fontSize: 13,
+      lineHeight: 1.22,
+      theme: {
+        background: '#020617',
+        foreground: '#E2E8F0',
+        cursor: '#F8FAFC',
+        cursorAccent: '#020617',
+        selectionBackground: 'rgba(96, 165, 250, 0.32)',
+        black: '#0f172a',
+        red: '#ef4444',
+        green: '#22c55e',
+        yellow: '#eab308',
+        blue: '#3b82f6',
+        magenta: '#a855f7',
+        cyan: '#06b6d4',
+        white: '#e2e8f0',
+        brightBlack: '#475569',
+        brightRed: '#f87171',
+        brightGreen: '#4ade80',
+        brightYellow: '#facc15',
+        brightBlue: '#60a5fa',
+        brightMagenta: '#c084fc',
+        brightCyan: '#22d3ee',
+        brightWhite: '#f8fafc'
+      }
+    });
+
+    let lastSentSize = null;
+    let layoutRetryHandle = null;
+    let layoutRetryDeadline = 0;
+    let layoutStablePassesRemaining = 0;
+
+    function post(message) {
+      window.webkit?.messageHandlers?.idata?.postMessage(message);
+    }
+
+    function writeBase64(base64Value) {
+      const binary = atob(base64Value);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      term.write(bytes);
+      scheduleTerminalLayoutPasses();
+    }
+
+    function measureAndResize() {
+      const dimensions = term?._core?._renderService?.dimensions;
+      const cellWidth = dimensions?.css?.cell?.width;
+      const cellHeight = dimensions?.css?.cell?.height;
+      if (!cellWidth || !cellHeight) {
+        return false;
+      }
+      const rect = terminalRoot.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return false;
+      }
+      const cols = Math.max(20, Math.floor(rect.width / cellWidth) - 1);
+      const rows = Math.max(8, Math.floor(rect.height / cellHeight) - 1);
+      const sizeKey = `${cols}x${rows}`;
+      if (sizeKey === lastSentSize) {
+        return true;
+      }
+      lastSentSize = sizeKey;
+      term.resize(cols, rows);
+      post({ type: 'resize', cols, rows });
+      return true;
+    }
+
+    function refreshTerminalLayout() {
+      const didMeasure = measureAndResize();
+      if (term.rows > 0) {
+        term.refresh(0, Math.max(term.rows - 1, 0));
+      }
+      return didMeasure;
+    }
+
+    function scheduleTerminalLayoutPasses() {
+      layoutRetryDeadline = Math.max(layoutRetryDeadline, Date.now() + 6000);
+      layoutStablePassesRemaining = Math.max(layoutStablePassesRemaining, 3);
+
+      if (layoutRetryHandle !== null) {
+        return;
+      }
+
+      const attempt = () => {
+        const didMeasure = refreshTerminalLayout();
+        if (didMeasure && layoutStablePassesRemaining > 0) {
+          layoutStablePassesRemaining -= 1;
+        }
+
+        const needsMorePasses =
+          !didMeasure ||
+          !lastSentSize ||
+          layoutStablePassesRemaining > 0;
+
+        if (needsMorePasses && Date.now() < layoutRetryDeadline) {
+          layoutRetryHandle = setTimeout(attempt, 120);
+          return;
+        }
+
+        layoutRetryHandle = null;
+        layoutRetryDeadline = 0;
+        layoutStablePassesRemaining = 0;
+      };
+
+      attempt();
+    }
+
+    window.iDataWriteBase64 = writeBase64;
+    window.iDataClearTerminal = function() {
+      term.reset();
+      term.clear();
+      scheduleTerminalLayoutPasses();
+    };
+    window.iDataFocusTerminal = function() {
+      term.focus();
+      scheduleTerminalLayoutPasses();
+    };
+
+    term.open(terminalRoot);
+    term.focus();
+    scheduleTerminalLayoutPasses();
+    term.onData((data) => {
+      post({ type: 'input', data });
+    });
+    term.onBinary((data) => {
+      post({ type: 'binary', data: btoa(data) });
+    });
+
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(scheduleTerminalLayoutPasses);
+    });
+    resizeObserver.observe(terminalRoot);
+
+    requestAnimationFrame(() => {
+      scheduleTerminalLayoutPasses();
+      post({ type: 'ready' });
+    });
+  </script>
+</body>
+</html>

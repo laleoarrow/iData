@@ -1,0 +1,29 @@
+<svg width="768" height="768" viewBox="0 0 768 768" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="markPanel" x1="140" y1="120" x2="622" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10243D"/>
+      <stop offset="1" stop-color="#174E94"/>
+    </linearGradient>
+    <linearGradient id="markI" x1="350" y1="246" x2="418" y2="514" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E2FCFF"/>
+      <stop offset="0.52" stop-color="#8BE7FF"/>
+      <stop offset="1" stop-color="#4AA6FF"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="104" y="108" width="560" height="560" rx="136" fill="url(#markPanel)"/>
+  <rect x="104.75" y="108.75" width="558.5" height="558.5" rx="135.25" stroke="white" stroke-opacity="0.14" stroke-width="1.5"/>
+
+  <rect x="164" y="164" width="440" height="440" rx="112" stroke="#9BD7FF" stroke-opacity="0.16" stroke-width="12"/>
+  <path d="M164 276H604" stroke="#9BD7FF" stroke-opacity="0.18" stroke-width="8"/>
+  <path d="M164 388H604" stroke="#9BD7FF" stroke-opacity="0.16" stroke-width="8"/>
+  <path d="M164 500H604" stroke="#9BD7FF" stroke-opacity="0.16" stroke-width="8"/>
+  <path d="M272 164V604" stroke="#9BD7FF" stroke-opacity="0.14" stroke-width="8"/>
+  <path d="M384 164V604" stroke="#9BD7FF" stroke-opacity="0.16" stroke-width="8"/>
+  <path d="M496 164V604" stroke="#9BD7FF" stroke-opacity="0.14" stroke-width="8"/>
+
+  <circle cx="384" cy="256" r="28" fill="url(#markI)"/>
+  <circle cx="384" cy="256" r="28.75" stroke="white" stroke-opacity="0.3" stroke-width="1.5"/>
+  <rect x="348" y="332" width="72" height="196" rx="36" fill="url(#markI)"/>
+  <rect x="348.75" y="332.75" width="70.5" height="194.5" rx="35.25" stroke="white" stroke-opacity="0.26" stroke-width="1.5"/>
+</svg>
