@@ -5,50 +5,167 @@ struct PreferencesView: View {
     @ObservedObject var updater: AppUpdaterController
 
     var body: some View {
-        Form {
-            Section("VisiData") {
-                TextField("/Users/leoarrow/.local/bin/vd", text: $model.vdExecutablePath)
-                    .textFieldStyle(.roundedBorder)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                preferencesHero
+                runtimeCard
+                updatesCard
+            }
+            .padding(24)
+        }
+        .scrollIndicators(.hidden)
+        .frame(width: 620, height: 660)
+        .background(preferencesBackground.ignoresSafeArea())
+    }
 
-                HStack {
-                    Button("Choose Executable…") {
-                        model.chooseVDExecutable()
-                    }
+    private var preferencesHero: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 16) {
+                Image(systemName: "gearshape.2.fill")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 60, height: 60)
+                    .background(Color.accentColor.opacity(0.26), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-                    if !model.vdExecutablePath.isEmpty {
-                        Button("Clear") {
-                            model.vdExecutablePath = ""
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Preferences")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+
+                    Text("Configure where `iData` finds `VisiData`, control update behavior, and verify the current runtime state before opening large files.")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        PreferencePill(title: model.appVersionSummary, tint: .white.opacity(0.12), icon: "shippingbox")
+
+                        switch model.visiDataDependencyState {
+                        case .available:
+                            PreferencePill(title: "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill")
+                        case .missing:
+                            PreferencePill(title: "VisiData Missing", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill")
                         }
                     }
                 }
-
-                Text("Leave this blank to auto-detect `vd` from PATH. Set it explicitly if you use a custom install.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10))
+        )
+        .shadow(color: .black.opacity(0.12), radius: 22, y: 10)
+    }
 
-            Section("Updates") {
+    private var runtimeCard: some View {
+        PreferencesCard(title: "VisiData Runtime", icon: "terminal") {
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("/opt/homebrew/bin/vd", text: $model.vdExecutablePath)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+
+                HStack(spacing: 10) {
+                    Button("Choose Executable…") {
+                        model.chooseVDExecutable()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button("Auto Detect") {
+                        model.vdExecutablePath = ""
+                    }
+                    .buttonStyle(.bordered)
+
+                    Spacer(minLength: 0)
+                }
+
+                Text(model.visiDataDependencySummary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var updatesCard: some View {
+        PreferencesCard(title: "Updates", icon: "square.and.arrow.down") {
+            VStack(alignment: .leading, spacing: 14) {
                 Toggle("Automatically check for updates", isOn: Binding(
                     get: { updater.automaticallyChecksForUpdates },
                     set: { updater.setAutomaticallyChecksForUpdates($0) }
                 ))
+                .toggleStyle(.switch)
 
                 Toggle("Automatically download updates", isOn: Binding(
                     get: { updater.automaticallyDownloadsUpdates },
                     set: { updater.setAutomaticallyDownloadsUpdates($0) }
                 ))
+                .toggleStyle(.switch)
                 .disabled(!updater.automaticallyChecksForUpdates)
 
-                Button("Check for Updates Now") {
-                    updater.checkForUpdates()
+                HStack(spacing: 10) {
+                    Button("Check for Updates Now") {
+                        updater.checkForUpdates()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button("Open Releases") {
+                        NSWorkspace.shared.open(updater.releasesURL)
+                    }
+                    .buttonStyle(.bordered)
                 }
 
                 Text(updater.statusMessage)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(20)
-        .frame(width: 520)
     }
 }
+
+private struct PreferencesCard<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(22)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
+    }
+}
+
+private struct PreferencePill: View {
+    let title: String
+    let tint: Color
+    let icon: String
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(tint, in: Capsule())
+    }
+}
+
+private let preferencesBackground = LinearGradient(
+    colors: [
+        Color.accentColor.opacity(0.16),
+        Color(nsColor: .windowBackgroundColor),
+        Color.black.opacity(0.05),
+    ],
+    startPoint: .topLeading,
+    endPoint: .bottomTrailing
+)

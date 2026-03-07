@@ -594,12 +594,14 @@ private struct WelcomeDetailView: View {
                 icon: "waveform.path.ecg.rectangle",
                 detail: "\(model.visiDataDependencySummary) Files are no longer restricted by suffix; iData only special-cases compressed gzip-like inputs."
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             SummaryCard(
                 title: "Updates",
                 icon: "square.and.arrow.down",
                 detail: updater.statusMessage
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
@@ -780,7 +782,7 @@ private struct SummaryCard: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(20)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
