@@ -1,17 +1,20 @@
 import AppKit
 import Foundation
 import SwiftUI
-import UniformTypeIdentifiers
 #if canImport(iDataCore)
 import iDataCore
 #endif
 
 @MainActor
 final class AppModel: ObservableObject {
+    enum VisiDataDependencyState: Equatable {
+        case available(path: String)
+        case missing
+    }
+
     struct SupportedFormat {
         let displayName: String
         let fileExtension: String
-        let contentType: UTType
     }
 
     @Published var activeSession: VisiDataSessionController?
@@ -27,23 +30,21 @@ final class AppModel: ObservableObject {
 
     private let defaults: UserDefaults
     private let recentFilesStore: RecentFilesStore
+    private let executableChecker: any ExecutableChecking
+    private let environmentPathProvider: () -> String
 
     static let vdExecutablePathKey = "vdExecutablePath"
     static let recentFilesLimit = 10
     static let supportedFormats: [SupportedFormat] = [
-        SupportedFormat(displayName: "CSV", fileExtension: "csv", contentType: UTType(filenameExtension: "csv") ?? .data),
-        SupportedFormat(displayName: "TSV", fileExtension: "tsv", contentType: UTType(filenameExtension: "tsv") ?? .data),
-        SupportedFormat(displayName: "Plain Text", fileExtension: "txt", contentType: UTType(filenameExtension: "txt") ?? .plainText),
-        SupportedFormat(displayName: "JSON", fileExtension: "json", contentType: UTType.json),
-        SupportedFormat(displayName: "JSON Lines", fileExtension: "jsonl", contentType: UTType(filenameExtension: "jsonl") ?? .data),
-        SupportedFormat(displayName: "Excel Workbook", fileExtension: "xlsx", contentType: UTType(filenameExtension: "xlsx") ?? .data),
-        SupportedFormat(displayName: "Compressed CSV", fileExtension: "csv.gz", contentType: UTType(filenameExtension: "gz") ?? .data),
-        SupportedFormat(displayName: "Compressed TSV", fileExtension: "tsv.gz", contentType: UTType(filenameExtension: "gz") ?? .data),
-        SupportedFormat(displayName: "Compressed Text", fileExtension: "txt.gz", contentType: UTType(filenameExtension: "gz") ?? .data),
+        SupportedFormat(displayName: "CSV", fileExtension: "csv"),
+        SupportedFormat(displayName: "TSV", fileExtension: "tsv"),
+        SupportedFormat(displayName: "JSON", fileExtension: "json"),
+        SupportedFormat(displayName: "JSON Lines", fileExtension: "jsonl"),
+        SupportedFormat(displayName: "Excel Workbook", fileExtension: "xlsx"),
+        SupportedFormat(displayName: "MA / GWAS", fileExtension: "ma"),
+        SupportedFormat(displayName: "Compressed GZip", fileExtension: "gz"),
+        SupportedFormat(displayName: "Compressed BGZip", fileExtension: "bgz"),
     ]
-    static var supportedFormatExtensions: [String] {
-        supportedFormats.map(\.fileExtension)
-    }
     static var supportedFormatHelpText: String {
         supportedFormats
             .map { "\($0.displayName) (.\($0.fileExtension))" }
@@ -52,12 +53,51 @@ final class AppModel: ObservableObject {
 
     init(
         defaults: UserDefaults = .standard,
-        recentFilesStore: RecentFilesStore? = nil
+        recentFilesStore: RecentFilesStore? = nil,
+        executableChecker: any ExecutableChecking = LocalExecutableChecker(),
+        environmentPathProvider: @escaping () -> String = { ProcessInfo.processInfo.environment["PATH"] ?? "" }
     ) {
         self.defaults = defaults
         self.recentFilesStore = recentFilesStore ?? RecentFilesStore(defaults: defaults)
+        self.executableChecker = executableChecker
+        self.environmentPathProvider = environmentPathProvider
         self.recentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
         self.vdExecutablePath = defaults.string(forKey: Self.vdExecutablePathKey) ?? ""
+    }
+
+    var displayedSession: VisiDataSessionController? {
+        guard let activeSession, activeSession.isRunning, activeSession.currentFileURL != nil else {
+            return nil
+        }
+
+        return activeSession
+    }
+
+    var appVersionSummary: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+        return "v\(shortVersion) · build \(buildVersion)"
+    }
+
+    var visiDataDependencyState: VisiDataDependencyState {
+        guard let resolvedURL = VDExecutableLocator.resolve(
+            explicitPath: normalizedVDExecutablePath(),
+            environmentPath: environmentPathProvider(),
+            checker: executableChecker
+        ) else {
+            return .missing
+        }
+
+        return .available(path: resolvedURL.path)
+    }
+
+    var visiDataDependencySummary: String {
+        switch visiDataDependencyState {
+        case let .available(path):
+            return "VisiData detected at \(path)"
+        case .missing:
+            return "VisiData not found. Install with `brew install visidata` or set the executable path in Preferences."
+        }
     }
 
     func openDocument() {
@@ -65,7 +105,6 @@ final class AppModel: ObservableObject {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = Self.supportedContentTypes
 
         if panel.runModal() == .OK, let url = panel.url {
             openExternalFile(url)
@@ -79,7 +118,7 @@ final class AppModel: ObservableObject {
             }
 
             statusMessage = nil
-            errorMessage = "Unsupported format. Supported formats: \(Self.supportedFormatHelpText)."
+            errorMessage = "Drop a regular file, not a folder. iData streams compressed .gz/.bgz files without extracting."
             return
         }
 
@@ -89,7 +128,7 @@ final class AppModel: ObservableObject {
     func openExternalFile(_ url: URL) {
         guard Self.supportsTableFile(url) else {
             statusMessage = nil
-            errorMessage = "Unsupported format. Supported formats: \(Self.supportedFormatHelpText)."
+            errorMessage = "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting."
             return
         }
 
@@ -101,8 +140,10 @@ final class AppModel: ObservableObject {
             activeSession = session
             previousSession?.terminate()
             lastOpenedFile = url
-            recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
-            recentFiles = recentFilesStore.load()
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
+                recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
+                recentFiles = recentFilesStore.load()
+            }
             statusMessage = "Opened \(url.lastPathComponent) inside iData."
             errorMessage = nil
         } catch {
@@ -131,15 +172,19 @@ final class AppModel: ObservableObject {
     }
 
     func removeRecentFile(_ url: URL) {
-        recentFilesStore.remove(url)
-        recentFiles = recentFilesStore.load()
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12)) {
+            recentFilesStore.remove(url)
+            recentFiles = recentFilesStore.load()
+        }
         statusMessage = "Removed \(url.lastPathComponent) from recent files."
         errorMessage = nil
     }
 
     func clearRecentFiles() {
-        recentFilesStore.clear()
-        recentFiles = []
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.88, blendDuration: 0.1)) {
+            recentFilesStore.clear()
+            recentFiles = []
+        }
         statusMessage = "Cleared recent files."
         errorMessage = nil
     }
@@ -162,6 +207,7 @@ final class AppModel: ObservableObject {
 
     func shutdown() {
         activeSession?.terminate()
+        activeSession = nil
     }
 
     @discardableResult
@@ -172,7 +218,7 @@ final class AppModel: ObservableObject {
             }
 
             statusMessage = nil
-            errorMessage = "Unsupported format. Supported formats: \(Self.supportedFormatHelpText)."
+            errorMessage = "Drop a regular file, not a folder. iData opens most file suffixes directly and streams .gz/.bgz files without extracting."
             return false
         }
 
@@ -186,19 +232,21 @@ final class AppModel: ObservableObject {
     }
 
     static func supportsTableFile(_ url: URL) -> Bool {
-        let lowercaseName = url.lastPathComponent.lowercased()
-        return supportedFormatExtensions.contains { lowercaseName.hasSuffix(".\($0)") || lowercaseName == $0 }
+        guard url.isFileURL else {
+            return false
+        }
+
+        if
+            let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey]),
+            let isDirectory = resourceValues.isDirectory
+        {
+            return !isDirectory
+        }
+
+        return !url.hasDirectoryPath
     }
 
     static func firstSupportedFile(in urls: [URL]) -> URL? {
         urls.first(where: supportsTableFile)
-    }
-
-    private static var supportedContentTypes: [UTType] {
-        var contentTypes: [UTType] = []
-        for contentType in supportedFormats.map(\.contentType) where !contentTypes.contains(contentType) {
-            contentTypes.append(contentType)
-        }
-        return contentTypes
     }
 }

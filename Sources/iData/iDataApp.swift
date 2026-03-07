@@ -11,9 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWindow.allowsAutomaticWindowTabbing = false
         NSApplication.shared.activate(ignoringOtherApps: true)
         NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.async {
-            self.collapseToSingleWindow()
-        }
     }
 
     func bind(
@@ -29,7 +26,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let queuedURLs = pendingOpenURLs
         pendingOpenURLs.removeAll()
-        openHandler(queuedURLs)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
+            openHandler(queuedURLs)
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -59,32 +60,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             pendingOpenURLs.append(contentsOf: fileURLs)
         }
-
-        DispatchQueue.main.async {
-            self.collapseToSingleWindow()
-        }
-    }
-
-    private func collapseToSingleWindow() {
-        let visibleWindows = NSApplication.shared.windows.filter(\.isVisible)
-        guard visibleWindows.count > 1 else {
-            return
-        }
-
-        let windowToKeep =
-            visibleWindows.max { lhs, rhs in
-                (lhs.frame.width * lhs.frame.height) < (rhs.frame.width * rhs.frame.height)
-            }
-
-        guard let windowToKeep else {
-            return
-        }
-
-        for window in visibleWindows where window != windowToKeep {
-            window.close()
-        }
-
-        windowToKeep.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -92,10 +67,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct IDataApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel()
+    @StateObject private var updater = AppUpdaterController()
 
     var body: some Scene {
-        WindowGroup {
-            ContentView(model: model)
+        Window("iData", id: "main") {
+            ContentView(model: model, updater: updater)
                 .onAppear {
                     appDelegate.bind(
                         openHandler: { urls in
@@ -105,11 +81,20 @@ struct IDataApp: App {
                             model.shutdown()
                         }
                     )
+                    updater.performStartupUpdateCheckIfNeeded()
                 }
+        }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    updater.checkForUpdates()
+                }
+                .disabled(!updater.isConfigured && !updater.canCheckForUpdates)
+            }
         }
 
         Settings {
-            PreferencesView(model: model)
+            PreferencesView(model: model, updater: updater)
         }
     }
 }

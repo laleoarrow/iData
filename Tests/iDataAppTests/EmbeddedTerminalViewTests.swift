@@ -5,13 +5,30 @@ import WebKit
 @MainActor
 struct EmbeddedTerminalViewTests {
     @Test
-    func rebindingToReadyTerminalMarksNewSessionDisplayReady() {
+    func sessionOnlyBecomesReadyAfterNavigationAndTerminalReady() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = WKWebView(frame: .zero)
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.handleTerminalReady()
+
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.webView(webView, didFinish: nil)
+
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func rebindingToFullyReadyTerminalMarksNewSessionDisplayReady() {
         let firstSession = VisiDataSessionController()
         let secondSession = VisiDataSessionController()
         let coordinator = EmbeddedTerminalView.Coordinator(session: firstSession)
         let webView = WKWebView(frame: .zero)
 
         coordinator.bind(session: firstSession, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
         coordinator.handleTerminalReady()
 
         #expect(displayReadyFlag(for: firstSession))

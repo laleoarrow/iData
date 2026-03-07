@@ -1,0 +1,23 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>iData</title>
+        <item>
+            <title>0.1.1</title>
+            <pubDate>Sun, 08 Mar 2026 01:48:25 +0800</pubDate>
+            <link>https://github.com/laleoarrow/iData</link>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[🍎 `iData v0.1.1` brings the first polished in-window `VisiData` experience.
+
+- adds a glass-style welcome screen with version, format examples, and common VisiData shortcuts
+- opens most regular files directly, including odd bioinformatics suffixes such as `.ma`
+- streams `.gz` / `.bgz` / `.bgzf` files without extracting them to disk
+- adds Sparkle-based in-app update checks backed by GitHub Releases and `appcast.xml`
+- packages a drag-to-Applications `.dmg` installer alongside the `.zip` bundle
+]]></description>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.1/iData-v0.1.1-macos-universal.zip" length="3053564" type="application/octet-stream" sparkle:edSignature="Xvfazvln2HL5Vt2pAsxCceKfbCPLvYX+Tt+Aj5YZMum65KHcbCV2YBAFU7q7jBLEsp2H98GuQs6MSvrBVsRnCA=="/>
+        </item>
+    </channel>
+</rss>

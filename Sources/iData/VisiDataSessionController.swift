@@ -22,13 +22,14 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let ioQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session")
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
-    private var bufferedOutput: [Data] = []
+    private var transcript = TerminalTranscript()
     private var requiresDisplayReset = true
     private var masterFileDescriptor: Int32 = -1
     private var childPID: pid_t = 0
     private var readSource: DispatchSourceRead?
     private var processSource: DispatchSourceProcess?
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
+    private var displayRefreshGeneration: UInt64 = 0
 
     deinit {
         stopCurrentProcessIfNeeded(reapSynchronously: true)
@@ -45,14 +46,9 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     @MainActor
     func markDisplayReady() {
         isDisplayReady = true
-
-        if requiresDisplayReset {
-            displaySink?.clearTerminalDisplay()
-            requiresDisplayReset = false
-        }
-
-        flushBufferedOutput()
+        replayTranscript()
         displaySink?.focusTerminalDisplay()
+        scheduleDisplayRefreshes()
     }
 
     @MainActor
@@ -67,7 +63,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         currentFileURL = fileURL
         errorMessage = nil
         statusMessage = "Opening \(fileURL.lastPathComponent)…"
-        bufferedOutput.removeAll(keepingCapacity: true)
+        transcript.reset()
         requiresDisplayReset = true
 
         if isDisplayReady {
@@ -134,6 +130,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     func terminate() {
+        displayRefreshGeneration &+= 1
         stopCurrentProcessIfNeeded(reapSynchronously: true)
         isRunning = false
         statusMessage = "Session ended."
@@ -265,27 +262,74 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     private func enqueueOutput(_ data: Data) {
+        transcript.append(data)
+
         if isDisplayReady {
             if requiresDisplayReset {
                 displaySink?.clearTerminalDisplay()
                 requiresDisplayReset = false
             }
             displaySink?.writeToTerminalDisplay(data)
-        } else {
-            bufferedOutput.append(data)
         }
     }
 
     @MainActor
-    private func flushBufferedOutput() {
+    private func replayTranscript() {
         guard isDisplayReady else {
             return
         }
 
-        for chunk in bufferedOutput {
+        displaySink?.clearTerminalDisplay()
+        requiresDisplayReset = false
+
+        for chunk in transcript.chunks {
             displaySink?.writeToTerminalDisplay(chunk)
         }
-        bufferedOutput.removeAll(keepingCapacity: true)
+    }
+
+    @MainActor
+    private func scheduleDisplayRefreshes() {
+        displayRefreshGeneration &+= 1
+        let generation = displayRefreshGeneration
+        let delays: [TimeInterval] = [0, 0.12, 0.35, 0.8]
+
+        for delay in delays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.displayRefreshGeneration == generation else {
+                    return
+                }
+
+                self.forceDisplayRefresh()
+            }
+        }
+
+        let replayDelays: [TimeInterval] = [0.18, 0.5]
+        for delay in replayDelays {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.displayRefreshGeneration == generation else {
+                    return
+                }
+
+                self.replayTranscript()
+                self.forceDisplayRefresh()
+            }
+        }
+    }
+
+    @MainActor
+    private func forceDisplayRefresh() {
+        guard isRunning, currentFileURL != nil else {
+            return
+        }
+
+        let cols = Int(lastKnownSize.cols)
+        let rows = Int(lastKnownSize.rows)
+        guard cols > 0, rows > 0 else {
+            return
+        }
+
+        resize(cols: cols, rows: rows)
+        displaySink?.focusTerminalDisplay()
     }
 
     private func writeToPTY(_ data: Data) {

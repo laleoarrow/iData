@@ -104,11 +104,15 @@
       for (let index = 0; index < binary.length; index += 1) {
         bytes[index] = binary.charCodeAt(index);
       }
-      term.write(bytes);
+      term.write(bytes, () => {
+        if (term.rows > 0) {
+          term.refresh(0, Math.max(term.rows - 1, 0));
+        }
+      });
       scheduleTerminalLayoutPasses();
     }
 
-    function measureAndResize() {
+    function measureAndResize(force = false) {
       const dimensions = term?._core?._renderService?.dimensions;
       const cellWidth = dimensions?.css?.cell?.width;
       const cellHeight = dimensions?.css?.cell?.height;
@@ -122,7 +126,7 @@
       const cols = Math.max(20, Math.floor(rect.width / cellWidth) - 1);
       const rows = Math.max(8, Math.floor(rect.height / cellHeight) - 1);
       const sizeKey = `${cols}x${rows}`;
-      if (sizeKey === lastSentSize) {
+      if (!force && sizeKey === lastSentSize) {
         return true;
       }
       lastSentSize = sizeKey;
@@ -137,6 +141,20 @@
         term.refresh(0, Math.max(term.rows - 1, 0));
       }
       return didMeasure;
+    }
+
+    function notifyReadyWhenSized(attempts = 0) {
+      const didMeasure = measureAndResize(true);
+      if (term.rows > 0) {
+        term.refresh(0, Math.max(term.rows - 1, 0));
+      }
+
+      if ((didMeasure && term.cols > 0 && term.rows > 0) || attempts >= 40) {
+        post({ type: 'ready' });
+        return;
+      }
+
+      requestAnimationFrame(() => notifyReadyWhenSized(attempts + 1));
     }
 
     function scheduleTerminalLayoutPasses() {
@@ -199,7 +217,7 @@
 
     requestAnimationFrame(() => {
       scheduleTerminalLayoutPasses();
-      post({ type: 'ready' });
+      notifyReadyWhenSized();
     });
   </script>
 </body>

@@ -6,32 +6,30 @@ import iDataCore
 @MainActor
 struct AppModelTests {
     @Test
-    func supportedFormatsMatchCurrentFeatureScope() {
-        #expect(AppModel.supportedFormatExtensions == ["csv", "tsv", "txt", "json", "jsonl", "xlsx", "csv.gz", "tsv.gz", "txt.gz"])
+    func formatExamplesDescribeCommonCases() {
         #expect(AppModel.supportedFormatHelpText.contains("CSV (.csv)"))
-        #expect(AppModel.supportedFormatHelpText.contains("JSON Lines (.jsonl)"))
         #expect(AppModel.supportedFormatHelpText.contains("Excel Workbook (.xlsx)"))
-        #expect(AppModel.supportedFormatHelpText.contains("Compressed CSV (.csv.gz)"))
+        #expect(AppModel.supportedFormatHelpText.contains("JSON Lines (.jsonl)"))
+        #expect(AppModel.supportedFormatHelpText.contains("MA / GWAS (.ma)"))
+        #expect(AppModel.supportedFormatHelpText.contains("Compressed GZip (.gz)"))
     }
 
     @Test
-    func supportsRequestedFormatsByExtension() {
+    func acceptsArbitraryBioinformaticsSuffixes() {
         #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.csv")))
-        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.JSONL")))
-        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.xlsx")))
-        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.csv.gz")))
-        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.TSV.GZ")))
-        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.txt.gz")))
-        #expect(!AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/sample.md")))
+        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/study.ma")))
+        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/summary.weird_suffix")))
+        #expect(AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/variants.bed.bgz")))
+        #expect(!AppModel.supportsTableFile(URL(fileURLWithPath: "/tmp/folder/", isDirectory: true)))
     }
 
     @Test
-    func firstSupportedDroppedFileWins() {
-        let unsupported = URL(fileURLWithPath: "/tmp/readme.md")
-        let supported = URL(fileURLWithPath: "/tmp/data.tsv")
+    func firstRegularFileWinsOverFolderDuringDrop() {
+        let folder = URL(fileURLWithPath: "/tmp/results/", isDirectory: true)
+        let supported = URL(fileURLWithPath: "/tmp/study.ma")
 
-        #expect(AppModel.firstSupportedFile(in: [unsupported, supported]) == supported)
-        #expect(AppModel.firstSupportedFile(in: [unsupported]) == nil)
+        #expect(AppModel.firstSupportedFile(in: [folder, supported]) == supported)
+        #expect(AppModel.firstSupportedFile(in: [folder]) == nil)
     }
 
     @Test
@@ -92,5 +90,53 @@ struct AppModelTests {
 
         #expect(message.contains("brew install visidata"))
         #expect(message.contains("Preferences"))
+    }
+
+    @Test
+    func inactiveSessionDoesNotQualifyAsDisplayedSession() {
+        let model = AppModel()
+        model.activeSession = VisiDataSessionController()
+
+        #expect(model.displayedSession == nil)
+    }
+
+    @Test
+    func dependencyStateUsesResolvedExecutablePath() {
+        let checker = FakeExecutableChecker(executablePaths: ["/opt/homebrew/bin/vd"])
+        let model = AppModel(
+            executableChecker: checker,
+            environmentPathProvider: { "/usr/bin:/opt/homebrew/bin" }
+        )
+
+        #expect(model.visiDataDependencyState == .available(path: "/opt/homebrew/bin/vd"))
+        #expect(model.visiDataDependencySummary.contains("/opt/homebrew/bin/vd"))
+    }
+
+    @Test
+    func dependencyStateReportsMissingExecutable() {
+        let checker = FakeExecutableChecker(executablePaths: [])
+        let model = AppModel(
+            executableChecker: checker,
+            environmentPathProvider: { "/usr/bin" }
+        )
+
+        #expect(model.visiDataDependencyState == .missing)
+        #expect(model.visiDataDependencySummary.contains("brew install visidata"))
+    }
+
+    @Test
+    func updaterStartsUnconfiguredWithoutSparkleKeys() {
+        let updater = AppUpdaterController()
+
+        #expect(!updater.isConfigured)
+        #expect(updater.statusMessage.contains("Sparkle") || updater.statusMessage.contains("GitHub Releases"))
+    }
+}
+
+private struct FakeExecutableChecker: ExecutableChecking {
+    let executablePaths: Set<String>
+
+    func isExecutableFile(atPath path: String) -> Bool {
+        executablePaths.contains(path)
     }
 }

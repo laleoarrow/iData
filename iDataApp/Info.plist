@@ -9,7 +9,7 @@
 	<key>CFBundleExecutable</key>
 	<string>iData</string>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.leoarrow.idata</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.1.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>2</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSHighResolutionCapable</key>
@@ -28,6 +28,14 @@
 	<string>NSApplication</string>
 	<key>NSQuitAlwaysKeepsWindows</key>
 	<false/>
+	<key>SUFeedURL</key>
+	<string>https://laleoarrow.github.io/iData/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>MXZYTaLXXIaUlb/mu/VLLkWkh+q6ZX7/Pi2pV5+Axyw=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUAutomaticallyUpdate</key>
+	<true/>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

@@ -2,6 +2,7 @@
 .build/
 dist/
 DerivedData/
+.artifacts/
 *.xcuserstate
 *.xccheckout
 xcuserdata/

@@ -37,7 +37,8 @@ struct EmbeddedTerminalView: NSViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, TerminalDisplaySink {
         private weak var webView: WKWebView?
         private weak var session: VisiDataSessionController?
-        private var isTerminalReady = false
+        private var didFinishInitialNavigation = false
+        private var didReceiveTerminalReady = false
 
         init(session: VisiDataSessionController) {
             self.session = session
@@ -52,9 +53,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
             self.webView = webView
             session.bind(displaySink: self)
-            if isTerminalReady {
-                session.markDisplayReady()
-            }
+            markSessionDisplayReadyIfPossible()
         }
 
         func unbindCurrentSession() {
@@ -66,7 +65,8 @@ struct EmbeddedTerminalView: NSViewRepresentable {
                 return
             }
 
-            isTerminalReady = false
+            didFinishInitialNavigation = false
+            didReceiveTerminalReady = false
 
             guard
                 let assetsDirectory = Bundle.main.resourceURL?
@@ -86,9 +86,14 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             webView.loadFileURL(htmlURL, allowingReadAccessTo: assetsDirectory)
         }
 
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            didFinishInitialNavigation = true
+            markSessionDisplayReadyIfPossible()
+        }
+
         func handleTerminalReady() {
-            isTerminalReady = true
-            session?.markDisplayReady()
+            didReceiveTerminalReady = true
+            markSessionDisplayReadyIfPossible()
         }
 
         func clearTerminalDisplay() {
@@ -138,6 +143,14 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         private func evaluate(functionCall: String) {
             webView?.evaluateJavaScript(functionCall)
+        }
+
+        private func markSessionDisplayReadyIfPossible() {
+            guard didFinishInitialNavigation, didReceiveTerminalReady else {
+                return
+            }
+
+            session?.markDisplayReady()
         }
 
         private func quotedJavaScriptString(_ value: String) -> String {

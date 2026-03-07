@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 DERIVED_DATA_DIR="$ROOT_DIR/.build/xcode-release"
+SOURCE_PACKAGES_DIR="$ROOT_DIR/.build/SourcePackages"
 APP_DIR="$ROOT_DIR/dist/iData.app"
 
 cd "$ROOT_DIR"
@@ -12,6 +13,7 @@ xcodebuild \
   -scheme iDataApp \
   -configuration Release \
   -destination 'platform=macOS' \
+  -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_DIR" \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   build
 

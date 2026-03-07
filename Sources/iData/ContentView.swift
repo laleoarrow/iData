@@ -1,49 +1,24 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var updater: AppUpdaterController
+    private let sidebarWidth: CGFloat = 292
 
     var body: some View {
-        NavigationSplitView {
-            VStack(spacing: 0) {
-                sidebarHeader
+        HStack(spacing: 0) {
+            SidebarView(model: model)
+                .frame(width: sidebarWidth)
+                .frame(maxHeight: .infinity)
 
-                if model.recentFiles.isEmpty {
-                    ContentUnavailableView(
-                        "No Recent Files",
-                        systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90",
-                        description: Text("Open a table or drag one into the window to start.")
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    List(model.recentFiles, id: \.path) { fileURL in
-                        RecentFileRow(
-                            fileURL: fileURL,
-                            isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
-                            openAction: { model.openExternalFile(fileURL) },
-                            removeAction: { model.removeRecentFile(fileURL) }
-                        )
-                        .contextMenu {
-                            Button("Open in VisiData") {
-                                model.openExternalFile(fileURL)
-                            }
+            Divider()
+                .overlay(Color.white.opacity(0.04))
 
-                            Button("Show in Finder") {
-                                model.revealInFinder(fileURL)
-                            }
-
-                            Button("Copy Path") {
-                                model.copyPathToPasteboard(fileURL)
-                            }
-                        }
-                    }
-                    .listStyle(.sidebar)
-                }
-            }
-        } detail: {
             detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 900, minHeight: 560)
+        .frame(minWidth: 960, minHeight: 620)
         .dropDestination(for: URL.self) { items, _ in
             model.handleDroppedFiles(items)
         }
@@ -64,33 +39,139 @@ struct ContentView: View {
 
     @ViewBuilder
     private var detailContent: some View {
-        if let session = model.activeSession {
-            SessionDetailView(model: model, session: session)
+        if let session = model.displayedSession {
+            SessionStageView(model: model, updater: updater, session: session)
         } else {
-            WelcomeDetailView(model: model)
+            WelcomeDetailView(model: model, updater: updater)
         }
     }
+}
 
-    private var sidebarHeader: some View {
-        HStack(spacing: 12) {
-            Text("Recent Files")
-                .font(.headline)
+private struct SidebarView: View {
+    @ObservedObject var model: AppModel
 
-            Spacer()
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .windowBackgroundColor),
+                    Color.accentColor.opacity(0.10),
+                    Color.black.opacity(0.08),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
 
-            if !model.recentFiles.isEmpty {
-                Button("Clear All") {
-                    model.clearRecentFiles()
+            VStack(spacing: 16) {
+                SidebarHeaderCard(model: model)
+
+                if model.recentFiles.isEmpty {
+                    EmptySidebarState()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            ForEach(model.recentFiles, id: \.path) { fileURL in
+                                RecentFileRow(
+                                    fileURL: fileURL,
+                                    isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                    openAction: { model.openExternalFile(fileURL) },
+                                    removeAction: { model.removeRecentFile(fileURL) }
+                                )
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .move(edge: .top).combined(with: .opacity),
+                                        removal: .scale(scale: 0.96).combined(with: .opacity)
+                                    )
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.bottom, 6)
+                    }
+                    .scrollIndicators(.hidden)
+                    .animation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15), value: model.recentFiles)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Clear all recent file records")
+
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+        }
+    }
+}
+
+private struct SidebarHeaderCard: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 42, height: 42)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("iData")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+
+                    Text("Native shell for large-table workflows with VisiData")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    model.openDocument()
+                } label: {
+                    Label("Open", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
+                Spacer(minLength: 0)
+
+                if !model.recentFiles.isEmpty {
+                    Button("Clear All") {
+                        model.clearRecentFiles()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Clear all recent file records")
+                }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(.bar)
+        .padding(16)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10))
+        )
+        .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
+    }
+}
+
+private struct EmptySidebarState: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("No recent files yet", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                .font(.headline)
+
+            Text("Open a table or drag one into the window. Recent items stay here for one-click reopening.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
     }
 }
 
@@ -105,10 +186,11 @@ private struct RecentFileRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: openAction) {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(fileURL.lastPathComponent)
                         .font(.headline)
-                        .lineLimit(1)
+                        .lineLimit(2)
+
                     Text(fileURL.path)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -119,16 +201,16 @@ private struct RecentFileRow: View {
             }
             .buttonStyle(.plain)
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 0)
 
             Button(action: removeAction) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 24, height: 24)
                     .background(
                         Circle()
-                            .fill(Color.white.opacity(isHovering ? 0.08 : 0.0))
+                            .fill(Color.white.opacity(isHovering ? 0.10 : 0.0))
                     )
                     .overlay(
                         Circle()
@@ -140,127 +222,281 @@ private struct RecentFileRow: View {
             .allowsHitTesting(isHovering)
             .help("Remove from recent files")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(rowBackground)
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(14)
+        .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(borderColor)
+        )
+        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 16 : 10, y: 6)
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.12)) {
+            withAnimation(.easeOut(duration: 0.14)) {
                 isHovering = hovering
             }
         }
-        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
-        .listRowSeparator(.hidden)
     }
 
-    private var rowBackground: some ShapeStyle {
+    private var backgroundStyle: some ShapeStyle {
         if isActive {
-            return AnyShapeStyle(.regularMaterial)
+            return AnyShapeStyle(
+                LinearGradient(
+                    colors: [
+                        Color.accentColor.opacity(0.22),
+                        Color.white.opacity(0.08),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
         }
 
         if isHovering {
-            return AnyShapeStyle(Color.white.opacity(0.04))
+            return AnyShapeStyle(.regularMaterial)
         }
 
-        return AnyShapeStyle(.clear)
+        return AnyShapeStyle(.thinMaterial)
+    }
+
+    private var borderColor: Color {
+        if isActive {
+            return Color.accentColor.opacity(0.34)
+        }
+
+        if isHovering {
+            return Color.white.opacity(0.12)
+        }
+
+        return Color.white.opacity(0.06)
+    }
+}
+
+private struct SessionStageView: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var updater: AppUpdaterController
+    @ObservedObject var session: VisiDataSessionController
+
+    var body: some View {
+        if session.isRunning, session.currentFileURL != nil {
+            SessionDetailView(model: model, session: session)
+        } else {
+            WelcomeDetailView(model: model, updater: updater)
+        }
     }
 }
 
 private struct WelcomeDetailView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var updater: AppUpdaterController
+
+    private let quickTips: [QuickTip] = [
+        QuickTip(keys: "hjkl / ←↑↓→", title: "Move", detail: "Navigate rows and columns quickly without leaving the keyboard."),
+        QuickTip(keys: "/  ?  n  N", title: "Search", detail: "Search forward or backward in the current sheet, then jump to next or previous match."),
+        QuickTip(keys: "s  t  u", title: "Select Rows", detail: "Select, toggle, or unselect rows before profiling or exporting."),
+        QuickTip(keys: "[  ]", title: "Sort", detail: "Sort the current column ascending or descending."),
+        QuickTip(keys: "Ctrl+H", title: "Help", detail: "Open the command and help menu to discover any VisiData action.")
+    ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            header
-            actionRow
-            infoCard
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                heroCard
+                summaryCards
+                quickTipsCard
+                formatsCard
 
-            if let errorMessage = model.errorMessage {
-                MessageCard(
-                    title: "Launch Error",
-                    message: errorMessage,
-                    color: .red.opacity(0.12)
-                )
-            } else if let statusMessage = model.statusMessage {
-                MessageCard(
-                    title: "Status",
-                    message: statusMessage,
-                    color: .green.opacity(0.12)
-                )
+                if let errorMessage = model.errorMessage {
+                    MessageCard(
+                        title: "Launch Error",
+                        message: errorMessage,
+                        color: .red.opacity(0.14)
+                    )
+                } else if let statusMessage = model.statusMessage {
+                    MessageCard(
+                        title: "Status",
+                        message: statusMessage,
+                        color: .green.opacity(0.14)
+                    )
+                }
             }
-
-            Spacer()
+            .padding(28)
         }
-        .padding(32)
-        .background(detailBackground)
+        .background(detailBackground.ignoresSafeArea())
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("iData")
-                .font(.system(size: 40, weight: .bold, design: .rounded))
+    private var heroCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top, spacing: 18) {
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 88, height: 88)
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
 
-            Text("A native macOS shell for opening large tables with VisiData.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Text("iData")
+                            .font(.system(size: 38, weight: .bold, design: .rounded))
 
-            Text("Use the native shell to pick files and manage recents, then keep the actual VisiData session inside the iData window.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
+                        StatusPill(title: model.appVersionSummary, tint: .white.opacity(0.14))
+                    }
 
-    private var actionRow: some View {
-        HStack(spacing: 12) {
-            Button {
-                model.openDocument()
-            } label: {
-                Label("Open File", systemImage: "tablecells")
+                    Text("Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        dependencyPill
+
+                        if let lastOpenedFile = model.lastOpenedFile {
+                            StatusPill(title: "Last: \(lastOpenedFile.lastPathComponent)", tint: .white.opacity(0.10))
+                        }
+                    }
+                }
             }
-            .buttonStyle(.borderedProminent)
 
-            SettingsLink {
-                Label("Preferences", systemImage: "gearshape")
-            }
-
-            if let fileURL = model.lastOpenedFile {
+            HStack(spacing: 12) {
                 Button {
-                    model.revealInFinder(fileURL)
+                    model.openDocument()
                 } label: {
-                    Label("Show in Finder", systemImage: "finder")
+                    Label("Open File", systemImage: "tablecells")
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    Label("Check for Updates", systemImage: "arrow.trianglehead.clockwise")
                 }
                 .buttonStyle(.bordered)
 
-                Button {
-                    model.copyPathToPasteboard(fileURL)
-                } label: {
-                    Label("Copy Path", systemImage: "doc.on.doc")
+                SettingsLink {
+                    Label("Preferences", systemImage: "gearshape")
                 }
                 .buttonStyle(.bordered)
+
+                if let fileURL = model.lastOpenedFile {
+                    Button {
+                        model.revealInFinder(fileURL)
+                    } label: {
+                        Label("Show Last File", systemImage: "finder")
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
+
+            Text("Tip: drag a supported table file into this window to open it directly.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text("Most bioinformatics suffixes are passed through directly. Compressed `.gz` / `.bgz` files are streamed without extracting.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.18),
+                    Color.white.opacity(0.05),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10))
+        )
+        .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
+    }
+
+    private var dependencyPill: some View {
+        switch model.visiDataDependencyState {
+        case .available:
+            return AnyView(StatusPill(title: "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill"))
+        case .missing:
+            return AnyView(StatusPill(title: "Install VisiData", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill"))
         }
     }
 
-    private var infoCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Current Behavior")
+    private var summaryCards: some View {
+        HStack(alignment: .top, spacing: 14) {
+            SummaryCard(
+                title: "Runtime",
+                icon: "waveform.path.ecg.rectangle",
+                detail: "\(model.visiDataDependencySummary) Files are no longer restricted by suffix; iData only special-cases compressed gzip-like inputs."
+            )
+
+            SummaryCard(
+                title: "Updates",
+                icon: "square.and.arrow.down",
+                detail: updater.statusMessage
+            )
+        }
+    }
+
+    private var quickTipsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("VisiData Quick Start")
                 .font(.headline)
 
-            InfoRow(title: "Viewer", value: "VisiData keeps full keyboard behavior and shortcuts")
-            InfoRow(title: "Host", value: "iData runs VisiData inside an embedded terminal surface")
-            InfoRow(title: "Dependency", value: "Requires VisiData (`brew install visidata`) unless you set a custom `vd` path in Preferences.")
-            InfoRow(title: "Association", value: "Finder registration is currently focused on CSV / TSV; Open and drag-and-drop support more formats.")
-            InfoRow(title: "Supported Formats", value: AppModel.supportedFormatHelpText)
-            InfoRow(title: "Executable", value: model.vdExecutablePath.isEmpty ? "Auto-detect from PATH" : model.vdExecutablePath)
+            Text("These are common starter shortcuts. All normal VisiData commands still work inside the embedded session.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
 
-            if let lastOpenedFile = model.lastOpenedFile {
-                Divider()
-                InfoRow(title: "Last Opened", value: lastOpenedFile.path)
+            ForEach(quickTips) { tip in
+                HStack(alignment: .top, spacing: 14) {
+                    Text(tip.keys)
+                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.08), in: Capsule())
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tip.title)
+                            .font(.headline)
+                        Text(tip.detail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(22)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
+    }
+
+    private var formatsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Supported Formats")
+                .font(.headline)
+
+            Text("These are common examples. iData now forwards most regular files directly to VisiData and only special-cases gzip-like compression.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
+                ForEach(AppModel.supportedFormats, id: \.fileExtension) { format in
+                    FormatChip(title: format.displayName, extensionText: format.fileExtension)
+                }
+            }
+        }
+        .padding(22)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
     }
 }
 
@@ -330,35 +566,94 @@ private struct SessionDetailView: View {
             }
         }
         .padding(24)
-        .background(detailBackground)
+        .background(detailBackground.ignoresSafeArea())
     }
 }
 
 private let detailBackground = LinearGradient(
     colors: [
         Color.accentColor.opacity(0.18),
-        Color.clear,
+        Color(nsColor: .windowBackgroundColor),
+        Color.black.opacity(0.06),
     ],
     startPoint: .topLeading,
     endPoint: .bottomTrailing
 )
 
-private struct InfoRow: View {
+private struct StatusPill: View {
     let title: String
-    let value: String
+    let tint: Color
+    var icon: String? = nil
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(spacing: 6) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+            }
             Text(title)
-                .fontWeight(.semibold)
-                .frame(width: 110, alignment: .leading)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(tint, in: Capsule())
+    }
+}
 
-            Text(value)
+private struct SummaryCard: View {
+    let title: String
+    let icon: String
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: icon)
+                .font(.headline)
+
+            Text(detail)
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
     }
+}
+
+private struct FormatChip: View {
+    let title: String
+    let extensionText: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Text(".\(extensionText)")
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.06))
+        )
+    }
+}
+
+private struct QuickTip: Identifiable {
+    let id = UUID()
+    let keys: String
+    let title: String
+    let detail: String
 }
 
 private struct MessageCard: View {

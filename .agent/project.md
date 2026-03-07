@@ -6,19 +6,11 @@
 
 ## Current behavior
 
-- Native macOS window with recent files, drag-and-drop, and preferences
+- Native macOS window with a welcome dashboard, recent files, drag-and-drop, and preferences
 - Embedded terminal surface inside the app window
-- Launches real `vd` for supported files
-- Supports:
-  - `csv`
-  - `tsv`
-  - `txt`
-  - `json`
-  - `jsonl`
-  - `xlsx`
-  - `csv.gz`
-  - `tsv.gz`
-  - `txt.gz`
+- Launches real `vd` for most regular files without an extension whitelist
+- Streams compressed `.gz`, `.bgz`, and `.bgzf` inputs without extracting them to disk
+- Uses Sparkle 2 for update checks against a GitHub Pages `appcast.xml`
 
 ## External dependency
 
@@ -37,7 +29,8 @@
 - `Sources/iDataCore/TerminalCommandBuilder.swift` — regular and gzip streaming launch commands
 - `Sources/iDataCore/VDExecutableLocator.swift` — `vd` discovery
 - `scripts/build_app.sh` — release app build into `dist/iData.app`
-- `scripts/package_release.sh` — zip release asset generation
+- `scripts/create_dmg.sh` — drag-to-Applications installer creation
+- `scripts/package_release.sh` — zip, dmg, checksums, appcast generation
 
 ## Bundle identifiers
 

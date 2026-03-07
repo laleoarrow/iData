@@ -25,8 +25,8 @@ Main installable output:
 
 Symptoms:
 
-- open action fails immediately
-- welcome screen shows a launch error
+- welcome screen stays visible and shows install guidance
+- open action reports a launch error instead of showing a blank terminal
 
 Expected guidance:
 
@@ -46,6 +46,7 @@ Known failure modes:
 - session handoff loses terminal `ready` state
 - SwiftUI reuses the same representable without rebuilding the bridge
 - xterm layout does not stabilize until resize
+- detail routing uses a stale `activeSession` instead of a running `displayedSession`
 
 ### 3. Wrong app instance opens files
 
@@ -64,6 +65,10 @@ ps -Ao pid,ppid,etime,command | egrep 'iData|vd'
 
 ```bash
 open -a /Users/leoarrow/Project/mypackage/agents/iData/dist/iData.app /tmp/sample.csv
+```
+
+```bash
+ps -Ao pid,ppid,etime,command | egrep 'iData|vd|gzip -dc'
 ```
 
 ## Terminal frontend

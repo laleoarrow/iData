@@ -20,6 +20,9 @@
 		A0000000000000000000002B /* EmbeddedTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003D /* EmbeddedTerminalView.swift */; };
 		A0000000000000000000002C /* TerminalAssets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003E /* TerminalAssets */; };
 		A0000000000000000000002D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003F /* Assets.xcassets */; };
+		A0000000000000000000002E /* AppUpdaterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000040 /* AppUpdaterController.swift */; };
+		A0000000000000000000002F /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000072 /* Sparkle */; };
+		A00000000000000000000030 /* TerminalTranscript.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000046 /* TerminalTranscript.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +41,8 @@
 		A0000000000000000000003D /* EmbeddedTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/EmbeddedTerminalView.swift; sourceTree = SOURCE_ROOT; };
 		A0000000000000000000003E /* TerminalAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = iDataApp/Resources/TerminalAssets; sourceTree = SOURCE_ROOT; };
 		A0000000000000000000003F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = iDataApp/Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000040 /* AppUpdaterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/AppUpdaterController.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000046 /* TerminalTranscript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iDataCore/TerminalTranscript.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +50,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A0000000000000000000002F /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +77,7 @@
 				A00000000000000000000035 /* VisiDataLauncher.swift */,
 				A0000000000000000000003C /* VisiDataSessionController.swift */,
 				A0000000000000000000003D /* EmbeddedTerminalView.swift */,
+				A00000000000000000000040 /* AppUpdaterController.swift */,
 			);
 			name = "App Sources";
 			sourceTree = "<group>";
@@ -82,6 +89,7 @@
 				A00000000000000000000037 /* RecentFilesStore.swift */,
 				A00000000000000000000038 /* TerminalCommandBuilder.swift */,
 				A00000000000000000000039 /* VDExecutableLocator.swift */,
+				A00000000000000000000046 /* TerminalTranscript.swift */,
 			);
 			name = "Core Sources";
 			sourceTree = "<group>";
@@ -120,6 +128,9 @@
 			dependencies = (
 			);
 			name = iDataApp;
+			packageProductDependencies = (
+				A00000000000000000000072 /* Sparkle */,
+			);
 			productName = iData;
 			productReference = A0000000000000000000003B /* iData.app */;
 			productType = "com.apple.product-type.application";
@@ -148,6 +159,9 @@
 				Base,
 			);
 			mainGroup = A00000000000000000000041;
+			packageReferences = (
+				A00000000000000000000071 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			productRefGroup = A00000000000000000000045 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -183,12 +197,33 @@
 				A00000000000000000000027 /* RecentFilesStore.swift in Sources */,
 				A00000000000000000000028 /* TerminalCommandBuilder.swift in Sources */,
 				A00000000000000000000029 /* VDExecutableLocator.swift in Sources */,
+				A00000000000000000000030 /* TerminalTranscript.swift in Sources */,
 				A0000000000000000000002A /* VisiDataSessionController.swift in Sources */,
 				A0000000000000000000002B /* EmbeddedTerminalView.swift in Sources */,
+				A0000000000000000000002E /* AppUpdaterController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A00000000000000000000071 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A00000000000000000000072 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A00000000000000000000071 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A00000000000000000000051 /* Debug */ = {
