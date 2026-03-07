@@ -35,6 +35,9 @@ struct ContentView: View {
                 .disabled(model.lastOpenedFile == nil)
             }
         }
+        .sheet(isPresented: $model.isHelpPresented) {
+            HelpView()
+        }
     }
 
     @ViewBuilder
@@ -74,7 +77,9 @@ private struct SidebarView: View {
                                 RecentFileRow(
                                     fileURL: fileURL,
                                     isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                    isPinned: model.isPinnedRecentFile(fileURL),
                                     openAction: { model.openExternalFile(fileURL) },
+                                    togglePinAction: { model.togglePinnedRecentFile(fileURL) },
                                     removeAction: { model.removeRecentFile(fileURL) }
                                 )
                                 .transition(
@@ -93,6 +98,8 @@ private struct SidebarView: View {
                 }
 
                 Spacer(minLength: 0)
+
+                SidebarFooter(model: model)
             }
             .padding(16)
         }
@@ -113,34 +120,26 @@ private struct SidebarHeaderCard: View {
                     .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("iData")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                    HStack(spacing: 8) {
+                        Text("iData")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+
+                        Spacer(minLength: 0)
+
+                        if !model.recentFiles.isEmpty {
+                            Button("Clear All") {
+                                model.clearRecentFiles()
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .help("Clear all recent file records")
+                        }
+                    }
 
                     Text("Native shell for large-table workflows with VisiData")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    model.openDocument()
-                } label: {
-                    Label("Open", systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-
-                Spacer(minLength: 0)
-
-                if !model.recentFiles.isEmpty {
-                    Button("Clear All") {
-                        model.clearRecentFiles()
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .help("Clear all recent file records")
                 }
             }
         }
@@ -151,6 +150,36 @@ private struct SidebarHeaderCard: View {
                 .strokeBorder(Color.white.opacity(0.10))
         )
         .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
+    }
+}
+
+private struct SidebarFooter: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        HStack(spacing: 10) {
+            SettingsLink {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Button {
+                model.isHelpPresented = true
+            } label: {
+                Label("Help", systemImage: "questionmark.circle")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
     }
 }
 
@@ -178,7 +207,9 @@ private struct EmptySidebarState: View {
 private struct RecentFileRow: View {
     let fileURL: URL
     let isActive: Bool
+    let isPinned: Bool
     let openAction: () -> Void
+    let togglePinAction: () -> Void
     let removeAction: () -> Void
 
     @State private var isHovering = false
@@ -202,6 +233,23 @@ private struct RecentFileRow: View {
             .buttonStyle(.plain)
 
             Spacer(minLength: 0)
+
+            Button(action: togglePinAction) {
+                Image(systemName: isPinned ? "pin.fill" : "pin")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(isPinned ? Color.accentColor : .secondary)
+                    .frame(width: 24, height: 24)
+                    .background(
+                        Circle()
+                            .fill(isPinned ? Color.accentColor.opacity(0.14) : Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        Circle()
+                            .strokeBorder(isPinned ? Color.accentColor.opacity(0.28) : Color.white.opacity(0.08))
+                    )
+            }
+            .buttonStyle(.plain)
+            .help(isPinned ? "Unpin from top" : "Pin to top")
 
             Button(action: removeAction) {
                 Image(systemName: "xmark")
@@ -282,6 +330,76 @@ private struct SessionStageView: View {
         } else {
             WelcomeDetailView(model: model, updater: updater)
         }
+    }
+}
+
+private struct HelpView: View {
+    private let softwareTips: [QuickTip] = [
+        QuickTip(keys: "Open… / Drag File", title: "Load Data", detail: "Open a file from the toolbar or drag any regular table-like file into the window."),
+        QuickTip(keys: "Recent + Pin", title: "Organize Files", detail: "Click a recent file to reopen it, pin important files to keep them fixed at the top, and use × only to remove the history record."),
+        QuickTip(keys: "⌘,", title: "Settings", detail: "Set a custom `vd` executable path, tune update behavior, or trigger a manual update check."),
+    ]
+
+    private let visiDataTips: [QuickTip] = [
+        QuickTip(keys: "hjkl / ←↑↓→", title: "Move", detail: "Navigate cells and columns without leaving the keyboard."),
+        QuickTip(keys: "/  ?  n  N", title: "Search", detail: "Search forward or backward, then jump through matches."),
+        QuickTip(keys: "[  ]", title: "Sort", detail: "Sort the current column ascending or descending."),
+        QuickTip(keys: "s  t  u", title: "Select", detail: "Select, toggle, or unselect rows for later commands."),
+        QuickTip(keys: "z?", title: "Command Help", detail: "Discover sheet-specific commands and see what VisiData can do on the current data."),
+        QuickTip(keys: "q", title: "Back / Quit Sheet", detail: "Go back from a derived sheet or quit the session when you are done."),
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("iData Help")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+
+                Text("iData is a native macOS shell around real VisiData. The outer app handles opening files, recent history, updates, and settings. The main table view remains actual VisiData, so normal VisiData shortcuts still apply.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                helpSection(title: "Using iData", tips: softwareTips)
+                helpSection(title: "Common VisiData Shortcuts", tips: visiDataTips)
+            }
+            .padding(24)
+        }
+        .frame(width: 620, height: 540)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    @ViewBuilder
+    private func helpSection(title: String, tips: [QuickTip]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+
+            ForEach(tips) { tip in
+                HStack(alignment: .top, spacing: 14) {
+                    Text(tip.keys)
+                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.08), in: Capsule())
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tip.title)
+                            .font(.headline)
+                        Text(tip.detail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(20)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.08))
+        )
     }
 }
 

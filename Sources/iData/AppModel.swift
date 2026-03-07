@@ -22,6 +22,7 @@ final class AppModel: ObservableObject {
     @Published var lastOpenedFile: URL?
     @Published var statusMessage: String?
     @Published var errorMessage: String?
+    @Published var isHelpPresented = false
     @Published var vdExecutablePath: String {
         didSet {
             defaults.set(vdExecutablePath, forKey: Self.vdExecutablePathKey)
@@ -34,6 +35,7 @@ final class AppModel: ObservableObject {
     private let environmentPathProvider: () -> String
 
     static let vdExecutablePathKey = "vdExecutablePath"
+    static let pinnedRecentFilesKey = "pinnedRecentFiles"
     static let recentFilesLimit = 10
     static let supportedFormats: [SupportedFormat] = [
         SupportedFormat(displayName: "CSV", fileExtension: "csv"),
@@ -61,7 +63,11 @@ final class AppModel: ObservableObject {
         self.recentFilesStore = recentFilesStore ?? RecentFilesStore(defaults: defaults)
         self.executableChecker = executableChecker
         self.environmentPathProvider = environmentPathProvider
-        self.recentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
+        let initialRecentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
+        self.recentFiles = Self.orderedRecentFiles(
+            initialRecentFiles,
+            pinned: Self.loadPinnedRecentFiles(defaults: defaults)
+        )
         self.vdExecutablePath = defaults.string(forKey: Self.vdExecutablePathKey) ?? ""
     }
 
@@ -142,7 +148,7 @@ final class AppModel: ObservableObject {
             lastOpenedFile = url
             withAnimation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
                 recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
-                recentFiles = recentFilesStore.load()
+                refreshRecentFiles()
             }
             statusMessage = "Opened \(url.lastPathComponent) inside iData."
             errorMessage = nil
@@ -174,7 +180,8 @@ final class AppModel: ObservableObject {
     func removeRecentFile(_ url: URL) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12)) {
             recentFilesStore.remove(url)
-            recentFiles = recentFilesStore.load()
+            unpinRecentFileIfNeeded(url)
+            refreshRecentFiles()
         }
         statusMessage = "Removed \(url.lastPathComponent) from recent files."
         errorMessage = nil
@@ -183,9 +190,34 @@ final class AppModel: ObservableObject {
     func clearRecentFiles() {
         withAnimation(.spring(response: 0.28, dampingFraction: 0.88, blendDuration: 0.1)) {
             recentFilesStore.clear()
+            defaults.removeObject(forKey: Self.pinnedRecentFilesKey)
             recentFiles = []
         }
         statusMessage = "Cleared recent files."
+        errorMessage = nil
+    }
+
+    func isPinnedRecentFile(_ url: URL) -> Bool {
+        Self.loadPinnedRecentFiles(defaults: defaults).contains {
+            $0.standardizedFileURL == url.standardizedFileURL
+        }
+    }
+
+    func togglePinnedRecentFile(_ url: URL) {
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.84, blendDuration: 0.12)) {
+            var pinnedFiles = Self.loadPinnedRecentFiles(defaults: defaults)
+
+            if let existingIndex = pinnedFiles.firstIndex(where: { $0.standardizedFileURL == url.standardizedFileURL }) {
+                pinnedFiles.remove(at: existingIndex)
+                statusMessage = "Unpinned \(url.lastPathComponent)."
+            } else {
+                pinnedFiles.insert(url, at: 0)
+                statusMessage = "Pinned \(url.lastPathComponent) to the top."
+            }
+
+            savePinnedRecentFiles(pinnedFiles)
+            refreshRecentFiles()
+        }
         errorMessage = nil
     }
 
@@ -248,5 +280,38 @@ final class AppModel: ObservableObject {
 
     static func firstSupportedFile(in urls: [URL]) -> URL? {
         urls.first(where: supportsTableFile)
+    }
+
+    private func refreshRecentFiles() {
+        recentFiles = Self.orderedRecentFiles(
+            recentFilesStore.load(),
+            pinned: Self.loadPinnedRecentFiles(defaults: defaults)
+        )
+    }
+
+    private func unpinRecentFileIfNeeded(_ url: URL) {
+        let remainingPinned = Self.loadPinnedRecentFiles(defaults: defaults).filter {
+            $0.standardizedFileURL != url.standardizedFileURL
+        }
+        savePinnedRecentFiles(remainingPinned)
+    }
+
+    private func savePinnedRecentFiles(_ urls: [URL]) {
+        defaults.set(urls.map(\.path), forKey: Self.pinnedRecentFilesKey)
+    }
+
+    private static func loadPinnedRecentFiles(defaults: UserDefaults) -> [URL] {
+        let storedPaths = defaults.stringArray(forKey: Self.pinnedRecentFilesKey) ?? []
+        return storedPaths.map { URL(fileURLWithPath: $0) }
+    }
+
+    private static func orderedRecentFiles(_ recentFiles: [URL], pinned: [URL]) -> [URL] {
+        let standardizedRecentFiles = recentFiles.map(\.standardizedFileURL)
+        let pinnedFiles = pinned.filter { pinnedURL in
+            standardizedRecentFiles.contains(pinnedURL.standardizedFileURL)
+        }
+        let pinnedSet = Set(pinnedFiles.map(\.standardizedFileURL))
+        let unpinnedFiles = recentFiles.filter { !pinnedSet.contains($0.standardizedFileURL) }
+        return pinnedFiles + unpinnedFiles
     }
 }

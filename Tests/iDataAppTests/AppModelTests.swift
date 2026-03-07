@@ -85,6 +85,51 @@ struct AppModelTests {
     }
 
     @Test
+    func pinningRecentFileMovesItToTop() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = RecentFilesStore(defaults: defaults)
+        let first = URL(fileURLWithPath: "/tmp/one.csv")
+        let second = URL(fileURLWithPath: "/tmp/two.csv")
+        let third = URL(fileURLWithPath: "/tmp/three.csv")
+        store.record(third, maxCount: AppModel.recentFilesLimit)
+        store.record(second, maxCount: AppModel.recentFilesLimit)
+        store.record(first, maxCount: AppModel.recentFilesLimit)
+
+        let model = AppModel(defaults: defaults, recentFilesStore: store)
+        model.togglePinnedRecentFile(second)
+
+        #expect(model.isPinnedRecentFile(second))
+        #expect(model.recentFiles == [second, first, third])
+    }
+
+    @Test
+    func removingPinnedRecentFileClearsPinState() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = RecentFilesStore(defaults: defaults)
+        let first = URL(fileURLWithPath: "/tmp/one.csv")
+        let second = URL(fileURLWithPath: "/tmp/two.csv")
+        store.record(second, maxCount: AppModel.recentFilesLimit)
+        store.record(first, maxCount: AppModel.recentFilesLimit)
+
+        let model = AppModel(defaults: defaults, recentFilesStore: store)
+        model.togglePinnedRecentFile(second)
+        model.removeRecentFile(second)
+
+        #expect(!model.isPinnedRecentFile(second))
+        #expect(model.recentFiles == [first])
+    }
+
+    @Test
     func missingVisiDataMessageIncludesInstallGuidance() {
         let message = LaunchError.visiDataNotFound.errorDescription ?? ""
 

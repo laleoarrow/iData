@@ -91,6 +91,13 @@ struct IDataApp: App {
                 }
                 .disabled(!updater.isConfigured && !updater.canCheckForUpdates)
             }
+
+            CommandGroup(replacing: .help) {
+                Button("iData Help") {
+                    model.isHelpPresented = true
+                }
+                .keyboardShortcut("?", modifiers: [.command, .shift])
+            }
         }
 
         Settings {
