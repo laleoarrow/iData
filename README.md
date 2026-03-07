@@ -1,5 +1,9 @@
 # iData
 
+[![Build](https://img.shields.io/github/actions/workflow/status/laleoarrow/iData/swift.yml?branch=main&style=flat-square)](https://github.com/laleoarrow/iData/actions/workflows/swift.yml)
+[![Release](https://img.shields.io/github/v/release/laleoarrow/iData?style=flat-square)](https://github.com/laleoarrow/iData/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-111111?style=flat-square)](https://github.com/laleoarrow/iData)
+
 `iData` is a native macOS shell around `VisiData`.
 
 ## What it does today
