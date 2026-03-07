@@ -72,11 +72,11 @@ Build the app bundle:
 Package a GitHub release asset:
 
 ```bash
-./scripts/package_release.sh 0.1.1
+./scripts/package_release.sh 0.1.2
 ```
 
 Install locally:
 
 - Copy `dist/iData.app` into `/Applications`
 - Quit any other running `iData` instance before testing the release build
-- Open `dist/iData-v0.1.1-macos-universal.dmg` if you want the drag-to-Applications installer view
+- Open `dist/iData-v0.1.2-macos-universal.dmg` if you want the drag-to-Applications installer view

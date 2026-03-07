@@ -15,13 +15,13 @@ Output:
 
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
-./scripts/package_release.sh 0.1.1
+./scripts/package_release.sh 0.1.2
 ```
 
 Outputs:
 
-- `dist/iData-v0.1.1-macos-universal.zip`
-- `dist/iData-v0.1.1-macos-universal.dmg`
+- `dist/iData-v0.1.2-macos-universal.zip`
+- `dist/iData-v0.1.2-macos-universal.dmg`
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
 
@@ -36,19 +36,19 @@ gh repo create iData --public --source=. --remote=origin --push
 Create tag:
 
 ```bash
-git tag v0.1.1
+git tag v0.1.2
 git push origin main --tags
 ```
 
 Create release:
 
 ```bash
-gh release create v0.1.1 \
-  dist/iData-v0.1.1-macos-universal.zip \
-  dist/iData-v0.1.1-macos-universal.dmg \
+gh release create v0.1.2 \
+  dist/iData-v0.1.2-macos-universal.zip \
+  dist/iData-v0.1.2-macos-universal.dmg \
   dist/SHA256SUMS.txt \
-  --title 'v0.1.1' \
-  --notes-file docs/releases/v0.1.1.md
+  --title 'v0.1.2' \
+  --notes-file docs/releases/v0.1.2.md
 ```
 
 ## Distribution notes

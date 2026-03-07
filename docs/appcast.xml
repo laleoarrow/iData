@@ -3,21 +3,20 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.1.1</title>
-            <pubDate>Sun, 08 Mar 2026 01:48:25 +0800</pubDate>
+            <title>0.1.2</title>
+            <pubDate>Sun, 08 Mar 2026 02:52:20 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[🍎 `iData v0.1.1` brings the first polished in-window `VisiData` experience.
+            <description sparkle:format="markdown"><![CDATA[🍎 `iData v0.1.2` focuses on stability, polish, and release packaging consistency.
 
-- adds a glass-style welcome screen with version, format examples, and common VisiData shortcuts
-- opens most regular files directly, including odd bioinformatics suffixes such as `.ma`
-- streams `.gz` / `.bgz` / `.bgzf` files without extracting them to disk
-- adds Sparkle-based in-app update checks backed by GitHub Releases and `appcast.xml`
-- packages a drag-to-Applications `.dmg` installer alongside the `.zip` bundle
+- fixes first-render and session-switch cases where embedded `VisiData` could stay blank until a resize
+- improves the in-app help experience with a clearer onboarding-style layout and common `VisiData` shortcuts
+- refines the sidebar controls with pinning, clearer history actions, and cleaner release-vs-install instructions
+- keeps GitHub Releases, Sparkle metadata, app version, and packaging scripts aligned for in-app updates
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.1/iData-v0.1.1-macos-universal.zip" length="3053564" type="application/octet-stream" sparkle:edSignature="Xvfazvln2HL5Vt2pAsxCceKfbCPLvYX+Tt+Aj5YZMum65KHcbCV2YBAFU7q7jBLEsp2H98GuQs6MSvrBVsRnCA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.2/iData-v0.1.2-macos-universal.zip" length="3144102" type="application/octet-stream" sparkle:edSignature="vjRearfM9Hhk6e6LXewIIZY+E7R2iShXDezrqBe1gJCSRQfq/Srqf3MdevGWW8kp/khHluQucE6v9D03g/cHAQ=="/>
         </item>
     </channel>
 </rss>
