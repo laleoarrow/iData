@@ -553,6 +553,9 @@ final class AppModel: ObservableObject {
 
             guard activeSession?.currentFileURL?.standardizedFileURL == sampleURL.standardizedFileURL else {
                 finishTutorial()
+                if errorMessage == nil {
+                    errorMessage = "Could not start tutorial because the sample table failed to open. Check VisiData path in Preferences."
+                }
                 return
             }
 

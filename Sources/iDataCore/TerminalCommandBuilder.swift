@@ -226,7 +226,7 @@ public enum TerminalCommandBuilder {
             try? handle.close()
         }
 
-        let data = (try? handle.read(upToCount: maxSampleBytes)) ?? nil
+        let data = try? handle.read(upToCount: maxSampleBytes)
         guard let data, !data.isEmpty else {
             return nil
         }
