@@ -53,6 +53,13 @@ struct ContentView: View {
 
 private struct SidebarView: View {
     @ObservedObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    private var listAnimation: Animation? {
+        model.animationsEnabled && !accessibilityReduceMotion
+            ? .spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)
+            : nil
+    }
 
     var body: some View {
         ZStack {
@@ -95,7 +102,7 @@ private struct SidebarView: View {
                         .padding(.bottom, 6)
                     }
                     .scrollIndicators(.hidden)
-                    .animation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15), value: model.recentFiles)
+                    .animation(listAnimation, value: model.recentFiles)
                 }
 
                 Spacer(minLength: 0)
@@ -157,6 +164,7 @@ private struct SidebarHeaderCard: View {
                 .strokeBorder(Color.white.opacity(0.10))
         )
         .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
+        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.008, hoverYOffset: -1, shadowOpacity: 0.08, shadowRadius: 12)
     }
 }
 
@@ -198,6 +206,9 @@ private struct SidebarFooter: View {
 }
 
 private struct EmptySidebarState: View {
+    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Label("No recent files yet", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
@@ -214,6 +225,13 @@ private struct EmptySidebarState: View {
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
+        )
+        .quietInteractiveSurface(
+            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
+            hoverScale: 1.008,
+            hoverYOffset: -1,
+            shadowOpacity: 0.08,
+            shadowRadius: 12
         )
     }
 }
@@ -988,6 +1006,8 @@ private struct SummaryCard: View {
     let title: String
     let icon: String
     let detail: String
+    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -1006,12 +1026,21 @@ private struct SummaryCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
         )
+        .quietInteractiveSurface(
+            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
+            hoverScale: 1.008,
+            hoverYOffset: -1,
+            shadowOpacity: 0.08,
+            shadowRadius: 12
+        )
     }
 }
 
 private struct FormatChip: View {
     let title: String
     let extensionText: String
+    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1029,6 +1058,13 @@ private struct FormatChip: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.06))
         )
+        .quietInteractiveSurface(
+            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
+            hoverScale: 1.012,
+            hoverYOffset: -1,
+            shadowOpacity: 0.06,
+            shadowRadius: 8
+        )
     }
 }
 
@@ -1043,6 +1079,8 @@ private struct MessageCard: View {
     let title: String
     let message: String
     let color: Color
+    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1055,5 +1093,12 @@ private struct MessageCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .quietInteractiveSurface(
+            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
+            hoverScale: 1.006,
+            hoverYOffset: -0.5,
+            shadowOpacity: 0.05,
+            shadowRadius: 8
+        )
     }
 }

@@ -22,8 +22,24 @@ Outputs:
 
 - `dist/iData-v0.1.3-macos-universal.zip`
 - `dist/iData-v0.1.3-macos-universal.dmg`
+- `dist/iData-v0.1.3-macos-universal.pkg`
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
+
+## Build only the installer package
+
+```bash
+cd /Users/leoarrow/Project/mypackage/agents/iData
+./scripts/build_app.sh
+./scripts/create_pkg.sh 0.1.3
+```
+
+Installer behavior:
+
+- installs `iData.app` into `/Applications/iData.app`
+- writes VisiData follow-up guidance into `/Users/Shared/iData`
+- places an interactive helper at `/Users/Shared/iData/Configure VisiData.command`
+- keeps `VisiData` external; users are guided toward `pipx install visidata` and `pipx inject visidata openpyxl`
 
 ## Publish with GitHub CLI
 
@@ -46,6 +62,7 @@ Create release:
 gh release create v0.1.3 \
   dist/iData-v0.1.3-macos-universal.zip \
   dist/iData-v0.1.3-macos-universal.dmg \
+  dist/iData-v0.1.3-macos-universal.pkg \
   dist/SHA256SUMS.txt \
   --title 'v0.1.3' \
   --notes-file docs/releases/v0.1.3.md

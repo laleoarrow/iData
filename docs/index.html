@@ -6,13 +6,13 @@
     <title>iData</title>
     <meta
       name="description"
-      content="A native macOS shell for VisiData, built for opening large tabular data with clarity and speed."
+      content="A premium macOS wrapper for VisiData that makes large, compressed, and odd-format tables feel native, fast, and release-ready."
     />
     <link rel="icon" type="image/png" href="./assets/app-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
@@ -21,13 +21,15 @@
     <div class="site-shell">
       <div class="ambient ambient-one"></div>
       <div class="ambient ambient-two"></div>
+
       <header class="topbar">
         <a class="brand" href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">
           <img src="./assets/app-icon.png" alt="iData icon" class="brand-icon" />
           <span>iData</span>
         </a>
-        <nav class="topbar-links">
-          <a href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">Download</a>
+        <nav class="topbar-links" aria-label="Primary">
+          <a href="#capabilities">Capabilities</a>
+          <a href="#release">Release</a>
           <a href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
       </header>
@@ -35,62 +37,180 @@
       <main>
         <section class="hero reveal">
           <div class="hero-copy">
-            <span class="eyebrow">macOS • VisiData • Large Tables</span>
-            <h1>Large tables, fast.</h1>
+            <span class="eyebrow">Developer premium • macOS-native • VisiData-powered</span>
+            <h1>Bring terminal-grade table performance to a polished macOS app.</h1>
             <p class="hero-text">
-              A native macOS shell for VisiData, built for opening big tabular data with clarity, speed, and a cleaner desktop experience.
+              iData wraps the real VisiData engine in a native desktop shell, so large tabular files open with
+              Finder-friendly ergonomics, compressed-stream support, and a release path that feels product-grade.
             </p>
+
             <div class="hero-actions">
-              <a class="button button-primary" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">Download for macOS</a>
-              <a class="button button-secondary" href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">View on GitHub</a>
+              <a class="button button-primary" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
+                Download latest build
+              </a>
+              <a class="button button-secondary" href="#release">See release details</a>
             </div>
+
             <div class="hero-meta">
-              <span id="release-badge">Latest release</span>
+              <span id="release-badge">Fetching latest release…</span>
+              <span id="release-published">GitHub release feed</span>
               <a href="./appcast.xml" target="_blank" rel="noreferrer">Sparkle appcast</a>
             </div>
+
+            <dl class="hero-stats" aria-label="Product highlights">
+              <div class="stat-card glass-card">
+                <dt>Workflow</dt>
+                <dd>Finder to VisiData</dd>
+              </div>
+              <div class="stat-card glass-card">
+                <dt>Input</dt>
+                <dd>Large, compressed, odd suffixes</dd>
+              </div>
+              <div class="stat-card glass-card">
+                <dt>Delivery</dt>
+                <dd>GitHub releases + Sparkle</dd>
+              </div>
+            </dl>
           </div>
 
-          <div class="hero-visual" aria-hidden="true">
+          <div class="hero-visual reveal" aria-hidden="true">
             <div class="visual-card glass-card">
               <div class="visual-card-head">
                 <span class="visual-pill">Native macOS shell</span>
                 <span class="visual-pill visual-pill-accent">Real VisiData core</span>
               </div>
+
               <div class="signal-stage">
+                <div class="signal-grid"></div>
                 <div class="signal-line signal-line-one"></div>
                 <div class="signal-line signal-line-two"></div>
                 <div class="signal-line signal-line-three"></div>
                 <div class="signal-node signal-node-one"></div>
                 <div class="signal-node signal-node-two"></div>
                 <div class="signal-node signal-node-three"></div>
+
+                <div class="terminal-panel glass-subpanel">
+                  <div class="terminal-topbar">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <div class="terminal-lines">
+                    <span>open samples.tsv.gz</span>
+                    <span>schema inferred</span>
+                    <span>rows streaming immediately</span>
+                    <span>window stays native</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
+        <section class="proof-band reveal">
+          <div class="proof-item">
+            <span class="proof-label">Native shell</span>
+            <p>Clean windowing, recent files, update plumbing, and a desktop experience that respects macOS conventions.</p>
+          </div>
+          <div class="proof-item">
+            <span class="proof-label">VisiData engine</span>
+            <p>No imitation layer: the page clearly positions iData as a wrapper around the real data workflow experts already trust.</p>
+          </div>
+          <div class="proof-item">
+            <span class="proof-label">Release clarity</span>
+            <p>Latest version, publish date, downloadable assets, and appcast access are visible without leaving the landing page.</p>
+          </div>
+        </section>
+
+        <section class="section-heading reveal" id="capabilities">
+          <span class="section-kicker">Capabilities</span>
+          <h2>Built for serious files, but presented like a finished product.</h2>
+          <p>
+            The landing page now leads with technical confidence, then backs it up with workflow cues, format expectations,
+            and a direct release path for installation and updates.
+          </p>
+        </section>
+
         <section class="feature-grid reveal">
           <article class="feature-card glass-card">
-            <span class="feature-kicker">Built for scale</span>
-            <h2>Open large tabular files without the usual drag.</h2>
-            <p>Designed for the workflows where Finder should feel native, but the engine still needs to be VisiData.</p>
+            <span class="feature-kicker">Large-file readiness</span>
+            <h3>Open heavyweight tabular data without pretending it is small.</h3>
+            <p>Positioned for datasets that outgrow spreadsheet habits, while keeping the entry point as simple as opening a file from Finder.</p>
           </article>
           <article class="feature-card glass-card">
-            <span class="feature-kicker">Flexible input</span>
-            <h2>Regular files, odd suffixes, and streamed compression.</h2>
-            <p>Handles common table formats, unusual bioinformatics extensions, and compressed inputs without extracting them to disk first.</p>
+            <span class="feature-kicker">Format tolerance</span>
+            <h3>Handle compressed inputs and unusual suffixes with less friction.</h3>
+            <p>Communicates support for real-world scientific and engineering file conventions instead of only polished demo formats.</p>
           </article>
           <article class="feature-card glass-card">
-            <span class="feature-kicker">Desktop quality</span>
-            <h2>Recent files, updates, help, and a cleaner macOS feel.</h2>
-            <p>Native windowing, integrated help, and Sparkle-based updates keep the experience aligned with the platform.</p>
+            <span class="feature-kicker">Platform polish</span>
+            <h3>Make updates, help, and recent-file behavior feel intentionally shipped.</h3>
+            <p>Frames iData as a maintained desktop product, not just a wrapper script with a download link.</p>
           </article>
         </section>
 
-        <section class="summary-strip reveal">
-          <div class="summary-item glass-chip">Native macOS shell</div>
-          <div class="summary-item glass-chip">Real VisiData inside</div>
-          <div class="summary-item glass-chip">Large-file oriented</div>
-          <div class="summary-item glass-chip">Compressed streams</div>
+        <section class="workflow-grid reveal">
+          <article class="workflow-card glass-card">
+            <span class="workflow-step">01</span>
+            <h3>Open from the desktop</h3>
+            <p>Start with files where they already live, instead of rethinking your path just to reach a terminal workflow.</p>
+          </article>
+          <article class="workflow-card glass-card">
+            <span class="workflow-step">02</span>
+            <h3>Stream the real data engine</h3>
+            <p>Keep VisiData at the center of the experience so performance and familiar semantics stay intact.</p>
+          </article>
+          <article class="workflow-card glass-card">
+            <span class="workflow-step">03</span>
+            <h3>Stay current cleanly</h3>
+            <p>Use GitHub releases for distribution and Sparkle appcast metadata for update-friendly delivery.</p>
+          </article>
+        </section>
+
+        <section class="release-panel glass-card reveal" id="release">
+          <div class="release-copy">
+            <span class="section-kicker">Release</span>
+            <h2>Download information that reads like a product release, not an afterthought.</h2>
+            <p>
+              The page surfaces the newest GitHub release directly, highlights whether a DMG is available, and gives a
+              cleaner path to release notes, assets, and the Sparkle feed.
+            </p>
+            <div class="release-actions">
+              <a class="button button-primary" id="download-latest" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
+                Download latest release
+              </a>
+              <a class="button button-secondary" id="view-release-notes" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
+                View release notes
+              </a>
+            </div>
+          </div>
+
+          <div class="release-card glass-subpanel">
+            <div class="release-row">
+              <span class="release-label">Version</span>
+              <strong id="release-version">Latest release</strong>
+            </div>
+            <div class="release-row">
+              <span class="release-label">Published</span>
+              <strong id="release-date">Checking GitHub…</strong>
+            </div>
+            <div class="release-row">
+              <span class="release-label">Primary asset</span>
+              <strong id="release-asset">Looking for downloadable builds…</strong>
+            </div>
+            <div class="release-row">
+              <span class="release-label">Install path</span>
+              <strong>GitHub Releases + Sparkle</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="summary-strip reveal" aria-label="Quick summary">
+          <div class="summary-item glass-chip">Native macOS wrapper</div>
+          <div class="summary-item glass-chip">VisiData-native workflow</div>
+          <div class="summary-item glass-chip">Compressed-stream aware</div>
+          <div class="summary-item glass-chip">Release metadata in-page</div>
+          <div class="summary-item glass-chip">Premium motion system</div>
         </section>
       </main>
     </div>

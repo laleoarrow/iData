@@ -6,6 +6,7 @@ VERSION=${1:-0.1.3}
 APP_DIR="$ROOT_DIR/dist/iData.app"
 ZIP_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.zip"
 DMG_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.dmg"
+PKG_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.pkg"
 SHA_PATH="$ROOT_DIR/dist/SHA256SUMS.txt"
 APPCAST_STAGING_DIR="$ROOT_DIR/dist/appcast"
 APPCAST_PATH="$ROOT_DIR/docs/appcast.xml"
@@ -16,6 +17,7 @@ GENERATE_APPCAST="$SPARKLE_BIN_DIR/generate_appcast"
 
 "$ROOT_DIR/scripts/build_app.sh"
 "$ROOT_DIR/scripts/create_dmg.sh" "$VERSION"
+"$ROOT_DIR/scripts/create_pkg.sh" "$VERSION"
 
 rm -f "$ZIP_PATH"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
@@ -23,6 +25,7 @@ ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
 {
   shasum -a 256 "$ZIP_PATH"
   shasum -a 256 "$DMG_PATH"
+  shasum -a 256 "$PKG_PATH"
 } > "$SHA_PATH"
 
 if [[ -x "$GENERATE_APPCAST" ]]; then
@@ -46,4 +49,5 @@ fi
 
 printf 'Created %s\n' "$ZIP_PATH"
 printf 'Created %s\n' "$DMG_PATH"
+printf 'Created %s\n' "$PKG_PATH"
 printf 'Created %s\n' "$SHA_PATH"

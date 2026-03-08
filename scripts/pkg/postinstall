@@ -1,0 +1,24 @@
+#!/bin/zsh
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+GUIDE_DIR="/Users/Shared/iData"
+README_SOURCE="$SCRIPT_DIR/visidata-pipx-guide.md"
+README_TARGET="$GUIDE_DIR/VisiData Setup Guide.md"
+COMMAND_SOURCE="$SCRIPT_DIR/configure_visidata.command"
+COMMAND_TARGET="$GUIDE_DIR/Configure VisiData.command"
+
+mkdir -p "$GUIDE_DIR"
+/usr/bin/install -m 0644 "$README_SOURCE" "$README_TARGET"
+/usr/bin/install -m 0755 "$COMMAND_SOURCE" "$COMMAND_TARGET"
+
+console_user=$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk '/Name :/ && $3 != "loginwindow" { print $3 }')
+if [[ -n "${console_user:-}" ]]; then
+  /usr/sbin/chown -R "$console_user":staff "$GUIDE_DIR" || true
+fi
+
+cat <<EOF
+iData installed to /Applications/iData.app
+VisiData post-install guide: $README_TARGET
+Interactive setup helper: $COMMAND_TARGET
+EOF
