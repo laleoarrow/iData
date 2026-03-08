@@ -46,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         terminateHandler?()
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+
     private func routeOpen(_ urls: [URL]) {
         let fileURLs = urls.filter(\.isFileURL)
 
