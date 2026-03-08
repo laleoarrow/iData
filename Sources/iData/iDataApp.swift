@@ -93,7 +93,7 @@ struct IDataApp: App {
                 Button("Check for Updates…") {
                     updater.checkForUpdates()
                 }
-                .disabled(!updater.isConfigured && !updater.canCheckForUpdates)
+                .disabled(!updater.canCheckForUpdates)
             }
 
             CommandGroup(replacing: .help) {
