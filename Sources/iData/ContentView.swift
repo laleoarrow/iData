@@ -249,6 +249,8 @@ private struct RecentFileRow: View {
                     )
             }
             .buttonStyle(.plain)
+            .opacity(isHovering ? 1 : 0)
+            .allowsHitTesting(isHovering)
             .help(isPinned ? "Unpin from top" : "Pin to top")
 
             Button(action: removeAction) {
@@ -334,6 +336,7 @@ private struct SessionStageView: View {
 }
 
 private struct HelpView: View {
+    @Environment(\.dismiss) private var dismiss
     private let onboardingTips: [QuickTip] = [
         QuickTip(keys: "Open… / Drag File", title: "Open Data", detail: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData."),
         QuickTip(keys: "Recent + Pin", title: "Keep Key Files", detail: "Click a recent item to reopen it. Pin important files so they stay fixed at the top of the sidebar."),
@@ -414,8 +417,29 @@ private struct HelpView: View {
                     .shadow(color: .black.opacity(0.16), radius: 20, y: 8)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("iData Help")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("iData Help")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+
+                        Spacer(minLength: 0)
+
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 30, height: 30)
+                                .background(Color.white.opacity(0.10), in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .strokeBorder(Color.white.opacity(0.10))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .help("Close Help")
+                        .keyboardShortcut(.cancelAction)
+                    }
 
                     Text("iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.")
                         .font(.title3)

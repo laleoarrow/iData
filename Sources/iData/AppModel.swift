@@ -81,8 +81,7 @@ final class AppModel: ObservableObject {
 
     var appVersionSummary: String {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
-        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
-        return "v\(shortVersion) · build \(buildVersion)"
+        return "v\(shortVersion)"
     }
 
     var visiDataDependencyState: VisiDataDependencyState {

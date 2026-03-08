@@ -176,6 +176,15 @@ struct AppModelTests {
         #expect(!updater.isConfigured)
         #expect(updater.statusMessage.contains("Sparkle") || updater.statusMessage.contains("GitHub Releases"))
     }
+
+    @Test
+    func appVersionSummaryOmitsBuildNumber() {
+        let model = AppModel()
+
+        #expect(model.appVersionSummary.starts(with: "v"))
+        #expect(!model.appVersionSummary.localizedCaseInsensitiveContains("build"))
+        #expect(!model.appVersionSummary.contains("·"))
+    }
 }
 
 private struct FakeExecutableChecker: ExecutableChecking {
