@@ -156,13 +156,44 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
 
         var fileActions: posix_spawn_file_actions_t? = nil
-        posix_spawn_file_actions_init(&fileActions)
+        guard posix_spawn_file_actions_init(&fileActions) == 0 else {
+            close(master)
+            close(slave)
+            throw LaunchError.processLaunchFailed(systemErrorDescription(errno))
+        }
+        defer {
+            posix_spawn_file_actions_destroy(&fileActions)
+        }
         posix_spawn_file_actions_adddup2(&fileActions, slave, STDIN_FILENO)
         posix_spawn_file_actions_adddup2(&fileActions, slave, STDOUT_FILENO)
         posix_spawn_file_actions_adddup2(&fileActions, slave, STDERR_FILENO)
         posix_spawn_file_actions_addclose(&fileActions, master)
         if slave > STDERR_FILENO {
             posix_spawn_file_actions_addclose(&fileActions, slave)
+        }
+
+        var spawnAttributes: posix_spawnattr_t? = nil
+        guard posix_spawnattr_init(&spawnAttributes) == 0 else {
+            close(master)
+            close(slave)
+            throw LaunchError.processLaunchFailed(systemErrorDescription(errno))
+        }
+        defer {
+            posix_spawnattr_destroy(&spawnAttributes)
+        }
+
+        let spawnFlags = Int16(POSIX_SPAWN_SETPGROUP)
+        guard posix_spawnattr_setflags(&spawnAttributes, spawnFlags) == 0 else {
+            close(master)
+            close(slave)
+            throw LaunchError.processLaunchFailed(systemErrorDescription(errno))
+        }
+
+        // Put the child in its own process group so we can terminate descendants as a unit.
+        guard posix_spawnattr_setpgroup(&spawnAttributes, 0) == 0 else {
+            close(master)
+            close(slave)
+            throw LaunchError.processLaunchFailed(systemErrorDescription(errno))
         }
 
         let launchCommand = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
@@ -183,7 +214,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                         &pid,
                         executablePathPointer,
                         &fileActions,
-                        nil,
+                        &spawnAttributes,
                         argumentBuffer.baseAddress,
                         environmentBuffer.baseAddress
                     )
@@ -197,8 +228,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         for pointer in environmentPointers {
             free(pointer)
         }
-        posix_spawn_file_actions_destroy(&fileActions)
-
         guard spawnResult == 0 else {
             close(master)
             close(slave)
@@ -406,7 +435,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             processSource?.cancel()
             processSource = nil
             childPID = 0
-            kill(pid, SIGTERM)
+            signalProcessTree(rootPID: pid, signal: SIGTERM)
 
             if reapSynchronously {
                 var exitStatus: Int32 = 0
@@ -419,7 +448,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                     }
 
                     if Date() >= deadline {
-                        kill(pid, SIGKILL)
+                        signalProcessTree(rootPID: pid, signal: SIGKILL)
                         _ = waitpid(pid, &exitStatus, 0)
                         break
                     }
@@ -430,6 +459,74 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
 
         cleanupDescriptorsAndSources()
+    }
+
+    private func signalProcessTree(rootPID: pid_t, signal: Int32) {
+        guard rootPID > 0 else {
+            return
+        }
+
+        let descendantPIDs = descendantProcessIDs(of: rootPID)
+
+        if kill(-rootPID, signal) == 0 {
+            for descendantPID in descendantPIDs {
+                _ = kill(descendantPID, signal)
+            }
+            return
+        }
+
+        for descendantPID in descendantPIDs {
+            _ = kill(descendantPID, signal)
+        }
+        _ = kill(rootPID, signal)
+    }
+
+    private func descendantProcessIDs(of rootPID: pid_t) -> [pid_t] {
+        var visited = Set<pid_t>()
+        var queue: [pid_t] = [rootPID]
+        var descendants: [pid_t] = []
+
+        while let parentPID = queue.popLast() {
+            for childPID in childProcessIDs(of: parentPID) where !visited.contains(childPID) {
+                visited.insert(childPID)
+                descendants.append(childPID)
+                queue.append(childPID)
+            }
+        }
+
+        return descendants
+    }
+
+    private func childProcessIDs(of parentPID: pid_t) -> [pid_t] {
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        process.arguments = ["-P", String(parentPID)]
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            return []
+        }
+
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            return []
+        }
+
+        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8) else {
+            return []
+        }
+
+        return output
+            .split(whereSeparator: \.isWhitespace)
+            .compactMap { pid_t($0) }
     }
 
     private func cleanupDescriptorsAndSources() {
