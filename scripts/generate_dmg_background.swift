@@ -98,8 +98,8 @@ let subtitle = NSAttributedString(
     ]
 )
 
-title.draw(at: CGPoint(x: 48, y: 82))
-subtitle.draw(at: CGPoint(x: 50, y: 52))
+title.draw(at: CGPoint(x: 48, y: 96))
+subtitle.draw(at: CGPoint(x: 50, y: 66))
 
 let footer = NSAttributedString(
     string: "Open the app from /Applications. Sparkle handles future updates in-place.",
@@ -108,7 +108,7 @@ let footer = NSAttributedString(
         .foregroundColor: NSColor.white.withAlphaComponent(0.50),
     ]
 )
-footer.draw(at: CGPoint(x: 50, y: 54))
+footer.draw(at: CGPoint(x: 50, y: 92))
 
 image.unlockFocus()
 
