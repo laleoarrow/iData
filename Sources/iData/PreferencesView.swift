@@ -14,6 +14,7 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 18) {
                 preferencesHero
                 animationsCard
+                tutorialCard
                 runtimeCard
                 updatesCard
             }
@@ -106,6 +107,29 @@ struct PreferencesView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var tutorialCard: some View {
+        PreferencesCard(title: "Tutorial", icon: "graduationcap.fill") {
+            VStack(alignment: .leading, spacing: 14) {
+                Picker("Tutorial language", selection: $model.tutorialLanguagePreference) {
+                    ForEach(AppModel.TutorialLanguagePreference.allCases) { option in
+                        Text(model.tutorialLanguageOptionTitle(option))
+                            .tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text("`System` follows macOS preferred language (Chinese system -> Chinese tutorial, otherwise English).")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(model.tutorialLanguageSummary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
             }
         }
     }

@@ -10,6 +10,7 @@
 
 - opens most regular files through a native macOS window without hardcoding suffix rules
 - embeds the `VisiData` session inside the app window
+- includes multi-chapter interactive tutorials with sample data, checklist progress, and an in-session floating coach (English/Chinese)
 - remembers recent files
 - supports drag-and-drop and Finder opening
 - streams `.gz` / `.bgz` files without extracting them to disk

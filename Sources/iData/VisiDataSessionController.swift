@@ -45,6 +45,11 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     func markDisplayReady() {
+        guard !isDisplayReady else {
+            displaySink?.focusTerminalDisplay()
+            return
+        }
+
         isDisplayReady = true
         replayTranscript()
         displaySink?.focusTerminalDisplay()
@@ -303,6 +308,11 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor
+    func appendOutputForTesting(_ data: Data) {
+        enqueueOutput(data)
+    }
+
+    @MainActor
     private func replayTranscript() {
         guard isDisplayReady else {
             return
@@ -328,18 +338,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                     return
                 }
 
-                self.forceDisplayRefresh()
-            }
-        }
-
-        let replayDelays: [TimeInterval] = [0.18, 0.5]
-        for delay in replayDelays {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self, self.displayRefreshGeneration == generation else {
-                    return
-                }
-
-                self.replayTranscript()
                 self.forceDisplayRefresh()
             }
         }

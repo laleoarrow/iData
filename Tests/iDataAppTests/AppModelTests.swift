@@ -211,6 +211,181 @@ struct AppModelTests {
         #expect(reloadedModel.reduceAnimations == true)
         #expect(reloadedModel.animationsEnabled == false)
     }
+
+    @Test
+    func sidebarCollapsePreferencePersists() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults)
+        #expect(model.isSidebarCollapsed == false)
+
+        model.setSidebarCollapsed(true)
+
+        let reloadedModel = AppModel(defaults: defaults)
+        #expect(reloadedModel.isSidebarCollapsed == true)
+    }
+
+    @Test
+    func collapsedRecentFileBadgeTextUsesUppercasedLeadingCharacter() {
+        #expect(AppModel.collapsedRecentFileBadgeText(for: URL(fileURLWithPath: "/tmp/report.tsv")) == "R")
+        #expect(AppModel.collapsedRecentFileBadgeText(for: URL(fileURLWithPath: "/tmp/αlpha.csv")) == "Α")
+        #expect(AppModel.collapsedRecentFileBadgeText(for: URL(fileURLWithPath: "/tmp/.hidden")) == ".")
+    }
+
+    @Test
+    func collapsedSidebarHeaderActionRequiresCommandForClearAll() {
+        #expect(AppModel.collapsedSidebarHeaderAction(hasRecentFiles: true, isCommandPressed: false) == .expand)
+        #expect(AppModel.collapsedSidebarHeaderAction(hasRecentFiles: true, isCommandPressed: true) == .clearAll)
+        #expect(AppModel.collapsedSidebarHeaderAction(hasRecentFiles: false, isCommandPressed: true) == .expand)
+    }
+
+    @Test
+    func tutorialStepsCoverCoreBeginnerWorkflow() {
+        let model = AppModel(preferredLanguagesProvider: { ["en-US"] })
+        let chapterTitles = model.tutorialChapters.map(\.title)
+        let basicSteps = model.tutorialChapters.first { $0.id == AppModel.defaultTutorialChapterID }?.steps.map(\.title) ?? []
+
+        #expect(chapterTitles.contains("Basic"))
+        #expect(chapterTitles.contains("Column Types"))
+        #expect(chapterTitles.contains("Editing"))
+        #expect(chapterTitles.contains("Plots"))
+        #expect(chapterTitles.contains("Analysis"))
+        #expect(basicSteps.contains("Move Around"))
+        #expect(basicSteps.contains("Search"))
+        #expect(basicSteps.contains("Sort"))
+        #expect(basicSteps.contains("Select Rows"))
+    }
+
+    @Test
+    func tutorialCommandsExplainSelectionHelpAndPlotAxisClearly() {
+        let model = AppModel(preferredLanguagesProvider: { ["en-US"] })
+
+        let basic = model.tutorialChapters.first { $0.id == AppModel.defaultTutorialChapterID }
+        let select = basic?.steps.first { $0.id == "basic-select" }
+        let help = basic?.steps.first { $0.id == "basic-help" }
+        let types = model.tutorialChapters.first { $0.id == "typesort" }
+        let floatConvert = types?.steps.first { $0.id == "typesort-float" }
+        let numericSort = types?.steps.first { $0.id == "typesort-sort" }
+        let plots = model.tutorialChapters.first { $0.id == "plots" }
+        let axis = plots?.steps.first { $0.id == "plot-axis" }
+        let open = plots?.steps.first { $0.id == "plot-open" }
+
+        #expect(select?.instruction.contains("`s` means select current row") == true)
+        #expect(select?.instruction.contains("`t` only toggles") == true)
+        #expect(help?.instruction.contains("Press `z`, then `?`") == true)
+        #expect(help?.instruction.contains("No extra text input is needed") == true)
+        #expect(floatConvert?.instruction.contains("`population_m`") == true)
+        #expect(floatConvert?.instruction.contains("press `%`") == true)
+        #expect(numericSort?.instruction.contains("press `]` for ascending and `[` for descending") == true)
+        #expect(axis?.instruction.contains("`population_m`") == true)
+        #expect(axis?.instruction.contains("`score`") == true)
+        #expect(open?.instruction.contains("y=`score` against x=`population_m`") == true)
+        #expect(open?.detail.contains("switch to English input") == true)
+        #expect(open?.detail.contains("make sure `population_m` is numeric") == true)
+    }
+
+    @Test
+    func inputSourceEnglishDetectionAvoidsBroadUSMatches() {
+        #expect(InputSourceMonitor.looksEnglish(
+            sourceID: "com.apple.keylayout.ABC",
+            inputModeID: "",
+            localizedName: "ABC"
+        ))
+
+        #expect(!InputSourceMonitor.looksEnglish(
+            sourceID: "com.example.customsource.wechat",
+            inputModeID: "",
+            localizedName: "微信输入法"
+        ))
+    }
+
+    @Test
+    func englishInputSwitchRejectsNonEnglishCandidates() {
+        #expect(InputSourceMonitor.shouldSelectEnglishCandidate(score: 320))
+        #expect(!InputSourceMonitor.shouldSelectEnglishCandidate(score: 0))
+        #expect(!InputSourceMonitor.shouldSelectEnglishCandidate(score: -1000))
+    }
+
+    @Test
+    func statusPanelRunningTintDependsOnVisiDataStatusOnly() {
+        #expect(statusPanelUsesRunningTint(for: "Running VisiData for sample.tsv."))
+        #expect(statusPanelUsesRunningTint(for: "正在运行 VisiData：sample.tsv"))
+        #expect(!statusPanelUsesRunningTint(for: "Ready to open a file"))
+    }
+
+    @Test
+    func collapsedRecentFilePrimaryActionMatchesVisibleState() {
+        #expect(collapsedRecentFilePrimaryAction(isCommandHovering: true) == .remove)
+        #expect(collapsedRecentFilePrimaryAction(isCommandHovering: false) == .open)
+    }
+
+    @Test
+    func tutorialStepNavigationStaysWithinBounds() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults)
+        model.beginTutorialGuide()
+
+        #expect(model.isTutorialActive)
+        #expect(model.tutorialStepIndex == 0)
+
+        model.rewindTutorialStep()
+        #expect(model.tutorialStepIndex == 0)
+
+        for _ in 0..<20 {
+            model.advanceTutorialStep()
+        }
+
+        #expect(model.tutorialCurrentChapter != nil)
+        #expect(model.tutorialStepIndex == (model.tutorialCurrentChapter?.steps.count ?? 1) - 1)
+    }
+
+    @Test
+    func finishingTutorialResetsGuideState() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults)
+        model.beginTutorialGuide()
+        model.advanceTutorialStep()
+        model.setTutorialCoachExpanded(false)
+
+        model.finishTutorial()
+
+        #expect(!model.isTutorialActive)
+        #expect(model.tutorialStepIndex == 0)
+        #expect(model.isTutorialCoachExpanded)
+        #expect(model.tutorialCurrentStep == nil)
+    }
+
+    @Test
+    func tutorialSampleFileIsGeneratedWithExpectedHeader() throws {
+        let model = AppModel()
+        let url = try model.makeTutorialSampleFile()
+        let content = try String(contentsOf: url, encoding: .utf8)
+
+        #expect(content.contains("city\tcountry\tpopulation_m\tscore"))
+        #expect(content.contains("Shanghai\tChina"))
+    }
+
+    @Test
+    func tutorialLanguageDefaultsToSystemAndFollowsChineseLocale() {
+        let model = AppModel(preferredLanguagesProvider: { ["zh-Hans-CN"] })
+        #expect(model.tutorialLanguagePreference == .system)
+        #expect(model.effectiveTutorialLanguage == .chinese)
+        #expect(model.tutorialChapters.first?.title == "基础")
+    }
 }
 
 private struct FakeExecutableChecker: ExecutableChecking {

@@ -45,6 +45,35 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.global-shimmer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.global-shimmer::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -36vw;
+  width: 36vw;
+  height: 140%;
+  background:
+    linear-gradient(
+      104deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(188, 222, 255, 0.03) 26%,
+      rgba(164, 216, 255, 0.12) 48%,
+      rgba(188, 222, 255, 0.03) 72%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  filter: blur(14px);
+  transform: translate3d(-160vw, 0, 0) rotate(1.2deg);
+  animation: globalSweep 36s linear infinite;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -56,6 +85,7 @@ p {
 
 .site-shell {
   position: relative;
+  z-index: 1;
   min-height: 100vh;
   width: min(1200px, calc(100% - 40px));
   margin: 0 auto;
@@ -774,6 +804,16 @@ main {
   to {
     transform: translate3d(10px, -6px, 0) scale(1.06);
     opacity: 1;
+  }
+}
+
+@keyframes globalSweep {
+  from {
+    transform: translate3d(-160vw, 0, 0) rotate(1.2deg);
+  }
+
+  to {
+    transform: translate3d(160vw, 0, 0) rotate(1.2deg);
   }
 }
 

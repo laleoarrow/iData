@@ -3,22 +3,31 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.1.4</title>
-            <pubDate>Sun, 08 Mar 2026 12:00:00 +0800</pubDate>
+            <title>0.1.5</title>
+            <pubDate>Sun, 08 Mar 2026 17:28:52 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>5</sparkle:version>
-            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>0.1.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[🍎 `iData v0.1.4` completes the current polish and packaging cycle.
+            <description sparkle:format="markdown"><![CDATA[# iData v0.1.5
 
-- tightens session shutdown so terminating `iData` also stops descendant `VisiData` processes reliably
-- adds a regression test for descendant-process cleanup
-- closes the app when the last window closes, matching standard macOS utility behavior
-- upgrades the landing page into a fuller product site with clearer release and download presentation
-- adds a `.pkg` installer that installs `iData.app` and drops a post-install `pipx + visidata + openpyxl` setup guide
-- keeps the native macOS shell, embedded `VisiData` workflow, Sparkle appcast path, and recent-file UX from `v0.1.3`
+Released: 2026-03-08
+
+## Highlights
+
+- Fixed a tutorial-session rendering regression where the first VisiData toolbar/menu row could disappear and cause visual misalignment.
+- Improved embedded terminal display readiness handling to avoid repeated transcript replay during rebind/update cycles.
+- Refined collapsed-sidebar interactions:
+  - destructive actions now require `Command` hover intent more consistently
+  - click behavior in narrow history mode is more reliable
+- Updated status/input area layout to a single unified status panel style with clearer English-input indication.
+- Slowed the full-window shimmer sweep to reduce distraction and improve perceived smoothness.
+
+## Notes
+
+- Build remains unsigned/not notarized for local distribution.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.4/iData-v0.1.4-macos-universal.zip" length="3286492" type="application/octet-stream" sparkle:edSignature="kLKbXiT1qe7Z8n+P06TehjEeD/ixvN89cp12HDAWZ+FkMkjclKEOx1Hn4yw7bQ8waq83DcWLLDpboF/fQ/+OCg=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.5/iData-v0.1.5-macos-universal.zip" length="3643404" type="application/octet-stream" sparkle:edSignature="aqRLZ74fgdRmdYK4ga9n5nPlBbpqosNK009j0q8Z6IVIY9GTh9Pim59kB4mAt9E5qb0FuF/cRnobVEtCZzcWBA=="/>
         </item>
     </channel>
 </rss>
