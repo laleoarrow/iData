@@ -11,11 +11,12 @@
   --accent: #87a6ff;
   --accent-strong: #c4d1ff;
   --accent-cyan: #7fe4ff;
+  --support: #ffd766;
   --shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
   --radius-xl: 32px;
   --radius-lg: 24px;
   --radius-md: 18px;
-  --section-gap: clamp(72px, 10vw, 120px);
+  --section-gap: clamp(52px, 7vw, 92px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -157,8 +158,12 @@ main {
   grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
   gap: 34px;
   align-items: center;
-  min-height: calc(100vh - 160px);
+  min-height: clamp(640px, 82vh, 900px);
   padding-top: 18px;
+}
+
+.hero + .proof-band {
+  margin-top: clamp(-22px, -2.5vw, -12px);
 }
 
 .hero-copy {
@@ -224,26 +229,12 @@ main {
     border-color 320ms var(--ease),
     opacity 320ms var(--ease);
   will-change: transform;
-}
-
-.button::before {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  border-radius: inherit;
-  opacity: 0;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
-  transform: translateX(-24%);
-  transition: opacity 240ms var(--ease), transform 420ms var(--ease);
+  z-index: 0;
 }
 
 .button:hover {
-  transform: translateY(-2px);
-}
-
-.button:hover::before {
-  opacity: 1;
-  transform: translateX(24%);
+  transform: translateY(-3px);
+  z-index: 1;
 }
 
 .button-primary {
@@ -253,7 +244,10 @@ main {
 }
 
 .button-primary:hover {
-  box-shadow: 0 26px 58px rgba(87, 118, 255, 0.4);
+  box-shadow:
+    0 24px 46px rgba(87, 118, 255, 0.38),
+    0 0 0 1px rgba(170, 191, 255, 0.5),
+    0 0 24px rgba(118, 147, 255, 0.42);
 }
 
 .button-secondary {
@@ -266,6 +260,26 @@ main {
 
 .button-secondary:hover {
   background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(171, 189, 255, 0.32),
+    0 0 22px rgba(114, 138, 255, 0.22);
+}
+
+.button-support {
+  background: rgba(255, 215, 102, 0.12);
+  border-color: rgba(255, 215, 102, 0.36);
+  color: rgba(255, 239, 194, 0.95);
+  box-shadow: inset 0 1px 0 rgba(255, 246, 214, 0.2);
+}
+
+.button-support:hover {
+  background: rgba(255, 215, 102, 0.2);
+  border-color: rgba(255, 215, 102, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 214, 0.24),
+    0 0 0 1px rgba(255, 226, 145, 0.45),
+    0 0 20px rgba(255, 214, 106, 0.28);
 }
 
 .hero-meta {
@@ -528,9 +542,36 @@ main {
   gap: 18px;
 }
 
+.proof-band {
+  position: relative;
+  padding: 22px 14px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.025));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.proof-band::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -86px;
+  width: min(680px, 88vw);
+  height: 160px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 50% 100%, rgba(136, 168, 255, 0.25), transparent 72%);
+  pointer-events: none;
+}
+
 .proof-item,
 .workflow-card {
   padding: 0 4px;
+}
+
+.proof-item {
+  position: relative;
+  z-index: 1;
 }
 
 .proof-label,
@@ -744,6 +785,10 @@ main {
 
   .hero {
     min-height: auto;
+  }
+
+  .hero + .proof-band {
+    margin-top: 0;
   }
 
   .hero-stats,
