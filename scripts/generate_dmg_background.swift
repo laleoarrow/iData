@@ -108,7 +108,7 @@ let footer = NSAttributedString(
         .foregroundColor: NSColor.white.withAlphaComponent(0.50),
     ]
 )
-footer.draw(at: CGPoint(x: 50, y: 26))
+footer.draw(at: CGPoint(x: 50, y: 54))
 
 image.unlockFocus()
 
