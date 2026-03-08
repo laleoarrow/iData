@@ -325,36 +325,6 @@ main {
   color: var(--text);
 }
 
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin: 6px 0 0;
-}
-
-.stat-card {
-  margin: 0;
-  padding: 18px 18px 20px;
-  border-radius: var(--radius-lg);
-}
-
-.stat-card dt {
-  margin-bottom: 10px;
-  color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.stat-card dd {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.45;
-  letter-spacing: -0.02em;
-}
-
 .hero-visual {
   display: flex;
   justify-content: center;
@@ -770,7 +740,6 @@ main {
     min-height: auto;
   }
 
-  .hero-stats,
   .feature-grid {
     grid-template-columns: 1fr;
   }
