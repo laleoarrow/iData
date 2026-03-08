@@ -8,7 +8,7 @@ guard arguments.count >= 2 else {
 }
 
 let outputURL = URL(fileURLWithPath: arguments[1])
-let size = NSSize(width: 960, height: 600)
+let size = NSSize(width: 800, height: 500)
 let image = NSImage(size: size)
 
 image.lockFocus()
@@ -37,9 +37,9 @@ context.drawLinearGradient(
 
 context.saveGState()
 context.setFillColor(NSColor(calibratedRed: 0.38, green: 0.61, blue: 1.0, alpha: 0.10).cgColor)
-context.fillEllipse(in: CGRect(x: 54, y: 340, width: 320, height: 320))
+context.fillEllipse(in: CGRect(x: 40, y: 280, width: 260, height: 260))
 context.setFillColor(NSColor(calibratedRed: 0.67, green: 0.46, blue: 1.0, alpha: 0.09).cgColor)
-context.fillEllipse(in: CGRect(x: 550, y: 140, width: 280, height: 280))
+context.fillEllipse(in: CGRect(x: 470, y: 120, width: 230, height: 230))
 context.restoreGState()
 
 func strokePath(_ points: [CGPoint], color: NSColor, width: CGFloat) {
@@ -57,12 +57,12 @@ func strokePath(_ points: [CGPoint], color: NSColor, width: CGFloat) {
 strokePath(
     [
         CGPoint(x: 48, y: 470),
-        CGPoint(x: 240, y: 470),
-        CGPoint(x: 310, y: 510),
-        CGPoint(x: 470, y: 510),
-        CGPoint(x: 530, y: 475),
-        CGPoint(x: 720, y: 475),
-        CGPoint(x: 820, y: 520),
+        CGPoint(x: 180, y: 470),
+        CGPoint(x: 235, y: 450),
+        CGPoint(x: 380, y: 450),
+        CGPoint(x: 450, y: 425),
+        CGPoint(x: 620, y: 425),
+        CGPoint(x: 740, y: 455),
     ],
     color: NSColor.white.withAlphaComponent(0.13),
     width: 2.0
@@ -71,12 +71,12 @@ strokePath(
 strokePath(
     [
         CGPoint(x: 56, y: 185),
-        CGPoint(x: 180, y: 185),
-        CGPoint(x: 250, y: 150),
-        CGPoint(x: 440, y: 150),
-        CGPoint(x: 540, y: 205),
-        CGPoint(x: 700, y: 205),
-        CGPoint(x: 820, y: 165),
+        CGPoint(x: 140, y: 185),
+        CGPoint(x: 205, y: 160),
+        CGPoint(x: 360, y: 160),
+        CGPoint(x: 455, y: 205),
+        CGPoint(x: 600, y: 205),
+        CGPoint(x: 730, y: 175),
     ],
     color: NSColor(calibratedRed: 0.56, green: 0.80, blue: 1.0, alpha: 0.16),
     width: 2.4
@@ -85,7 +85,7 @@ strokePath(
 let title = NSAttributedString(
     string: "Drag iData to Applications",
     attributes: [
-        .font: NSFont.systemFont(ofSize: 36, weight: .bold),
+        .font: NSFont.systemFont(ofSize: 31, weight: .bold),
         .foregroundColor: NSColor.white.withAlphaComponent(0.95),
     ]
 )
@@ -93,22 +93,22 @@ let title = NSAttributedString(
 let subtitle = NSAttributedString(
     string: "Native macOS shell for large-table workflows with VisiData",
     attributes: [
-        .font: NSFont.systemFont(ofSize: 17, weight: .medium),
+        .font: NSFont.systemFont(ofSize: 15, weight: .medium),
         .foregroundColor: NSColor.white.withAlphaComponent(0.72),
     ]
 )
 
-title.draw(at: CGPoint(x: 58, y: 78))
-subtitle.draw(at: CGPoint(x: 60, y: 48))
+title.draw(at: CGPoint(x: 48, y: 82))
+subtitle.draw(at: CGPoint(x: 50, y: 52))
 
 let footer = NSAttributedString(
     string: "Open the app from /Applications. Sparkle handles future updates in-place.",
     attributes: [
-        .font: NSFont.systemFont(ofSize: 13, weight: .regular),
+        .font: NSFont.systemFont(ofSize: 12, weight: .regular),
         .foregroundColor: NSColor.white.withAlphaComponent(0.50),
     ]
 )
-footer.draw(at: CGPoint(x: 60, y: 22))
+footer.draw(at: CGPoint(x: 50, y: 26))
 
 image.unlockFocus()
 
