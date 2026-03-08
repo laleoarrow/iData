@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>iData</title>
+    <meta
+      name="description"
+      content="A native macOS shell for VisiData, built for opening large tabular data with clarity and speed."
+    />
+    <link rel="icon" type="image/png" href="./assets/app-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+      <header class="topbar">
+        <a class="brand" href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">
+          <img src="./assets/app-icon.png" alt="iData icon" class="brand-icon" />
+          <span>iData</span>
+        </a>
+        <nav class="topbar-links">
+          <a href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">Download</a>
+          <a href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">GitHub</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero reveal">
+          <div class="hero-copy">
+            <span class="eyebrow">macOS • VisiData • Large Tables</span>
+            <h1>Large tables, fast.</h1>
+            <p class="hero-text">
+              A native macOS shell for VisiData, built for opening big tabular data with clarity, speed, and a cleaner desktop experience.
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">Download for macOS</a>
+              <a class="button button-secondary" href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">View on GitHub</a>
+            </div>
+            <div class="hero-meta">
+              <span id="release-badge">Latest release</span>
+              <a href="./appcast.xml" target="_blank" rel="noreferrer">Sparkle appcast</a>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="visual-card glass-card">
+              <div class="visual-card-head">
+                <span class="visual-pill">Native macOS shell</span>
+                <span class="visual-pill visual-pill-accent">Real VisiData core</span>
+              </div>
+              <div class="signal-stage">
+                <div class="signal-line signal-line-one"></div>
+                <div class="signal-line signal-line-two"></div>
+                <div class="signal-line signal-line-three"></div>
+                <div class="signal-node signal-node-one"></div>
+                <div class="signal-node signal-node-two"></div>
+                <div class="signal-node signal-node-three"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="feature-grid reveal">
+          <article class="feature-card glass-card">
+            <span class="feature-kicker">Built for scale</span>
+            <h2>Open large tabular files without the usual drag.</h2>
+            <p>Designed for the workflows where Finder should feel native, but the engine still needs to be VisiData.</p>
+          </article>
+          <article class="feature-card glass-card">
+            <span class="feature-kicker">Flexible input</span>
+            <h2>Regular files, odd suffixes, and streamed compression.</h2>
+            <p>Handles common table formats, unusual bioinformatics extensions, and compressed inputs without extracting them to disk first.</p>
+          </article>
+          <article class="feature-card glass-card">
+            <span class="feature-kicker">Desktop quality</span>
+            <h2>Recent files, updates, help, and a cleaner macOS feel.</h2>
+            <p>Native windowing, integrated help, and Sparkle-based updates keep the experience aligned with the platform.</p>
+          </article>
+        </section>
+
+        <section class="summary-strip reveal">
+          <div class="summary-item glass-chip">Native macOS shell</div>
+          <div class="summary-item glass-chip">Real VisiData inside</div>
+          <div class="summary-item glass-chip">Large-file oriented</div>
+          <div class="summary-item glass-chip">Compressed streams</div>
+        </section>
+      </main>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

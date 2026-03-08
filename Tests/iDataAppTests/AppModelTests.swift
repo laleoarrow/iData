@@ -185,6 +185,32 @@ struct AppModelTests {
         #expect(!model.appVersionSummary.localizedCaseInsensitiveContains("build"))
         #expect(!model.appVersionSummary.contains("·"))
     }
+
+    @Test
+    func versionDisplayCanRevealBuildNumber() {
+        let model = AppModel()
+
+        #expect(model.appVersionDisplay(revealingBuild: false) == model.appVersionSummary)
+        #expect(model.appVersionDisplay(revealingBuild: true).contains("("))
+    }
+
+    @Test
+    func reduceAnimationsPreferencePersists() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults)
+        #expect(model.reduceAnimations == false)
+
+        model.reduceAnimations = true
+
+        let reloadedModel = AppModel(defaults: defaults)
+        #expect(reloadedModel.reduceAnimations == true)
+        #expect(reloadedModel.animationsEnabled == false)
+    }
 }
 
 private struct FakeExecutableChecker: ExecutableChecking {

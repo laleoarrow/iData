@@ -3,11 +3,17 @@ import SwiftUI
 struct PreferencesView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    private var motionEnabled: Bool {
+        model.animationsEnabled && !accessibilityReduceMotion
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 preferencesHero
+                animationsCard
                 runtimeCard
                 updatesCard
             }
@@ -16,6 +22,7 @@ struct PreferencesView: View {
         .scrollIndicators(.hidden)
         .frame(width: 620, height: 660)
         .background(preferencesBackground.ignoresSafeArea())
+        .environment(\EnvironmentValues.idataAnimationsEnabled, model.animationsEnabled)
     }
 
     private var preferencesHero: some View {
@@ -37,13 +44,13 @@ struct PreferencesView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 10) {
-                        PreferencePill(title: model.appVersionSummary, tint: .white.opacity(0.12), icon: "shippingbox")
+                        VersionRevealPill(model: model, tint: .white.opacity(0.12), icon: "shippingbox")
 
                         switch model.visiDataDependencyState {
                         case .available:
-                            PreferencePill(title: "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill")
+                            PreferencePill(title: "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill", animated: motionEnabled)
                         case .missing:
-                            PreferencePill(title: "VisiData Missing", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill")
+                            PreferencePill(title: "VisiData Missing", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill", animated: motionEnabled)
                         }
                     }
                 }
@@ -58,6 +65,20 @@ struct PreferencesView: View {
         .shadow(color: .black.opacity(0.12), radius: 22, y: 10)
     }
 
+    private var animationsCard: some View {
+        PreferencesCard(title: "Appearance", icon: "sparkles") {
+            VStack(alignment: .leading, spacing: 14) {
+                Toggle("Reduce iData animations", isOn: $model.reduceAnimations)
+                    .toggleStyle(.switch)
+
+                Text("Turns down most spring, hover, and reveal animations across the app. System Reduce Motion is still respected.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
     private var runtimeCard: some View {
         PreferencesCard(title: "VisiData Runtime", icon: "terminal") {
             VStack(alignment: .leading, spacing: 14) {
@@ -70,11 +91,13 @@ struct PreferencesView: View {
                         model.chooseVDExecutable()
                     }
                     .buttonStyle(.borderedProminent)
+                    .quietInteractiveSurface(enabled: motionEnabled)
 
                     Button("Auto Detect") {
                         model.vdExecutablePath = ""
                     }
                     .buttonStyle(.bordered)
+                    .quietInteractiveSurface(enabled: motionEnabled)
 
                     Spacer(minLength: 0)
                 }
@@ -108,11 +131,13 @@ struct PreferencesView: View {
                         updater.checkForUpdates()
                     }
                     .buttonStyle(.borderedProminent)
+                    .quietInteractiveSurface(enabled: motionEnabled)
 
                     Button("Open Releases") {
                         NSWorkspace.shared.open(updater.releasesURL)
                     }
                     .buttonStyle(.bordered)
+                    .quietInteractiveSurface(enabled: motionEnabled)
                 }
 
                 Text(updater.statusMessage)
@@ -150,6 +175,7 @@ private struct PreferencePill: View {
     let title: String
     let tint: Color
     let icon: String
+    let animated: Bool
 
     var body: some View {
         Label(title, systemImage: icon)
@@ -157,6 +183,7 @@ private struct PreferencePill: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(tint, in: Capsule())
+            .quietInteractiveSurface(enabled: animated, hoverScale: 1.012, hoverYOffset: -0.5, shadowOpacity: 0.08, shadowRadius: 8)
     }
 }
 

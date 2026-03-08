@@ -23,6 +23,11 @@ final class AppModel: ObservableObject {
     @Published var statusMessage: String?
     @Published var errorMessage: String?
     @Published var isHelpPresented = false
+    @Published var reduceAnimations: Bool {
+        didSet {
+            defaults.set(reduceAnimations, forKey: Self.reduceAnimationsKey)
+        }
+    }
     @Published var vdExecutablePath: String {
         didSet {
             defaults.set(vdExecutablePath, forKey: Self.vdExecutablePathKey)
@@ -36,14 +41,42 @@ final class AppModel: ObservableObject {
 
     static let vdExecutablePathKey = "vdExecutablePath"
     static let pinnedRecentFilesKey = "pinnedRecentFiles"
+    static let reduceAnimationsKey = "reduceAnimations"
     static let recentFilesLimit = 10
     static let supportedFormats: [SupportedFormat] = [
         SupportedFormat(displayName: "CSV", fileExtension: "csv"),
         SupportedFormat(displayName: "TSV", fileExtension: "tsv"),
+        SupportedFormat(displayName: "TXT / Delimited Text", fileExtension: "txt"),
+        SupportedFormat(displayName: "TAB / Delimited Text", fileExtension: "tab"),
         SupportedFormat(displayName: "JSON", fileExtension: "json"),
         SupportedFormat(displayName: "JSON Lines", fileExtension: "jsonl"),
         SupportedFormat(displayName: "Excel Workbook", fileExtension: "xlsx"),
+        SupportedFormat(displayName: "Excel Legacy", fileExtension: "xls"),
+        SupportedFormat(displayName: "Parquet", fileExtension: "parquet"),
+        SupportedFormat(displayName: "Feather", fileExtension: "feather"),
         SupportedFormat(displayName: "MA / GWAS", fileExtension: "ma"),
+        SupportedFormat(displayName: "PLINK Assoc", fileExtension: "assoc"),
+        SupportedFormat(displayName: "PLINK QAssoc", fileExtension: "qassoc"),
+        SupportedFormat(displayName: "PLINK GLM", fileExtension: "glm"),
+        SupportedFormat(displayName: "Meta Analysis", fileExtension: "meta"),
+        SupportedFormat(displayName: "10x Matrix", fileExtension: "mtx"),
+        SupportedFormat(displayName: "10x Barcodes", fileExtension: "barcodes.tsv"),
+        SupportedFormat(displayName: "10x Features", fileExtension: "features.tsv"),
+        SupportedFormat(displayName: "10x HDF5 Matrix", fileExtension: "h5"),
+        SupportedFormat(displayName: "PLINK BED", fileExtension: "bed"),
+        SupportedFormat(displayName: "PLINK BIM", fileExtension: "bim"),
+        SupportedFormat(displayName: "PLINK FAM", fileExtension: "fam"),
+        SupportedFormat(displayName: "PLINK 2 PGEN", fileExtension: "pgen"),
+        SupportedFormat(displayName: "PLINK 2 PVAR", fileExtension: "pvar"),
+        SupportedFormat(displayName: "PLINK 2 PSAM", fileExtension: "psam"),
+        SupportedFormat(displayName: "VCF", fileExtension: "vcf"),
+        SupportedFormat(displayName: "BCF", fileExtension: "bcf"),
+        SupportedFormat(displayName: "BED / Interval", fileExtension: "bedgraph"),
+        SupportedFormat(displayName: "GTF / GFF", fileExtension: "gtf"),
+        SupportedFormat(displayName: "GFF", fileExtension: "gff"),
+        SupportedFormat(displayName: "GFF3", fileExtension: "gff3"),
+        SupportedFormat(displayName: "AnnData", fileExtension: "h5ad"),
+        SupportedFormat(displayName: "Loom", fileExtension: "loom"),
         SupportedFormat(displayName: "Compressed GZip", fileExtension: "gz"),
         SupportedFormat(displayName: "Compressed BGZip", fileExtension: "bgz"),
     ]
@@ -68,6 +101,7 @@ final class AppModel: ObservableObject {
             initialRecentFiles,
             pinned: Self.loadPinnedRecentFiles(defaults: defaults)
         )
+        self.reduceAnimations = defaults.object(forKey: Self.reduceAnimationsKey) as? Bool ?? false
         self.vdExecutablePath = defaults.string(forKey: Self.vdExecutablePathKey) ?? ""
     }
 
@@ -80,7 +114,22 @@ final class AppModel: ObservableObject {
     }
 
     var appVersionSummary: String {
+        appVersionDisplay(revealingBuild: false)
+    }
+
+    var appBuildNumber: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+    }
+
+    var animationsEnabled: Bool {
+        !reduceAnimations
+    }
+
+    func appVersionDisplay(revealingBuild: Bool) -> String {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        if revealingBuild {
+            return "v\(shortVersion) (\(appBuildNumber))"
+        }
         return "v\(shortVersion)"
     }
 
@@ -145,7 +194,7 @@ final class AppModel: ObservableObject {
             activeSession = session
             previousSession?.terminate()
             lastOpenedFile = url
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
+            performAnimatedMutation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
                 recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
                 refreshRecentFiles()
             }
@@ -177,7 +226,7 @@ final class AppModel: ObservableObject {
     }
 
     func removeRecentFile(_ url: URL) {
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12)) {
+        performAnimatedMutation(.spring(response: 0.32, dampingFraction: 0.86, blendDuration: 0.12)) {
             recentFilesStore.remove(url)
             unpinRecentFileIfNeeded(url)
             refreshRecentFiles()
@@ -187,7 +236,7 @@ final class AppModel: ObservableObject {
     }
 
     func clearRecentFiles() {
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.88, blendDuration: 0.1)) {
+        performAnimatedMutation(.spring(response: 0.28, dampingFraction: 0.88, blendDuration: 0.1)) {
             recentFilesStore.clear()
             defaults.removeObject(forKey: Self.pinnedRecentFilesKey)
             recentFiles = []
@@ -203,7 +252,7 @@ final class AppModel: ObservableObject {
     }
 
     func togglePinnedRecentFile(_ url: URL) {
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.84, blendDuration: 0.12)) {
+        performAnimatedMutation(.spring(response: 0.32, dampingFraction: 0.84, blendDuration: 0.12)) {
             var pinnedFiles = Self.loadPinnedRecentFiles(defaults: defaults)
 
             if let existingIndex = pinnedFiles.firstIndex(where: { $0.standardizedFileURL == url.standardizedFileURL }) {
@@ -260,6 +309,17 @@ final class AppModel: ObservableObject {
     private func normalizedVDExecutablePath() -> String? {
         let trimmed = vdExecutablePath.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func performAnimatedMutation(
+        _ animation: Animation,
+        changes: () -> Void
+    ) {
+        if animationsEnabled {
+            withAnimation(animation, changes)
+        } else {
+            changes()
+        }
     }
 
     static func supportsTableFile(_ url: URL) -> Bool {

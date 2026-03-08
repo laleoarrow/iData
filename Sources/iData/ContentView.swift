@@ -38,6 +38,7 @@ struct ContentView: View {
         .sheet(isPresented: $model.isHelpPresented) {
             HelpView()
         }
+        .environment(\EnvironmentValues.idataAnimationsEnabled, model.animationsEnabled)
     }
 
     @ViewBuilder
@@ -108,6 +109,11 @@ private struct SidebarView: View {
 
 private struct SidebarHeaderCard: View {
     @ObservedObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    private var motionEnabled: Bool {
+        model.animationsEnabled && !accessibilityReduceMotion
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -132,6 +138,7 @@ private struct SidebarHeaderCard: View {
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
                             .help("Clear all recent file records")
                         }
                     }
@@ -155,6 +162,11 @@ private struct SidebarHeaderCard: View {
 
 private struct SidebarFooter: View {
     @ObservedObject var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    private var motionEnabled: Bool {
+        model.animationsEnabled && !accessibilityReduceMotion
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -163,6 +175,7 @@ private struct SidebarFooter: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .quietInteractiveSurface(enabled: motionEnabled)
 
             Button {
                 model.isHelpPresented = true
@@ -171,6 +184,7 @@ private struct SidebarFooter: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .quietInteractiveSurface(enabled: motionEnabled)
 
             Spacer(minLength: 0)
         }
@@ -337,6 +351,7 @@ private struct SessionStageView: View {
 
 private struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     private let onboardingTips: [QuickTip] = [
         QuickTip(keys: "Open… / Drag File", title: "Open Data", detail: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData."),
         QuickTip(keys: "Recent + Pin", title: "Keep Key Files", detail: "Click a recent item to reopen it. Pin important files so they stay fixed at the top of the sidebar."),
@@ -357,6 +372,10 @@ private struct HelpView: View {
         QuickTip(keys: "z?", title: "Command Help", detail: "Discover sheet-specific commands and see what VisiData can do on the current data."),
         QuickTip(keys: "q", title: "Back / Quit Sheet", detail: "Go back from a derived sheet or quit the session when you are done."),
     ]
+
+    private var motionEnabled: Bool {
+        !accessibilityReduceMotion
+    }
 
     var body: some View {
         ScrollView {
@@ -437,6 +456,7 @@ private struct HelpView: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.03, hoverYOffset: -1)
                         .help("Close Help")
                         .keyboardShortcut(.cancelAction)
                     }
@@ -476,6 +496,7 @@ private struct HelpView: View {
 private struct WelcomeDetailView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     private let quickTips: [QuickTip] = [
         QuickTip(keys: "hjkl / ←↑↓→", title: "Move", detail: "Navigate rows and columns quickly without leaving the keyboard."),
@@ -484,6 +505,10 @@ private struct WelcomeDetailView: View {
         QuickTip(keys: "[  ]", title: "Sort", detail: "Sort the current column ascending or descending."),
         QuickTip(keys: "Ctrl+H", title: "Help", detail: "Open the command and help menu to discover any VisiData action.")
     ]
+
+    private var motionEnabled: Bool {
+        model.animationsEnabled && !accessibilityReduceMotion
+    }
 
     var body: some View {
         ScrollView {
@@ -527,7 +552,7 @@ private struct WelcomeDetailView: View {
                         Text("iData")
                             .font(.system(size: 38, weight: .bold, design: .rounded))
 
-                        StatusPill(title: model.appVersionSummary, tint: .white.opacity(0.14))
+                        VersionRevealPill(model: model, tint: .white.opacity(0.14), icon: "shippingbox")
                     }
 
                     Text("Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
@@ -552,6 +577,7 @@ private struct WelcomeDetailView: View {
                     Label("Open File", systemImage: "tablecells")
                 }
                 .buttonStyle(.borderedProminent)
+                .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
 
                 Button {
                     updater.checkForUpdates()
@@ -559,11 +585,13 @@ private struct WelcomeDetailView: View {
                     Label("Check for Updates", systemImage: "arrow.trianglehead.clockwise")
                 }
                 .buttonStyle(.bordered)
+                .quietInteractiveSurface(enabled: motionEnabled)
 
                 SettingsLink {
                     Label("Preferences", systemImage: "gearshape")
                 }
                 .buttonStyle(.bordered)
+                .quietInteractiveSurface(enabled: motionEnabled)
 
                 if let fileURL = model.lastOpenedFile {
                     Button {
@@ -572,6 +600,7 @@ private struct WelcomeDetailView: View {
                         Label("Show Last File", systemImage: "finder")
                     }
                     .buttonStyle(.bordered)
+                    .quietInteractiveSurface(enabled: motionEnabled)
                 }
             }
 
@@ -693,6 +722,11 @@ private struct WelcomeDetailView: View {
 private struct SessionDetailView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var session: VisiDataSessionController
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    private var motionEnabled: Bool {
+        model.animationsEnabled && !accessibilityReduceMotion
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -714,6 +748,7 @@ private struct SessionDetailView: View {
                         Label("Show in Finder", systemImage: "finder")
                     }
                     .buttonStyle(.bordered)
+                    .quietInteractiveSurface(enabled: motionEnabled)
 
                     Button {
                         model.copyPathToPasteboard(fileURL)
@@ -721,6 +756,7 @@ private struct SessionDetailView: View {
                         Label("Copy Path", systemImage: "doc.on.doc")
                     }
                     .buttonStyle(.bordered)
+                    .quietInteractiveSurface(enabled: motionEnabled)
                 }
             }
 
@@ -770,10 +806,160 @@ private let detailBackground = LinearGradient(
     endPoint: .bottomTrailing
 )
 
+struct IDataAnimationsEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var idataAnimationsEnabled: Bool {
+        get { self[IDataAnimationsEnabledKey.self] }
+        set { self[IDataAnimationsEnabledKey.self] = newValue }
+    }
+}
+
+final class CommandKeyMonitor: ObservableObject {
+    @Published var isCommandPressed = NSEvent.modifierFlags.contains(.command)
+
+    private var localMonitor: Any?
+
+    init() {
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            self?.isCommandPressed = event.modifierFlags.contains(.command)
+            return event
+        }
+    }
+
+    deinit {
+        if let localMonitor {
+            NSEvent.removeMonitor(localMonitor)
+        }
+    }
+}
+
+private struct QuietInteractiveSurfaceModifier: ViewModifier {
+    let enabled: Bool
+    let hoverScale: CGFloat
+    let hoverYOffset: CGFloat
+    let shadowOpacity: Double
+    let shadowRadius: CGFloat
+
+    @State private var isHovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(enabled && isHovering ? hoverScale : 1)
+            .offset(y: enabled && isHovering ? hoverYOffset : 0)
+            .shadow(
+                color: .black.opacity(enabled && isHovering ? shadowOpacity : 0),
+                radius: enabled && isHovering ? shadowRadius : 0,
+                y: enabled && isHovering ? max(2, shadowRadius * 0.35) : 0
+            )
+            .animation(enabled ? .easeOut(duration: 0.24) : nil, value: isHovering)
+            .onHover { hovering in
+                if enabled {
+                    isHovering = hovering
+                } else {
+                    isHovering = false
+                }
+            }
+    }
+}
+
+extension View {
+    func quietInteractiveSurface(
+        enabled: Bool,
+        hoverScale: CGFloat = 1.01,
+        hoverYOffset: CGFloat = -1.5,
+        shadowOpacity: Double = 0.14,
+        shadowRadius: CGFloat = 16
+    ) -> some View {
+        modifier(
+            QuietInteractiveSurfaceModifier(
+                enabled: enabled,
+                hoverScale: hoverScale,
+                hoverYOffset: hoverYOffset,
+                shadowOpacity: shadowOpacity,
+                shadowRadius: shadowRadius
+            )
+        )
+    }
+}
+
+struct VersionRevealPill: View {
+    @ObservedObject var model: AppModel
+    let tint: Color
+    var icon: String? = "shippingbox"
+
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @StateObject private var commandMonitor = CommandKeyMonitor()
+    @State private var isHovering = false
+
+    private var motionEnabled: Bool {
+        model.animationsEnabled && !accessibilityReduceMotion
+    }
+
+    private var revealsBuild: Bool {
+        isHovering && commandMonitor.isCommandPressed
+    }
+
+    var body: some View {
+        HStack(spacing: 7) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+            }
+
+            Text(model.appVersionSummary)
+                .font(.subheadline.weight(.semibold))
+
+            if revealsBuild {
+                Text("build \(model.appBuildNumber)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.white.opacity(0.10))
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+        }
+        .lineLimit(1)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(tint, in: Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.white.opacity(revealsBuild ? 0.14 : 0.04))
+        )
+        .quietInteractiveSurface(
+            enabled: motionEnabled,
+            hoverScale: 1.015,
+            hoverYOffset: -1,
+            shadowOpacity: 0.10,
+            shadowRadius: 10
+        )
+        .animation(motionEnabled ? .easeOut(duration: 0.28) : nil, value: revealsBuild)
+        .onHover { hovering in
+            if motionEnabled {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    isHovering = hovering
+                }
+            } else {
+                isHovering = hovering
+            }
+        }
+        .help("Hold Command while hovering to reveal the build number")
+    }
+}
+
 private struct StatusPill: View {
     let title: String
     let tint: Color
     var icon: String? = nil
+    @Environment(\EnvironmentValues.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         HStack(spacing: 6) {
@@ -788,6 +974,13 @@ private struct StatusPill: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(tint, in: Capsule())
+        .quietInteractiveSurface(
+            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
+            hoverScale: 1.012,
+            hoverYOffset: -0.5,
+            shadowOpacity: 0.08,
+            shadowRadius: 8
+        )
     }
 }
 
