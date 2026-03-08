@@ -3,20 +3,22 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.1.3</title>
-            <pubDate>Sun, 08 Mar 2026 03:00:23 +0800</pubDate>
+            <title>0.1.4</title>
+            <pubDate>Sun, 08 Mar 2026 12:00:00 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>4</sparkle:version>
-            <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[🍎 `iData v0.1.3` focuses on UI consistency and a more polished native shell.
+            <description sparkle:format="markdown"><![CDATA[🍎 `iData v0.1.4` completes the current polish and packaging cycle.
 
-- makes the side-by-side welcome cards render at consistent heights
-- redesigns Preferences into a glass-style settings panel with clearer runtime and update sections
-- fixes Preferences window sizing so the updates controls are fully visible
-- keeps the embedded `VisiData` workflow, recent pinning, in-app help, and Sparkle update path from `v0.1.2`
+- tightens session shutdown so terminating `iData` also stops descendant `VisiData` processes reliably
+- adds a regression test for descendant-process cleanup
+- closes the app when the last window closes, matching standard macOS utility behavior
+- upgrades the landing page into a fuller product site with clearer release and download presentation
+- adds a `.pkg` installer that installs `iData.app` and drops a post-install `pipx + visidata + openpyxl` setup guide
+- keeps the native macOS shell, embedded `VisiData` workflow, Sparkle appcast path, and recent-file UX from `v0.1.3`
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.3/iData-v0.1.3-macos-universal.zip" length="3182220" type="application/octet-stream" sparkle:edSignature="HF6H7meZwzcmfLOzcLxmO33RbY046cTudTCPyDZLswWc2YcunR7mVista5kRClSLY/CqL4hHIS6DQ2PujPPfAw=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.4/iData-v0.1.4-macos-universal.zip" length="3286492" type="application/octet-stream" sparkle:edSignature="kLKbXiT1qe7Z8n+P06TehjEeD/ixvN89cp12HDAWZ+FkMkjclKEOx1Hn4yw7bQ8waq83DcWLLDpboF/fQ/+OCg=="/>
         </item>
     </channel>
 </rss>

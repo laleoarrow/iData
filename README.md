@@ -24,7 +24,8 @@
 Recommended install:
 
 ```bash
-brew install visidata
+pipx install visidata
+pipx inject visidata openpyxl
 ```
 
 If you use a custom install, set the `vd` executable path in Preferences.
@@ -72,11 +73,12 @@ Build the app bundle:
 Package a GitHub release asset:
 
 ```bash
-./scripts/package_release.sh 0.1.3
+./scripts/package_release.sh 0.1.4
 ```
 
 Install locally:
 
 - Copy `dist/iData.app` into `/Applications`
 - Quit any other running `iData` instance before testing the release build
-- Open `dist/iData-v0.1.3-macos-universal.dmg` if you want the drag-to-Applications installer view
+- Open `dist/iData-v0.1.4-macos-universal.dmg` if you want the drag-to-Applications installer view
+- Or run `dist/iData-v0.1.4-macos-universal.pkg` for the installer package flow

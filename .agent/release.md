@@ -15,14 +15,14 @@ Output:
 
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
-./scripts/package_release.sh 0.1.3
+./scripts/package_release.sh 0.1.4
 ```
 
 Outputs:
 
-- `dist/iData-v0.1.3-macos-universal.zip`
-- `dist/iData-v0.1.3-macos-universal.dmg`
-- `dist/iData-v0.1.3-macos-universal.pkg`
+- `dist/iData-v0.1.4-macos-universal.zip`
+- `dist/iData-v0.1.4-macos-universal.dmg`
+- `dist/iData-v0.1.4-macos-universal.pkg`
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
 
@@ -31,7 +31,7 @@ Outputs:
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
 ./scripts/build_app.sh
-./scripts/create_pkg.sh 0.1.3
+./scripts/create_pkg.sh 0.1.4
 ```
 
 Installer behavior:
@@ -52,20 +52,20 @@ gh repo create iData --public --source=. --remote=origin --push
 Create tag:
 
 ```bash
-git tag v0.1.3
+git tag v0.1.4
 git push origin main --tags
 ```
 
 Create release:
 
 ```bash
-gh release create v0.1.3 \
-  dist/iData-v0.1.3-macos-universal.zip \
-  dist/iData-v0.1.3-macos-universal.dmg \
-  dist/iData-v0.1.3-macos-universal.pkg \
+gh release create v0.1.4 \
+  dist/iData-v0.1.4-macos-universal.zip \
+  dist/iData-v0.1.4-macos-universal.dmg \
+  dist/iData-v0.1.4-macos-universal.pkg \
   dist/SHA256SUMS.txt \
-  --title 'v0.1.3' \
-  --notes-file docs/releases/v0.1.3.md
+  --title 'v0.1.4' \
+  --notes-file docs/releases/v0.1.4.md
 ```
 
 ## Distribution notes
