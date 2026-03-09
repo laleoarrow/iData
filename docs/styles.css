@@ -789,6 +789,138 @@ main {
   }
 }
 
+/* Flow lines background */
+.flow-lines {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40vh;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.flow-line {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(100, 150, 255, 0.1) 10%,
+    rgba(135, 166, 255, 0.4) 30%,
+    rgba(127, 228, 255, 0.6) 50%,
+    rgba(135, 166, 255, 0.4) 70%,
+    rgba(100, 150, 255, 0.1) 90%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 20px rgba(127, 200, 255, 0.3),
+    0 0 40px rgba(127, 200, 255, 0.15);
+  border-radius: 999px;
+  opacity: 0;
+  animation: flowDrift var(--duration, 12s) var(--ease) infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.flow-line-1 {
+  width: 60%;
+  left: -10%;
+  bottom: 8%;
+  --rotation: -3deg;
+  --duration: 14s;
+  --delay: 0s;
+}
+
+.flow-line-2 {
+  width: 75%;
+  left: 15%;
+  bottom: 15%;
+  --rotation: 5deg;
+  --duration: 18s;
+  --delay: -4s;
+}
+
+.flow-line-3 {
+  width: 50%;
+  left: 40%;
+  bottom: 5%;
+  --rotation: -2deg;
+  --duration: 11s;
+  --delay: -2s;
+}
+
+.flow-line-4 {
+  width: 85%;
+  left: -5%;
+  bottom: 22%;
+  --rotation: 4deg;
+  --duration: 22s;
+  --delay: -7s;
+}
+
+.flow-line-5 {
+  width: 45%;
+  left: 50%;
+  bottom: 12%;
+  --rotation: -6deg;
+  --duration: 16s;
+  --delay: -3s;
+}
+
+.flow-line-6 {
+  width: 70%;
+  left: 20%;
+  bottom: 28%;
+  --rotation: 2deg;
+  --duration: 19s;
+  --delay: -9s;
+}
+
+.flow-line-7 {
+  width: 55%;
+  left: -8%;
+  bottom: 18%;
+  --rotation: -4deg;
+  --duration: 13s;
+  --delay: -5s;
+}
+
+.flow-line-8 {
+  width: 65%;
+  left: 30%;
+  bottom: 3%;
+  --rotation: 3deg;
+  --duration: 17s;
+  --delay: -1s;
+}
+
+@keyframes flowDrift {
+  0% {
+    opacity: 0;
+    transform: translateX(-100px) rotate(var(--rotation, 0deg)) scaleX(0.8);
+  }
+  15% {
+    opacity: 0.7;
+  }
+  35% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(50px) rotate(var(--rotation, 0deg)) scaleX(1.05);
+  }
+  70% {
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(200px) rotate(var(--rotation, 0deg)) scaleX(0.9);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -801,5 +933,9 @@ main {
   .reveal {
     opacity: 1;
     transform: none;
+  }
+
+  .flow-lines {
+    display: none;
   }
 }
