@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:laleoarrow.github.io)",
+      "Bash(curl -L https://laleoarrow.github.io/*)",
+      "Bash(wget https://laleoarrow.github.io/*)",
+      "Bash(git status)",
+      "Bash(git add .)",
+      "Bash(git commit -m:*)",
+      "Bash(git push origin:*)",
+      "Bash(python3 -m pip install pillow -q)",
+      "Bash(python3 -c \"from PIL import Image; print('PIL installed')\")",
+      "Bash(open /Users/leoarrow/Project/mypackage/agents/iData/docs/assets/app-icon.png)",
+      "Bash(gh release list --limit 5)",
+      "Bash(git add iDataApp/Info.plist)",
+      "Bash(git tag v0.1.6)",
+      "Bash(git push)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)"
+    ]
+  }
+}
