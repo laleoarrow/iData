@@ -1,11 +1,12 @@
 import Testing
+import Foundation
 import WebKit
 @testable import iData
 
 @MainActor
 struct EmbeddedTerminalViewTests {
     @Test
-    func sessionOnlyBecomesReadyAfterNavigationAndTerminalReady() {
+    func sessionOnlyBecomesReadyAfterNavigationTerminalReadyAndFirstResize() {
         let session = VisiDataSessionController()
         let coordinator = EmbeddedTerminalView.Coordinator(session: session)
         let webView = WKWebView(frame: .zero)
@@ -17,11 +18,15 @@ struct EmbeddedTerminalViewTests {
 
         coordinator.webView(webView, didFinish: nil)
 
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalResize(cols: 120, rows: 32)
+
         #expect(displayReadyFlag(for: session))
     }
 
     @Test
-    func rebindingToFullyReadyTerminalMarksNewSessionDisplayReady() {
+    func rebindingToNewSessionWaitsForFreshResizeBeforeMarkingDisplayReady() {
         let firstSession = VisiDataSessionController()
         let secondSession = VisiDataSessionController()
         let coordinator = EmbeddedTerminalView.Coordinator(session: firstSession)
@@ -30,12 +35,17 @@ struct EmbeddedTerminalViewTests {
         coordinator.bind(session: firstSession, webView: webView)
         coordinator.webView(webView, didFinish: nil)
         coordinator.handleTerminalReady()
+        coordinator.handleTerminalResize(cols: 120, rows: 32)
 
         #expect(displayReadyFlag(for: firstSession))
 
         coordinator.bind(session: secondSession, webView: webView)
 
         #expect(!displayReadyFlag(for: firstSession))
+        #expect(!displayReadyFlag(for: secondSession))
+
+        coordinator.handleTerminalResize(cols: 120, rows: 32)
+
         #expect(displayReadyFlag(for: secondSession))
     }
 
@@ -76,6 +86,41 @@ struct EmbeddedTerminalViewTests {
         #expect(sink.writeCallCount == 1)
     }
 
+    @Test
+    func terminalHTMLUsesDedicatedMountElementForXterm() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("id=\"terminal-mount\""))
+        #expect(html.contains("const terminalMount = document.getElementById('terminal-mount');"))
+        #expect(html.contains("term.open(terminalMount);"))
+    }
+
+    @Test
+    func terminalHTMLForcesResizeWhenFocusReenters() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("scheduleTerminalLayoutPasses({ forceResize: true });"))
+        #expect(html.contains("document.addEventListener('visibilitychange'"))
+        #expect(html.contains("window.addEventListener('pageshow'"))
+    }
+
+    @Test
+    func terminalHTMLResetsViewportStateWhenClearingTerminal() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("term.clearSelection();"))
+        #expect(html.contains("term.scrollToTop();"))
+    }
+
+    @Test
+    func terminalHTMLRecreatesTerminalInstanceWhenClearingDisplay() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("function createTerminal("))
+        #expect(html.contains("term.dispose();"))
+        #expect(html.contains("createTerminal();"))
+    }
+
     private func displayReadyFlag(for session: VisiDataSessionController) -> Bool {
         Mirror(reflecting: session)
             .children
@@ -98,4 +143,14 @@ private final class TerminalDisplaySinkSpy: TerminalDisplaySink {
     }
 
     func focusTerminalDisplay() {}
+}
+
+private func terminalHTML(filePath: StaticString = #filePath) throws -> String {
+    let fileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = fileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let htmlURL = repositoryRoot.appendingPathComponent("iDataApp/Resources/TerminalAssets/terminal.html")
+    return try String(contentsOf: htmlURL, encoding: .utf8)
 }

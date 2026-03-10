@@ -39,6 +39,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         private weak var session: VisiDataSessionController?
         private var didFinishInitialNavigation = false
         private var didReceiveTerminalReady = false
+        private var didReceiveTerminalResize = false
 
         init(session: VisiDataSessionController) {
             self.session = session
@@ -46,13 +47,18 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         }
 
         func bind(session: VisiDataSessionController, webView: WKWebView) {
+            let sessionDidChange = self.session !== session
             if self.session !== session {
                 self.session?.bind(displaySink: nil)
                 self.session = session
+                didReceiveTerminalResize = false
             }
 
             self.webView = webView
             session.bind(displaySink: self)
+            if sessionDidChange {
+                requestTerminalLayoutSyncIfPossible()
+            }
             markSessionDisplayReadyIfPossible()
         }
 
@@ -67,6 +73,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
             didFinishInitialNavigation = false
             didReceiveTerminalReady = false
+            didReceiveTerminalResize = false
 
             guard
                 let assetsDirectory = Bundle.main.resourceURL?
@@ -93,6 +100,16 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         func handleTerminalReady() {
             didReceiveTerminalReady = true
+            markSessionDisplayReadyIfPossible()
+        }
+
+        func handleTerminalResize(cols: Int, rows: Int) {
+            guard cols > 0, rows > 0 else {
+                return
+            }
+
+            didReceiveTerminalResize = true
+            session?.resize(cols: cols, rows: rows)
             markSessionDisplayReadyIfPossible()
         }
 
@@ -134,7 +151,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
                     let cols = body["cols"] as? Int,
                     let rows = body["rows"] as? Int
                 {
-                    session?.resize(cols: cols, rows: rows)
+                    handleTerminalResize(cols: cols, rows: rows)
                 }
             default:
                 break
@@ -145,8 +162,16 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             webView?.evaluateJavaScript(functionCall)
         }
 
-        private func markSessionDisplayReadyIfPossible() {
+        private func requestTerminalLayoutSyncIfPossible() {
             guard didFinishInitialNavigation, didReceiveTerminalReady else {
+                return
+            }
+
+            evaluate(functionCall: "window.iDataRefreshLayout ? window.iDataRefreshLayout() : window.iDataFocusTerminal();")
+        }
+
+        private func markSessionDisplayReadyIfPossible() {
+            guard didFinishInitialNavigation, didReceiveTerminalReady, didReceiveTerminalResize else {
                 return
             }
 

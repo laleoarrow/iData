@@ -33,15 +33,22 @@
       width: 100%;
       height: 100%;
       box-sizing: border-box;
+      padding: 14px;
       border-radius: 16px;
       overflow: hidden;
       box-shadow: 0 24px 80px rgba(0,0,0,0.35);
       background: rgba(2, 6, 23, 0.88);
       border: 1px solid rgba(148, 163, 184, 0.15);
     }
-    .xterm {
-      padding: 14px;
+    #terminal-mount {
+      width: 100%;
       height: 100%;
+      overflow: hidden;
+    }
+    .xterm {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
     }
     .xterm-viewport {
       border-radius: 12px;
@@ -50,83 +57,180 @@
 </head>
 <body>
   <div id="terminal-shell">
-    <div id="terminal"></div>
+    <div id="terminal">
+      <div id="terminal-mount"></div>
+    </div>
   </div>
   <script src="xterm.js"></script>
   <script>
     const terminalRoot = document.getElementById('terminal');
-    const term = new Terminal({
-      cursorBlink: true,
-      allowTransparency: true,
-      macOptionIsMeta: true,
-      rightClickSelectsWord: true,
-      scrollback: 20000,
-      fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
-      fontSize: 13,
-      lineHeight: 1.22,
-      theme: {
-        background: '#020617',
-        foreground: '#E2E8F0',
-        cursor: '#F8FAFC',
-        cursorAccent: '#020617',
-        selectionBackground: 'rgba(96, 165, 250, 0.32)',
-        black: '#0f172a',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#e2e8f0',
-        brightBlack: '#475569',
-        brightRed: '#f87171',
-        brightGreen: '#4ade80',
-        brightYellow: '#facc15',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#c084fc',
-        brightCyan: '#22d3ee',
-        brightWhite: '#f8fafc'
-      }
-    });
+    const terminalMount = document.getElementById('terminal-mount');
+    let term = null;
+    const terminalDisposables = [];
 
     let lastSentSize = null;
     let layoutRetryHandle = null;
     let layoutRetryDeadline = 0;
     let layoutStablePassesRemaining = 0;
+    let readyRetryDelayMs = 180;
+    let readyProbeFrameBudget = 40;
+    let readyRetryHandle = null;
+    let didPostTerminalReady = false;
+    let forceResizePassesPending = 0;
 
     function post(message) {
       window.webkit?.messageHandlers?.idata?.postMessage(message);
     }
 
+    function makeTerminalOptions() {
+      return {
+        cursorBlink: true,
+        allowTransparency: true,
+        macOptionIsMeta: true,
+        rightClickSelectsWord: true,
+        scrollback: 20000,
+        fontFamily: 'SF Mono, Menlo, Monaco, Consolas, monospace',
+        fontSize: 13,
+        lineHeight: 1.22,
+        theme: {
+          background: '#020617',
+          foreground: '#E2E8F0',
+          cursor: '#F8FAFC',
+          cursorAccent: '#020617',
+          selectionBackground: 'rgba(96, 165, 250, 0.32)',
+          black: '#0f172a',
+          red: '#ef4444',
+          green: '#22c55e',
+          yellow: '#eab308',
+          blue: '#3b82f6',
+          magenta: '#a855f7',
+          cyan: '#06b6d4',
+          white: '#e2e8f0',
+          brightBlack: '#475569',
+          brightRed: '#f87171',
+          brightGreen: '#4ade80',
+          brightYellow: '#facc15',
+          brightBlue: '#60a5fa',
+          brightMagenta: '#c084fc',
+          brightCyan: '#22d3ee',
+          brightWhite: '#f8fafc'
+        }
+      };
+    }
+
+    function disposeTerminalDisposables() {
+      while (terminalDisposables.length > 0) {
+        terminalDisposables.pop()?.dispose?.();
+      }
+    }
+
+    function createTerminal(resetReadyState = false) {
+      disposeTerminalDisposables();
+
+      if (term) {
+        term.clearSelection();
+        term.scrollToTop();
+        term.dispose();
+        term = null;
+      }
+
+      terminalMount.textContent = '';
+      term = new Terminal(makeTerminalOptions());
+      term.open(terminalMount);
+      term.focus();
+
+      terminalDisposables.push(term.onData((data) => {
+        post({ type: 'input', data });
+      }));
+      terminalDisposables.push(term.onBinary((data) => {
+        post({ type: 'binary', data: btoa(data) });
+      }));
+
+      lastSentSize = null;
+      forceResizePassesPending = Math.max(forceResizePassesPending, 1);
+
+      if (resetReadyState) {
+        didPostTerminalReady = false;
+      }
+    }
+
     function writeBase64(base64Value) {
+      if (!term) {
+        return;
+      }
+
+      const currentTerm = term;
       const binary = atob(base64Value);
       const bytes = new Uint8Array(binary.length);
       for (let index = 0; index < binary.length; index += 1) {
         bytes[index] = binary.charCodeAt(index);
       }
-      term.write(bytes, () => {
-        if (term.rows > 0) {
-          term.refresh(0, Math.max(term.rows - 1, 0));
+      currentTerm.write(bytes, () => {
+        if (currentTerm.rows > 0) {
+          currentTerm.refresh(0, Math.max(currentTerm.rows - 1, 0));
         }
       });
       scheduleTerminalLayoutPasses();
     }
 
+    function renderDimensions() {
+      if (!term) {
+        return null;
+      }
+
+      return term?.dimensions || term?._core?._renderService?.dimensions;
+    }
+
+    function scrollbarWidth() {
+      if (!term) {
+        return 0;
+      }
+
+      const showScrollbar = term.options?.scrollbar?.showScrollbar ?? true;
+      if (term.options?.scrollback === 0 || !showScrollbar) {
+        return 0;
+      }
+      return term.options?.scrollbar?.width ?? 14;
+    }
+
     function measureAndResize(force = false) {
-      const dimensions = term?._core?._renderService?.dimensions;
+      if (!term) {
+        return false;
+      }
+
+      const dimensions = renderDimensions();
       const cellWidth = dimensions?.css?.cell?.width;
       const cellHeight = dimensions?.css?.cell?.height;
       if (!cellWidth || !cellHeight) {
         return false;
       }
-      const rect = terminalRoot.getBoundingClientRect();
-      if (!rect.width || !rect.height) {
+
+      const xtermElement = term.element;
+      const parentElement = xtermElement?.parentElement || terminalMount;
+      if (!parentElement) {
         return false;
       }
-      const cols = Math.max(20, Math.floor(rect.width / cellWidth) - 1);
-      const rows = Math.max(8, Math.floor(rect.height / cellHeight) - 1);
+
+      const parentRect = parentElement.getBoundingClientRect();
+      if (!parentRect.width || !parentRect.height) {
+        return false;
+      }
+
+      const elementStyle = window.getComputedStyle(xtermElement || parentElement);
+      const horizontalPadding =
+        parseFloat(elementStyle.paddingLeft || '0') +
+        parseFloat(elementStyle.paddingRight || '0');
+      const verticalPadding =
+        parseFloat(elementStyle.paddingTop || '0') +
+        parseFloat(elementStyle.paddingBottom || '0');
+
+      const usableWidth = Math.max(0, parentRect.width - horizontalPadding - scrollbarWidth());
+      const usableHeight = Math.max(0, parentRect.height - verticalPadding);
+
+      const cols = Math.max(20, Math.floor(usableWidth / cellWidth));
+      const rows = Math.max(8, Math.floor(usableHeight / cellHeight));
       const sizeKey = `${cols}x${rows}`;
-      if (!force && sizeKey === lastSentSize) {
+      if (!force && sizeKey === lastSentSize && term.cols === cols && term.rows === rows) {
         return true;
       }
       lastSentSize = sizeKey;
@@ -135,29 +239,67 @@
       return true;
     }
 
-    function refreshTerminalLayout() {
-      const didMeasure = measureAndResize();
+    function refreshTerminalLayout(forceResize = false) {
+      if (!term) {
+        return false;
+      }
+
+      const didMeasure = measureAndResize(forceResize);
       if (term.rows > 0) {
         term.refresh(0, Math.max(term.rows - 1, 0));
       }
       return didMeasure;
     }
 
+    function postTerminalReady() {
+      if (didPostTerminalReady) {
+        return;
+      }
+      if (readyRetryHandle !== null) {
+        clearTimeout(readyRetryHandle);
+        readyRetryHandle = null;
+      }
+      didPostTerminalReady = true;
+      post({ type: 'ready' });
+    }
+
     function notifyReadyWhenSized(attempts = 0) {
+      if (didPostTerminalReady) {
+        return;
+      }
+
       const didMeasure = measureAndResize(true);
       if (term.rows > 0) {
         term.refresh(0, Math.max(term.rows - 1, 0));
       }
 
-      if ((didMeasure && term.cols > 0 && term.rows > 0) || attempts >= 40) {
-        post({ type: 'ready' });
+      if (didMeasure && term.cols > 0 && term.rows > 0) {
+        postTerminalReady();
         return;
       }
 
-      requestAnimationFrame(() => notifyReadyWhenSized(attempts + 1));
+      if (attempts < readyProbeFrameBudget) {
+        requestAnimationFrame(() => notifyReadyWhenSized(attempts + 1));
+        return;
+      }
+
+      scheduleTerminalLayoutPasses();
+
+      if (readyRetryHandle !== null) {
+        clearTimeout(readyRetryHandle);
+      }
+
+      readyRetryHandle = setTimeout(() => {
+        readyRetryHandle = null;
+        notifyReadyWhenSized(0);
+      }, readyRetryDelayMs);
     }
 
-    function scheduleTerminalLayoutPasses() {
+    function scheduleTerminalLayoutPasses(options = {}) {
+      if (options.forceResize) {
+        forceResizePassesPending = Math.max(forceResizePassesPending, 1);
+      }
+
       layoutRetryDeadline = Math.max(layoutRetryDeadline, Date.now() + 6000);
       layoutStablePassesRemaining = Math.max(layoutStablePassesRemaining, 3);
 
@@ -166,7 +308,11 @@
       }
 
       const attempt = () => {
-        const didMeasure = refreshTerminalLayout();
+        const forceResize = forceResizePassesPending > 0;
+        const didMeasure = refreshTerminalLayout(forceResize);
+        if (didMeasure && forceResizePassesPending > 0) {
+          forceResizePassesPending -= 1;
+        }
         if (didMeasure && layoutStablePassesRemaining > 0) {
           layoutStablePassesRemaining -= 1;
         }
@@ -191,32 +337,43 @@
 
     window.iDataWriteBase64 = writeBase64;
     window.iDataClearTerminal = function() {
-      term.reset();
-      term.clear();
-      scheduleTerminalLayoutPasses();
+      createTerminal();
+      scheduleTerminalLayoutPasses({ forceResize: true });
+    };
+    window.iDataRefreshLayout = function() {
+      scheduleTerminalLayoutPasses({ forceResize: true });
     };
     window.iDataFocusTerminal = function() {
-      term.focus();
-      scheduleTerminalLayoutPasses();
+      term?.focus();
+      scheduleTerminalLayoutPasses({ forceResize: true });
     };
 
-    term.open(terminalRoot);
-    term.focus();
-    scheduleTerminalLayoutPasses();
-    term.onData((data) => {
-      post({ type: 'input', data });
-    });
-    term.onBinary((data) => {
-      post({ type: 'binary', data: btoa(data) });
-    });
+    createTerminal(true);
+    scheduleTerminalLayoutPasses({ forceResize: true });
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(scheduleTerminalLayoutPasses);
     });
     resizeObserver.observe(terminalRoot);
+    resizeObserver.observe(terminalMount);
+
+    terminalRoot.addEventListener('focusin', () => {
+      scheduleTerminalLayoutPasses({ forceResize: true });
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        scheduleTerminalLayoutPasses({ forceResize: true });
+      }
+    });
+    window.addEventListener('pageshow', () => {
+      scheduleTerminalLayoutPasses({ forceResize: true });
+    });
+    window.addEventListener('focus', () => {
+      scheduleTerminalLayoutPasses({ forceResize: true });
+    });
 
     requestAnimationFrame(() => {
-      scheduleTerminalLayoutPasses();
+      scheduleTerminalLayoutPasses({ forceResize: true });
       notifyReadyWhenSized();
     });
   </script>
