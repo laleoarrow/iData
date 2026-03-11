@@ -8,7 +8,9 @@ guard arguments.count >= 2 else {
 }
 
 let outputURL = URL(fileURLWithPath: arguments[1])
-let size = NSSize(width: 800, height: 500)
+let width: CGFloat = 800
+let height: CGFloat = 500
+let size = NSSize(width: width, height: height)
 let image = NSImage(size: size)
 
 image.lockFocus()
@@ -17,98 +19,142 @@ guard let context = NSGraphicsContext.current?.cgContext else {
     exit(1)
 }
 
-let backgroundRect = CGRect(origin: .zero, size: size)
-let gradient = CGGradient(
-    colorsSpace: CGColorSpaceCreateDeviceRGB(),
-    colors: [
-        NSColor(calibratedRed: 0.05, green: 0.08, blue: 0.16, alpha: 1.0).cgColor,
-        NSColor(calibratedRed: 0.11, green: 0.15, blue: 0.30, alpha: 1.0).cgColor,
-        NSColor(calibratedRed: 0.18, green: 0.22, blue: 0.42, alpha: 1.0).cgColor,
-    ] as CFArray,
-    locations: [0.0, 0.48, 1.0]
+// 1. Premium Dark Tech Gradient Background
+let colorsSpace = CGColorSpaceCreateDeviceRGB()
+let gradientColors = [
+    NSColor(calibratedRed: 0.03, green: 0.04, blue: 0.08, alpha: 1.0).cgColor,
+    NSColor(calibratedRed: 0.07, green: 0.11, blue: 0.22, alpha: 1.0).cgColor,
+    NSColor(calibratedRed: 0.12, green: 0.08, blue: 0.25, alpha: 1.0).cgColor
+] as CFArray
+
+let backgroundGradient = CGGradient(
+    colorsSpace: colorsSpace,
+    colors: gradientColors,
+    locations: [0.0, 0.6, 1.0]
 )!
 
 context.drawLinearGradient(
-    gradient,
-    start: CGPoint(x: 0, y: size.height),
-    end: CGPoint(x: size.width, y: 0),
+    backgroundGradient,
+    start: CGPoint(x: 0, y: height),
+    end: CGPoint(x: width, y: 0),
     options: []
 )
 
+// 2. Subtle Glowing Orbs for "Tech" Feel
 context.saveGState()
-context.setFillColor(NSColor(calibratedRed: 0.38, green: 0.61, blue: 1.0, alpha: 0.10).cgColor)
-context.fillEllipse(in: CGRect(x: 40, y: 280, width: 260, height: 260))
-context.setFillColor(NSColor(calibratedRed: 0.67, green: 0.46, blue: 1.0, alpha: 0.09).cgColor)
-context.fillEllipse(in: CGRect(x: 470, y: 120, width: 230, height: 230))
+context.setBlendMode(.screen)
+let glowGradient1 = CGGradient(colorsSpace: colorsSpace, colors: [
+    NSColor(calibratedRed: 0.2, green: 0.5, blue: 1.0, alpha: 0.15).cgColor,
+    NSColor(calibratedRed: 0.2, green: 0.5, blue: 1.0, alpha: 0.0).cgColor
+] as CFArray, locations: [0.0, 1.0])!
+
+context.drawRadialGradient(
+    glowGradient1,
+    startCenter: CGPoint(x: 200, y: 250), startRadius: 0,
+    endCenter: CGPoint(x: 200, y: 250), endRadius: 200,
+    options: []
+)
+
+let glowGradient2 = CGGradient(colorsSpace: colorsSpace, colors: [
+    NSColor(calibratedRed: 0.6, green: 0.2, blue: 0.9, alpha: 0.12).cgColor,
+    NSColor(calibratedRed: 0.6, green: 0.2, blue: 0.9, alpha: 0.0).cgColor
+] as CFArray, locations: [0.0, 1.0])!
+
+context.drawRadialGradient(
+    glowGradient2,
+    startCenter: CGPoint(x: 600, y: 250), startRadius: 0,
+    endCenter: CGPoint(x: 600, y: 250), endRadius: 220,
+    options: []
+)
 context.restoreGState()
 
-func strokePath(_ points: [CGPoint], color: NSColor, width: CGFloat) {
-    guard let first = points.first else { return }
-    let path = NSBezierPath()
-    path.move(to: first)
-    for point in points.dropFirst() {
-        path.line(to: point)
-    }
-    path.lineWidth = width
-    color.setStroke()
-    path.stroke()
+// 3. Elegant Arrow from App Location (~200,250) to Applications Location (~600,250)
+let arrowStart = CGPoint(x: 310, y: 250)
+let arrowEnd = CGPoint(x: 490, y: 250)
+let control1 = CGPoint(x: 370, y: 300)
+let control2 = CGPoint(x: 430, y: 300)
+
+let arrowPath = NSBezierPath()
+arrowPath.move(to: arrowStart)
+arrowPath.curve(to: arrowEnd, controlPoint1: control1, controlPoint2: control2)
+
+// Arrow style
+NSColor.white.withAlphaComponent(0.6).setStroke()
+arrowPath.lineWidth = 2.5
+// Add a clean dashed/dotted pattern for a tech vibe
+let dashPattern: [CGFloat] = [6, 6]
+arrowPath.setLineDash(dashPattern, count: 2, phase: 0)
+arrowPath.stroke()
+
+// Draw Chevron Head at arrowEnd
+let chevronSize: CGFloat = 8.0
+let chevronPath = NSBezierPath()
+// Calculate tangent angle at the end of the bezier curve (roughly from control2 to arrowEnd)
+let dy = arrowEnd.y - control2.y
+let dx = arrowEnd.x - control2.x
+let angle = atan2(dy, dx)
+
+let pt1 = CGPoint(
+    x: arrowEnd.x - chevronSize * cos(angle - .pi / 6),
+    y: arrowEnd.y - chevronSize * sin(angle - .pi / 6)
+)
+let pt2 = CGPoint(
+    x: arrowEnd.x - chevronSize * cos(angle + .pi / 6),
+    y: arrowEnd.y - chevronSize * sin(angle + .pi / 6)
+)
+
+chevronPath.move(to: pt1)
+chevronPath.line(to: arrowEnd)
+chevronPath.line(to: pt2)
+chevronPath.lineWidth = 2.5
+chevronPath.setLineDash([], count: 0, phase: 0) // Solid arrowhead
+chevronPath.lineCapStyle = .round
+chevronPath.lineJoinStyle = .round
+NSColor.white.withAlphaComponent(0.8).setStroke()
+chevronPath.stroke()
+
+// 4. Minimal, Premium Typography
+
+func drawCenteredText(_ string: String, yPos: CGFloat, font: NSFont, color: NSColor, letterSpacing: CGFloat = 0) {
+    let paragraphStyle = NSMutableParagraphStyle()
+    paragraphStyle.alignment = .center
+    
+    let attributes: [NSAttributedString.Key: Any] = [
+        .font: font,
+        .foregroundColor: color,
+        .paragraphStyle: paragraphStyle,
+        .kern: letterSpacing
+    ]
+    
+    let attrString = NSAttributedString(string: string, attributes: attributes)
+    let textSize = attrString.size()
+    let xPos = (width - textSize.width) / 2.0
+    attrString.draw(at: CGPoint(x: xPos, y: yPos))
 }
 
-strokePath(
-    [
-        CGPoint(x: 48, y: 470),
-        CGPoint(x: 180, y: 470),
-        CGPoint(x: 235, y: 450),
-        CGPoint(x: 380, y: 450),
-        CGPoint(x: 450, y: 425),
-        CGPoint(x: 620, y: 425),
-        CGPoint(x: 740, y: 455),
-    ],
-    color: NSColor.white.withAlphaComponent(0.13),
-    width: 2.0
+drawCenteredText(
+    "Install iData",
+    yPos: 380,
+    font: NSFont.systemFont(ofSize: 28, weight: .semibold),
+    color: NSColor.white.withAlphaComponent(0.95),
+    letterSpacing: 0.5
 )
 
-strokePath(
-    [
-        CGPoint(x: 56, y: 185),
-        CGPoint(x: 140, y: 185),
-        CGPoint(x: 205, y: 160),
-        CGPoint(x: 360, y: 160),
-        CGPoint(x: 455, y: 205),
-        CGPoint(x: 600, y: 205),
-        CGPoint(x: 730, y: 175),
-    ],
-    color: NSColor(calibratedRed: 0.56, green: 0.80, blue: 1.0, alpha: 0.16),
-    width: 2.4
+drawCenteredText(
+    "Drag to Applications folder",
+    yPos: 350,
+    font: NSFont.systemFont(ofSize: 15, weight: .regular),
+    color: NSColor.white.withAlphaComponent(0.6),
+    letterSpacing: 0.2
 )
 
-let title = NSAttributedString(
-    string: "Drag iData to Applications",
-    attributes: [
-        .font: NSFont.systemFont(ofSize: 31, weight: .bold),
-        .foregroundColor: NSColor.white.withAlphaComponent(0.95),
-    ]
+// Subtle app version / footer at the bottom
+drawCenteredText(
+    "Native macOS shell for VisiData",
+    yPos: 50,
+    font: NSFont.systemFont(ofSize: 12, weight: .medium),
+    color: NSColor.white.withAlphaComponent(0.3)
 )
-
-let subtitle = NSAttributedString(
-    string: "Native macOS shell for large-table workflows with VisiData",
-    attributes: [
-        .font: NSFont.systemFont(ofSize: 15, weight: .medium),
-        .foregroundColor: NSColor.white.withAlphaComponent(0.72),
-    ]
-)
-
-title.draw(at: CGPoint(x: 48, y: 96))
-subtitle.draw(at: CGPoint(x: 50, y: 66))
-
-let footer = NSAttributedString(
-    string: "Open the app from /Applications. Sparkle handles future updates in-place.",
-    attributes: [
-        .font: NSFont.systemFont(ofSize: 12, weight: .regular),
-        .foregroundColor: NSColor.white.withAlphaComponent(0.50),
-    ]
-)
-footer.draw(at: CGPoint(x: 50, y: 36))
 
 image.unlockFocus()
 
