@@ -1055,8 +1055,8 @@ final class AppModel: ObservableObject {
         echo ""
 
         # ── Step 3: Inject Excel & common format plugins ──
-        echo "▸ Injecting Excel plugins (openpyxl, xlrd)..."
-        pipx inject visidata openpyxl xlrd || true
+        echo "▸ Injecting Excel and compression plugins (openpyxl, xlrd, zstandard)..."
+        pipx inject visidata openpyxl xlrd zstandard || true
         echo ""
 
         # ── Verification ──

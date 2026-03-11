@@ -451,7 +451,7 @@ struct AppModelTests {
 
         #expect(script.contains("brew install pipx"))
         #expect(script.contains("pipx install visidata"))
-        #expect(script.contains("pipx inject visidata openpyxl xlrd"))
+        #expect(script.contains("pipx inject visidata openpyxl xlrd zstandard"))
     }
 }
 
