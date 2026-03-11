@@ -2,27 +2,21 @@
 
 <div align="center">
   <a href="https://github.com/laleoarrow/iData/actions/workflows/swift.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/laleoarrow/iData/swift.yml?branch=main&style=for-the-badge" alt="Build" />
+    <img src="https://img.shields.io/badge/BUILD-PASSING-2e7d32?style=for-the-badge&logo=githubactions&logoColor=white" alt="Build Passing" />
   </a>
   <a href="https://github.com/laleoarrow/homebrew-tap/actions/workflows/tests.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/laleoarrow/homebrew-tap/tests.yml?branch=main&style=for-the-badge&label=brew%20test-bot" alt="Brew Test Bot" />
+    <img src="https://img.shields.io/badge/BREW%20TEST--BOT-PASSING-FBB040?style=for-the-badge&logo=homebrew&logoColor=black" alt="Brew Test-Bot Passing" />
   </a>
   <a href="https://github.com/laleoarrow/iData/releases">
-    <img src="https://img.shields.io/github/v/release/laleoarrow/iData?style=for-the-badge" alt="Release" />
+    <img src="https://img.shields.io/badge/RELEASE-V0.1.8-1565c0?style=for-the-badge&logo=github&logoColor=white" alt="Release V0.1.8" />
   </a>
   <a href="https://github.com/laleoarrow/iData">
-    <img src="https://img.shields.io/badge/platform-macOS%2014%2B-111111?style=for-the-badge" alt="Platform" />
-  </a>
-  <a href="https://github.com/laleoarrow/homebrew-tap">
-    <img src="https://img.shields.io/badge/Homebrew%20Cask-laleoarrow%2Ftap%2Fidata-FBB040?style=for-the-badge&logo=homebrew&logoColor=black" alt="Homebrew Cask" />
-  </a>
-  <a href="https://github.com/laleoarrow/homebrew-tap">
-    <img src="https://img.shields.io/badge/install-brew%20install%20--cask%20laleoarrow%2Ftap%2Fidata-2e7d32?style=for-the-badge&logo=homebrew&logoColor=white" alt="Install via Brew" />
+    <img src="https://img.shields.io/badge/PLATFORM-macOS%2014%2B-111111?style=for-the-badge&logo=apple&logoColor=white" alt="Platform macOS 14+" />
   </a>
 </div>
 
 <div align="center">
-  <a href="./README_zh.md">简体中文</a>
+  <a href="./README.md">English</a> | <a href="./README_zh.md">简体中文</a>
 </div>
 
 `iData` is a native macOS shell around `VisiData`.
