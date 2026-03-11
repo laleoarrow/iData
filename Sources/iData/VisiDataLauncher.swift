@@ -32,8 +32,8 @@ enum LaunchError: LocalizedError {
             )
         case .visiDataNotFound:
             AppModel.localized(
-                english: "Could not find `vd`. Install VisiData with `brew install visidata`, or set its executable path in Preferences.",
-                chinese: "找不到 `vd`。请用 `brew install visidata` 安装 VisiData，或在偏好设置中指定其可执行文件路径。"
+                english: "Could not find `vd`. \(AppModel.visiDataInstallGuidance(.english))",
+                chinese: "找不到 `vd`。\(AppModel.visiDataInstallGuidance(.chinese))"
             )
         case let .pseudoTerminalUnavailable(message):
             AppModel.localized(

@@ -419,8 +419,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                 return
             }
 
-            self.isRunning = false
-
             if didExitNormally(exitStatus) {
                 let code = exitCode(from: exitStatus)
                 if code == 0 {
@@ -434,10 +432,15 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                         english: "VisiData exited with code \(code).",
                         chinese: "VisiData 已退出，代码为 \(code)。"
                     )
-                    self.errorMessage = AppModel.localized(
+                    let baseErrorMessage = AppModel.localized(
                         english: "VisiData exited with code \(code).",
                         chinese: "VisiData 已退出，代码为 \(code)。"
                     )
+                    if let currentFileURL, let dependencyGuidance = AppModel.visiDataFormatDependencyGuidance(for: currentFileURL, language: AppModel.resolvedLanguage()) {
+                        self.errorMessage = "\(baseErrorMessage) \(dependencyGuidance)"
+                    } else {
+                        self.errorMessage = baseErrorMessage
+                    }
                 }
             } else if didTerminateBySignal(exitStatus) {
                 let signal = terminatingSignal(from: exitStatus)
@@ -455,6 +458,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                     chinese: "VisiData 已结束。"
                 )
             }
+
+            self.isRunning = false
         }
     }
 

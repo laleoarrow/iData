@@ -3,30 +3,32 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.1.8</title>
-            <pubDate>Wed, 11 Mar 2026 19:01:30 +0800</pubDate>
+            <title>0.1.10</title>
+            <pubDate>Wed, 11 Mar 2026 23:42:03 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>9</sparkle:version>
-            <sparkle:shortVersionString>0.1.8</sparkle:shortVersionString>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>0.1.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# iData v0.1.9
+            <description sparkle:format="markdown"><![CDATA[# iData v0.1.10
 
-This release finalizes the distribution and documentation updates around Homebrew and release workflow stability.
+This release fixes the VisiData failure path so users keep the session view and see actionable dependency guidance instead of being bounced back to the welcome screen.
 
 ## Highlights
 
-- README header badges refreshed and streamlined
-- README split into English (`README.md`) and Chinese (`README_zh.md`) with language switch links
-- VisiData install guidance aligned to `pipx install visidata` + `pipx inject visidata openpyxl`
-- Homebrew cask sync workflow hardened for release/prerelease handling
+- Keep failed sessions visible so loader and launch errors remain readable in the main detail view
+- Add format-specific dependency guidance for common VisiData loaders, including `.xlsx` -> `openpyxl`
+- Align missing-VisiData guidance around one-click setup, `pipx install visidata`, and `pipx inject visidata ...`
+- Extend regression coverage for session display policy and format dependency hints
 
 ## Notes
 
 - Primary install path:
   - `brew install --cask laleoarrow/tap/idata`
-- VisiData remains an external dependency and should be installed separately.
+- Recommended VisiData install path:
+  - `pipx install visidata`
+  - `pipx inject visidata openpyxl xlrd zstandard`
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.9/iData-v0.1.9-macos-universal.zip" length="3819388" type="application/octet-stream" sparkle:edSignature="S8XJdEvaa6eNCw0hf3Z2bHyow1dB/HYEFF30dI1W4zNi5w5GY0gRYDzt4IPxHNpMnE64UMaps0+NERCZI4iyAw=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.10/iData-v0.1.10-macos-universal.zip" length="3825278" type="application/octet-stream" sparkle:edSignature="+Zp14YdF5wkilFCrLar4Cnr5haQhWVKFCWsSzCzCMBJNFAg8RpVZGGRKalS+s5n4UTp+ZKIHhsgLCVEJs8lhCQ=="/>
         </item>
     </channel>
 </rss>

@@ -390,11 +390,28 @@ final class AppModel: ObservableObject {
     }
 
     var displayedSession: VisiDataSessionController? {
-        guard let activeSession, activeSession.isRunning, activeSession.currentFileURL != nil else {
+        guard let activeSession, activeSession.currentFileURL != nil else {
+            return nil
+        }
+
+        guard Self.shouldDisplaySessionDetail(
+            hasCurrentFile: activeSession.currentFileURL != nil,
+            isRunning: activeSession.isRunning,
+            hasError: activeSession.errorMessage != nil
+        ) else {
             return nil
         }
 
         return activeSession
+    }
+
+    nonisolated static func shouldDisplaySessionDetail(
+        hasCurrentFile: Bool,
+        isRunning: Bool,
+        hasError: Bool
+    ) -> Bool {
+        // Keep a failed session visible so its launch/loader guidance remains actionable.
+        hasCurrentFile && (isRunning || hasError)
     }
 
     var appVersionSummary: String {
@@ -559,6 +576,77 @@ final class AppModel: ObservableObject {
         )
     }
 
+    nonisolated static func visiDataInstallGuidance(_ language: AppResolvedLanguage) -> String {
+        switch language {
+        case .english:
+            return "Use iData's one-click setup, or install with `pipx install visidata` and `pipx inject visidata openpyxl`. `brew install visidata` also works. You can set the executable path in Preferences."
+        case .chinese:
+            return "可先使用 iData 的一键安装，或执行 `pipx install visidata` 和 `pipx inject visidata openpyxl`。`brew install visidata` 也可用；也可以在偏好设置中指定可执行文件路径。"
+        }
+    }
+
+    private struct VisiDataFormatDependencyAdvice {
+        let extensions: Set<String>
+        let english: String
+        let chinese: String
+    }
+
+    private nonisolated static let compressionSuffixes = ["gz", "bgz", "bgzf"]
+    private nonisolated static let visidataFormatDependencyAdvice: [VisiDataFormatDependencyAdvice] = [
+        VisiDataFormatDependencyAdvice(
+            extensions: ["xlsx"],
+            english: "For `.xlsx` files, VisiData uses `openpyxl`. Install it with `pipx inject visidata openpyxl` if loader support is missing.",
+            chinese: "`.xlsx` 文件通常依赖 `openpyxl`。如果缺少对应 loader，可执行 `pipx inject visidata openpyxl`。"
+        ),
+        VisiDataFormatDependencyAdvice(
+            extensions: ["xls", "xlsb"],
+            english: "For `.xls` and `.xlsb` files, VisiData uses `xlrd`. Install it with `pipx inject visidata xlrd` if loader support is missing.",
+            chinese: "`.xls` 和 `.xlsb` 文件通常依赖 `xlrd`。如果缺少对应 loader，可执行 `pipx inject visidata xlrd`。"
+        ),
+        VisiDataFormatDependencyAdvice(
+            extensions: ["parquet"],
+            english: "For `.parquet` files, VisiData needs `pyarrow` or the pandas-backed loader. Install support with `pipx inject visidata pyarrow pandas` if needed.",
+            chinese: "`.parquet` 文件通常依赖 `pyarrow`，也可走 pandas loader。若缺少支持，可执行 `pipx inject visidata pyarrow pandas`。"
+        ),
+        VisiDataFormatDependencyAdvice(
+            extensions: ["ods"],
+            english: "For `.ods` files, VisiData uses `odfpy`. Install it with `pipx inject visidata odfpy` if loader support is missing.",
+            chinese: "`.ods` 文件通常依赖 `odfpy`。如果缺少对应 loader，可执行 `pipx inject visidata odfpy`。"
+        ),
+        VisiDataFormatDependencyAdvice(
+            extensions: ["arrow", "arrows"],
+            english: "For Arrow IPC files, VisiData uses `pyarrow`. Install it with `pipx inject visidata pyarrow` if loader support is missing.",
+            chinese: "Arrow IPC 文件通常依赖 `pyarrow`。如果缺少对应 loader，可执行 `pipx inject visidata pyarrow`。"
+        ),
+    ]
+
+    nonisolated static func visiDataFormatDependencyGuidance(
+        for url: URL,
+        language: AppResolvedLanguage
+    ) -> String? {
+        let normalizedExtension = normalizedDataExtension(for: url)
+        guard
+            let advice = visidataFormatDependencyAdvice.first(where: { $0.extensions.contains(normalizedExtension) })
+        else {
+            return nil
+        }
+
+        switch language {
+        case .english:
+            return advice.english
+        case .chinese:
+            return advice.chinese
+        }
+    }
+
+    private nonisolated static func normalizedDataExtension(for url: URL) -> String {
+        var components = url.lastPathComponent.lowercased().split(separator: ".").map(String.init)
+        while let last = components.last, compressionSuffixes.contains(last) {
+            components.removeLast()
+        }
+        return components.last ?? ""
+    }
+
     func localized(english: String, chinese: String) -> String {
         Self.localized(effectiveLanguage, english: english, chinese: chinese)
     }
@@ -589,8 +677,8 @@ final class AppModel: ObservableObject {
             )
         case .missing:
             return localized(
-                english: "VisiData not found. Install with `brew install visidata` or set the executable path in Preferences.",
-                chinese: "未找到 VisiData。可用 `brew install visidata` 安装，或在偏好设置里指定可执行文件路径。"
+                english: "VisiData not found. \(Self.visiDataInstallGuidance(.english))",
+                chinese: "未找到 VisiData。\(Self.visiDataInstallGuidance(.chinese))"
             )
         }
     }

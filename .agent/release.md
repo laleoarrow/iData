@@ -15,14 +15,14 @@ Output:
 
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
-./scripts/package_release.sh 0.1.8
+./scripts/package_release.sh 0.1.10
 ```
 
 Outputs:
 
-- `dist/iData-v0.1.8-macos-universal.zip`
-- `dist/iData-v0.1.8-macos-universal.dmg`
-- `dist/iData-v0.1.8-macos-universal.pkg`
+- `dist/iData-v0.1.10-macos-universal.zip`
+- `dist/iData-v0.1.10-macos-universal.dmg`
+- `dist/iData-v0.1.10-macos-universal.pkg`
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
 
@@ -40,7 +40,7 @@ Optional signing and notarization inputs:
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
 ./scripts/build_app.sh
-./scripts/create_pkg.sh 0.1.8
+./scripts/create_pkg.sh 0.1.10
 ```
 
 Installer behavior:
@@ -61,20 +61,20 @@ gh repo create iData --public --source=. --remote=origin --push
 Create tag:
 
 ```bash
-git tag v0.1.8
+git tag v0.1.10
 git push origin main --tags
 ```
 
 Create release:
 
 ```bash
-gh release create v0.1.8 \
-  dist/iData-v0.1.8-macos-universal.zip \
-  dist/iData-v0.1.8-macos-universal.dmg \
-  dist/iData-v0.1.8-macos-universal.pkg \
+gh release create v0.1.10 \
+  dist/iData-v0.1.10-macos-universal.zip \
+  dist/iData-v0.1.10-macos-universal.dmg \
+  dist/iData-v0.1.10-macos-universal.pkg \
   dist/SHA256SUMS.txt \
-  --title 'v0.1.8' \
-  --notes-file docs/releases/v0.1.8.md
+  --title 'v0.1.10' \
+  --notes-file docs/releases/v0.1.10.md
 ```
 
 After `gh release create`, workflow `sync-homebrew-cask.yml` updates `laleoarrow/homebrew-tap` (`Casks/idata.rb`) using the release zip digest.

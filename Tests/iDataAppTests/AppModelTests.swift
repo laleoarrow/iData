@@ -133,6 +133,8 @@ struct AppModelTests {
     func missingVisiDataMessageIncludesInstallGuidance() {
         let message = LaunchError.visiDataNotFound.errorDescription ?? ""
 
+        #expect(message.contains("one-click"))
+        #expect(message.contains("pipx install visidata"))
         #expect(message.contains("brew install visidata"))
         #expect(message.contains("Preferences"))
     }
@@ -143,6 +145,42 @@ struct AppModelTests {
         model.activeSession = VisiDataSessionController()
 
         #expect(model.displayedSession == nil)
+    }
+
+    @Test
+    func sessionDisplayPolicyKeepsFailedSessionVisible() {
+        #expect(AppModel.shouldDisplaySessionDetail(hasCurrentFile: true, isRunning: true, hasError: false))
+        #expect(AppModel.shouldDisplaySessionDetail(hasCurrentFile: true, isRunning: false, hasError: true))
+        #expect(!AppModel.shouldDisplaySessionDetail(hasCurrentFile: true, isRunning: false, hasError: false))
+        #expect(!AppModel.shouldDisplaySessionDetail(hasCurrentFile: false, isRunning: true, hasError: true))
+    }
+
+    @Test
+    func failedSessionRemainsDisplayedSoGuidanceStaysVisible() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-appmodel-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("report.xlsx")
+        try Data("placeholder".utf8).write(to: inputFile)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd.zsh")
+        try makeImmediateExitLauncher(at: launcher, exitCode: 9)
+
+        let session = VisiDataSessionController()
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+
+        let model = AppModel()
+        model.activeSession = session
+
+        let didFail = await waitForSessionFailure(session, timeoutNanoseconds: 5_000_000_000)
+
+        #expect(didFail)
+        #expect(model.displayedSession === session)
+        #expect(session.errorMessage?.contains("openpyxl") == true)
     }
 
     @Test
@@ -166,6 +204,8 @@ struct AppModelTests {
         )
 
         #expect(model.visiDataDependencyState == .missing)
+        #expect(model.visiDataDependencySummary.contains("one-click"))
+        #expect(model.visiDataDependencySummary.contains("pipx install visidata"))
         #expect(model.visiDataDependencySummary.contains("brew install visidata"))
     }
 
@@ -179,6 +219,8 @@ struct AppModelTests {
         )
 
         #expect(model.visiDataDependencySummary.contains("未找到"))
+        #expect(model.visiDataDependencySummary.contains("一键"))
+        #expect(model.visiDataDependencySummary.contains("pipx install visidata"))
         #expect(model.visiDataDependencySummary.contains("偏好设置"))
     }
 
@@ -190,6 +232,103 @@ struct AppModelTests {
         #expect(excel?.localizedDisplayName(for: .english) == "Excel Workbook")
         #expect(excel?.localizedDisplayName(for: .chinese) == "Excel 工作簿")
         #expect(gzip?.localizedDisplayName(for: .chinese) == "压缩 GZip")
+    }
+
+    @Test
+    func xlsxDependencyGuidanceMentionsOpenpyxl() {
+        let guidance = AppModel.visiDataFormatDependencyGuidance(
+            for: URL(fileURLWithPath: "/tmp/report.xlsx"),
+            language: .english
+        )
+
+        #expect(guidance?.contains(".xlsx") == true)
+        #expect(guidance?.contains("openpyxl") == true)
+        #expect(guidance?.contains("pipx inject visidata openpyxl") == true)
+    }
+
+    @Test
+    func xlsDependencyGuidanceMentionsXlrd() {
+        let guidance = AppModel.visiDataFormatDependencyGuidance(
+            for: URL(fileURLWithPath: "/tmp/report.xls"),
+            language: .english
+        )
+
+        #expect(guidance?.contains(".xls") == true)
+        #expect(guidance?.contains("xlrd") == true)
+        #expect(guidance?.contains("pipx inject visidata xlrd") == true)
+    }
+
+    @Test
+    func parquetDependencyGuidanceMentionsPyarrowOrPandas() {
+        let guidance = AppModel.visiDataFormatDependencyGuidance(
+            for: URL(fileURLWithPath: "/tmp/table.parquet"),
+            language: .english
+        )
+
+        #expect(guidance?.contains(".parquet") == true)
+        #expect(guidance?.contains("pyarrow") == true)
+        #expect(guidance?.contains("pandas") == true)
+    }
+
+    @Test
+    func compressedWorkbookDependencyGuidanceUsesNestedSuffix() {
+        let guidance = AppModel.visiDataFormatDependencyGuidance(
+            for: URL(fileURLWithPath: "/tmp/report.xlsx.gz"),
+            language: .english
+        )
+
+        #expect(guidance?.contains(".xlsx") == true)
+        #expect(guidance?.contains("openpyxl") == true)
+    }
+
+    @Test
+    func csvHasNoExtraDependencyGuidance() {
+        let guidance = AppModel.visiDataFormatDependencyGuidance(
+            for: URL(fileURLWithPath: "/tmp/table.csv"),
+            language: .english
+        )
+
+        #expect(guidance == nil)
+    }
+
+    @Test
+    func formatDependencyGuidanceRemainsStableUnderLargeFilenameSet() {
+        let baseDirectory = "/tmp/idata-guidance-stress"
+        let cases: [(suffix: String, shouldMatch: Bool)] = [
+            ("report.xlsx", true),
+            ("report.XLSX.GZ", true),
+            ("report.xls", true),
+            ("report.xlsb.bgz", true),
+            ("dataset.parquet", true),
+            ("dataset.parquet.bgzf", true),
+            ("sheet.ods", true),
+            ("stream.arrow", true),
+            ("stream.arrows.gz", true),
+            ("table.csv", false),
+            ("table.tsv.gz", false),
+            ("notes.txt", false),
+            ("archive.zip", false),
+        ]
+
+        var matched = 0
+        var unmatched = 0
+
+        for iteration in 0..<2_000 {
+            let testCase = cases[iteration % cases.count]
+            let url = URL(fileURLWithPath: "\(baseDirectory)/\(iteration)-\(testCase.suffix)")
+            let guidance = AppModel.visiDataFormatDependencyGuidance(for: url, language: .english)
+
+            if testCase.shouldMatch {
+                #expect(guidance != nil)
+                matched += 1
+            } else {
+                #expect(guidance == nil)
+                unmatched += 1
+            }
+        }
+
+        #expect(matched > 0)
+        #expect(unmatched > 0)
     }
 
     @Test
@@ -624,4 +763,33 @@ private struct FakeExecutableChecker: ExecutableChecking {
     func isExecutableFile(atPath path: String) -> Bool {
         executablePaths.contains(path)
     }
+}
+
+private func makeImmediateExitLauncher(at url: URL, exitCode: Int) throws {
+    let script = """
+    #!/bin/zsh
+    exit \(exitCode)
+    """
+
+    try script.write(to: url, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+}
+
+@MainActor
+private func waitForSessionFailure(
+    _ session: VisiDataSessionController,
+    timeoutNanoseconds: UInt64,
+    pollNanoseconds: UInt64 = 25_000_000
+) async -> Bool {
+    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+
+    while DispatchTime.now().uptimeNanoseconds < deadline {
+        if !session.isRunning, session.errorMessage != nil {
+            return true
+        }
+
+        try? await Task.sleep(nanoseconds: pollNanoseconds)
+    }
+
+    return !session.isRunning && session.errorMessage != nil
 }

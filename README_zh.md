@@ -82,5 +82,5 @@ swift test
 打包发布：
 
 ```bash
-./scripts/package_release.sh 0.1.8
+./scripts/package_release.sh 0.1.10
 ```

@@ -829,7 +829,11 @@ private struct SessionStageView: View {
     }
 
     private var isSessionReady: Bool {
-        session.isRunning && session.currentFileURL != nil
+        AppModel.shouldDisplaySessionDetail(
+            hasCurrentFile: session.currentFileURL != nil,
+            isRunning: session.isRunning,
+            hasError: session.errorMessage != nil
+        )
     }
 
     var body: some View {
@@ -1320,7 +1324,7 @@ private struct WelcomeDetailView: View {
 
     private var heroCard: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 18) {
+            HStack(alignment: .center, spacing: 16) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -1328,10 +1332,11 @@ private struct WelcomeDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .center, spacing: 10) {
                         Text("iData")
-                            .font(.system(size: 38, weight: .bold, design: .rounded))
+                            .font(.title2)
+                            .fontWeight(.semibold)
 
                         VersionPill(model: model, tint: .white.opacity(0.14), icon: "shippingbox")
 
