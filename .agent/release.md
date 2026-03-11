@@ -26,6 +26,13 @@ Outputs:
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
 
+Optional signing and notarization inputs:
+
+- `IDATA_DEVELOPER_ID_APP`
+- `IDATA_DEVELOPER_ID_INSTALLER`
+- `IDATA_NOTARY_KEYCHAIN_PROFILE`
+- or `IDATA_NOTARY_KEY_PATH` + `IDATA_NOTARY_KEY_ID` + `IDATA_NOTARY_ISSUER`
+
 ## Build only the installer package
 
 ```bash
@@ -68,6 +75,10 @@ gh release create v0.1.8 \
   --notes-file docs/releases/v0.1.8.md
 ```
 
+For Apple signing/notarization details:
+
+- `docs/apple-signing-and-notarization.md`
+
 ## Update Appcast & Website (Crucial Step)
 
 The iData website at `https://laleoarrow.github.io/iData/` serves the `appcast.xml` for seamless Sparkle over-the-air updates. During a release:
@@ -80,6 +91,7 @@ The iData website at `https://laleoarrow.github.io/iData/` serves the `appcast.x
 ## Distribution notes
 
 - The app is currently unsigned and not notarized
+- `package_release.sh` now supports optional signing/notarization when the required Apple env vars are configured
 - Local installs from the working tree can be copied directly into `/Applications`
 - Users who download from GitHub may need to approve the app in macOS security settings
 - Sparkle requires `docs/appcast.xml` to be published from GitHub Pages

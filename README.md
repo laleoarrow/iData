@@ -55,6 +55,7 @@ If `VisiData` is missing, `iData` stays on the welcome screen and shows install 
 - release assets live on GitHub Releases
 - the update feed lives at `docs/appcast.xml` and is intended for GitHub Pages hosting
 - package a release with `./scripts/package_release.sh <version>`
+- optional Apple signing/notarization is documented in `docs/apple-signing-and-notarization.md`
 
 ## Development
 
@@ -77,9 +78,23 @@ Package a GitHub release asset:
 ./scripts/package_release.sh 0.1.8
 ```
 
+Optional signed/notarized release after Apple credentials are ready:
+
+```bash
+export IDATA_DEVELOPER_ID_APP="Developer ID Application: Your Name (TEAMID)"
+export IDATA_DEVELOPER_ID_INSTALLER="Developer ID Installer: Your Name (TEAMID)"
+export IDATA_NOTARY_KEYCHAIN_PROFILE="iData-notary"
+
+./scripts/package_release.sh 0.1.8
+```
+
 Install locally:
 
 - Copy `dist/iData.app` into `/Applications`
 - Quit any other running `iData` instance before testing the release build
 - Open `dist/iData-v0.1.8-macos-universal.dmg` if you want the drag-to-Applications installer view
 - Or run `dist/iData-v0.1.8-macos-universal.pkg` for the installer package flow
+
+Signing/notarization setup guide:
+
+- `docs/apple-signing-and-notarization.md`

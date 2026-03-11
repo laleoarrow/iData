@@ -14,13 +14,57 @@ RELEASE_NOTES_SOURCE="$ROOT_DIR/docs/releases/v${VERSION}.md"
 RELEASE_NOTES_STAGING="$APPCAST_STAGING_DIR/iData-v${VERSION}-macos-universal.md"
 SPARKLE_BIN_DIR="$ROOT_DIR/.build/SourcePackages/artifacts/sparkle/Sparkle/bin"
 GENERATE_APPCAST="$SPARKLE_BIN_DIR/generate_appcast"
+APP_SIGN_IDENTITY=${IDATA_DEVELOPER_ID_APP:-}
+INSTALLER_SIGN_IDENTITY=${IDATA_DEVELOPER_ID_INSTALLER:-}
+NOTARY_PROFILE=${IDATA_NOTARY_KEYCHAIN_PROFILE:-}
+NOTARY_KEY_PATH=${IDATA_NOTARY_KEY_PATH:-}
+NOTARY_KEY_ID=${IDATA_NOTARY_KEY_ID:-}
+
+notarization_configured() {
+  [[ -n "$NOTARY_PROFILE" ]] || [[ -n "$NOTARY_KEY_PATH" && -n "$NOTARY_KEY_ID" ]]
+}
 
 "$ROOT_DIR/scripts/build_app.sh"
+
+if [[ -n "$APP_SIGN_IDENTITY" ]]; then
+  "$ROOT_DIR/scripts/sign_app.sh" "$APP_DIR"
+
+  if notarization_configured; then
+    APP_NOTARY_ZIP="$ROOT_DIR/dist/.iData-v${VERSION}-notary.zip"
+    rm -f "$APP_NOTARY_ZIP"
+    ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$APP_NOTARY_ZIP"
+    "$ROOT_DIR/scripts/notarize_path.sh" "$APP_NOTARY_ZIP" --no-staple
+    rm -f "$APP_NOTARY_ZIP"
+    xcrun stapler staple -v "$APP_DIR"
+    xcrun stapler validate -v "$APP_DIR"
+  else
+    echo "Skipping app notarization: configure IDATA_NOTARY_KEYCHAIN_PROFILE or API key env vars"
+  fi
+else
+  echo "Skipping app signing: IDATA_DEVELOPER_ID_APP is not set"
+fi
+
 "$ROOT_DIR/scripts/create_dmg.sh" "$VERSION"
 "$ROOT_DIR/scripts/create_pkg.sh" "$VERSION"
 
 rm -f "$ZIP_PATH"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
+
+if notarization_configured; then
+  if [[ -n "$APP_SIGN_IDENTITY" ]]; then
+    "$ROOT_DIR/scripts/notarize_path.sh" "$DMG_PATH"
+  else
+    echo "Skipping DMG notarization: app bundle was not Developer ID signed"
+  fi
+
+  if [[ -n "$INSTALLER_SIGN_IDENTITY" ]]; then
+    "$ROOT_DIR/scripts/notarize_path.sh" "$PKG_PATH"
+  else
+    echo "Skipping PKG notarization: IDATA_DEVELOPER_ID_INSTALLER is not set"
+  fi
+else
+  echo "Skipping release archive notarization: notarization credentials are not configured"
+fi
 
 {
   shasum -a 256 "$ZIP_PATH"

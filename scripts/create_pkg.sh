@@ -12,6 +12,7 @@ COMPONENT_PKG="$PKG_WORK_DIR/iData-app-component.pkg"
 PRODUCT_ID="io.github.leoarrow.idata.installer"
 COMPONENT_ID="io.github.leoarrow.idata.pkg.app"
 SCRIPTS_DIR="$ROOT_DIR/scripts/pkg"
+INSTALLER_IDENTITY=${IDATA_DEVELOPER_ID_INSTALLER:-}
 
 export COPYFILE_DISABLE=1
 
@@ -35,11 +36,20 @@ pkgbuild \
   --install-location / \
   "$COMPONENT_PKG"
 
-productbuild \
-  --package "$COMPONENT_PKG" \
-  --identifier "$PRODUCT_ID" \
-  --version "$VERSION" \
-  "$FINAL_PKG"
+typeset -a PRODUCTBUILD_ARGS
+PRODUCTBUILD_ARGS=(
+  --package "$COMPONENT_PKG"
+  --identifier "$PRODUCT_ID"
+  --version "$VERSION"
+)
+
+if [[ -n "$INSTALLER_IDENTITY" ]]; then
+  PRODUCTBUILD_ARGS+=(--sign "$INSTALLER_IDENTITY")
+else
+  echo "Skipping pkg signing: IDATA_DEVELOPER_ID_INSTALLER is not set"
+fi
+
+productbuild "${PRODUCTBUILD_ARGS[@]}" "$FINAL_PKG"
 
 if ! pkgutil --check-signature "$FINAL_PKG"; then
   printf 'Package is currently unsigned: %s\n' "$FINAL_PKG" >&2
