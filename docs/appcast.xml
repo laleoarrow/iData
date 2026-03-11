@@ -4,7 +4,7 @@
         <title>iData</title>
         <item>
             <title>0.1.7</title>
-            <pubDate>Wed, 11 Mar 2026 14:10:48 +0800</pubDate>
+            <pubDate>Wed, 11 Mar 2026 14:18:57 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
             <sparkle:version>8</sparkle:version>
             <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
@@ -26,7 +26,7 @@ Released: 2026-03-11
 
 - Build remains unsigned/not notarized for local distribution.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.7/iData-v0.1.7-macos-universal.zip" length="3773535" type="application/octet-stream" sparkle:edSignature="52bSbLdUqVCO64oe5sLVNXLBuV0cVRfocxXKksn5f+LzCdjiRYJ4+3PW9fEtj7kSPHYJt1E2elXl0KZxfwSbAQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.7/iData-v0.1.7-macos-universal.zip" length="3764618" type="application/octet-stream" sparkle:edSignature="CBbRJs+dpYoqE+rRcZuG0kXCrlmXe5PyFbxJIUnk1AaHMrZZpp7K16l5BSJFkVMp5eqLw5ute2fI9okoT6EaAQ=="/>
         </item>
     </channel>
 </rss>

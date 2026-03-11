@@ -884,6 +884,19 @@ final class AppModel: ObservableObject {
             }
 
             let previousDefaultApp = FileTypeAssociation.currentDefaultApp(forExtension: lookupExtension)
+
+            // Remember the previous default app BEFORE we attempt to change it.
+            // macOS may apply the change asynchronously, so if we wait until after
+            // checking isNowDefault, we risk never saving the old default.
+            if
+                let previousDefaultApp,
+                !FileTypeAssociation.isIDataBundleIdentifier(previousDefaultApp.bundleIdentifier)
+            {
+                await MainActor.run {
+                    rememberPreviousDefaultApp(previousDefaultApp, forLookupExtension: lookupExtension)
+                }
+            }
+
             let setResult = await FileTypeAssociation.setIDataAsDefaultApp(forExtension: lookupExtension)
 
             await MainActor.run {
@@ -892,18 +905,14 @@ final class AppModel: ObservableObject {
                 let shownExtension = lookupExtension
 
                 if isNowDefault {
-                    if
-                        let previousDefaultApp,
-                        !FileTypeAssociation.isIDataBundleIdentifier(previousDefaultApp.bundleIdentifier)
-                    {
-                        rememberPreviousDefaultApp(previousDefaultApp, forLookupExtension: lookupExtension)
-                    }
                     statusMessage = "已设置 .\(shownExtension) 默认用 iData 打开"
                     errorMessage = nil
                 } else if setResult == .success {
                     statusMessage = "系统已收到设置请求，但 .\(shownExtension) 还未切换到 iData。请再试一次并确认系统提示。"
                     errorMessage = nil
                 } else {
+                    // Setting failed, forget the saved previous default since no change was made
+                    forgetPreviousDefaultApp(forLookupExtension: lookupExtension)
                     errorMessage = "无法设置 .\(shownExtension) 默认应用：\(setResult.userMessage)"
                     statusMessage = nil
                 }
