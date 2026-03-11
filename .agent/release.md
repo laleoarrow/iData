@@ -48,7 +48,7 @@ Installer behavior:
 - installs `iData.app` into `/Applications/iData.app`
 - writes VisiData follow-up guidance into `/Users/Shared/iData`
 - places an interactive helper at `/Users/Shared/iData/Configure VisiData.command`
-- keeps `VisiData` external; users are guided toward `pipx install visidata` and `pipx inject visidata openpyxl`
+- keeps `VisiData` external; users are guided toward `pipx install visidata` and `pipx inject visidata openpyxl pyxlsb xlrd zstandard`
 
 ## Publish with GitHub CLI
 

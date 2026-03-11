@@ -13,6 +13,9 @@ PYTHON3_BIN=""
 VD_BIN=""
 PIPX_VISIDATA_STATUS="not detected"
 OPENPYXL_STATUS="not detected"
+PYXLSB_STATUS="not detected"
+XLRD_STATUS="not detected"
+ZSTANDARD_STATUS="not detected"
 
 refresh_detection() {
   PIPX_BIN=$(command -v pipx || true)
@@ -20,6 +23,9 @@ refresh_detection() {
   VD_BIN=$(command -v vd || true)
   PIPX_VISIDATA_STATUS="not detected"
   OPENPYXL_STATUS="not detected"
+  PYXLSB_STATUS="not detected"
+  XLRD_STATUS="not detected"
+  ZSTANDARD_STATUS="not detected"
 
   if [[ -n "$PIPX_BIN" ]]; then
     if "$PIPX_BIN" runpip visidata show visidata >/dev/null 2>&1; then
@@ -30,6 +36,24 @@ refresh_detection() {
       OPENPYXL_STATUS="installed in the visidata pipx environment"
     else
       OPENPYXL_STATUS="missing from the visidata pipx environment"
+    fi
+
+    if "$PIPX_BIN" runpip visidata show pyxlsb >/dev/null 2>&1; then
+      PYXLSB_STATUS="installed in the visidata pipx environment"
+    else
+      PYXLSB_STATUS="missing from the visidata pipx environment"
+    fi
+
+    if "$PIPX_BIN" runpip visidata show xlrd >/dev/null 2>&1; then
+      XLRD_STATUS="installed in the visidata pipx environment"
+    else
+      XLRD_STATUS="missing from the visidata pipx environment"
+    fi
+
+    if "$PIPX_BIN" runpip visidata show zstandard >/dev/null 2>&1; then
+      ZSTANDARD_STATUS="installed in the visidata pipx environment"
+    else
+      ZSTANDARD_STATUS="missing from the visidata pipx environment"
     fi
   fi
 }
@@ -46,6 +70,9 @@ Detected on this Mac:
 - vd on PATH: ${VD_BIN:-missing}
 - pipx visidata environment: $PIPX_VISIDATA_STATUS
 - openpyxl for Excel loaders: $OPENPYXL_STATUS
+- pyxlsb for Excel Binary Workbook loaders: $PYXLSB_STATUS
+- xlrd for legacy Excel loaders: $XLRD_STATUS
+- zstandard for compressed inputs: $ZSTANDARD_STATUS
 
 Recommended setup path
 ----------------------
@@ -56,11 +83,11 @@ Recommended setup path
    - pipx ensurepath
 3. Install VisiData into pipx
    - pipx install visidata
-4. Add Excel support for .xlsx/.xlsm loaders
-   - pipx inject visidata openpyxl
+4. Add common workbook and compression support
+   - pipx inject visidata openpyxl pyxlsb xlrd zstandard
 5. Verify the environment
    - pipx list
-   - pipx runpip visidata show openpyxl
+   - pipx runpip visidata show openpyxl pyxlsb xlrd zstandard
    - command -v vd
 
 iData notes
@@ -105,8 +132,8 @@ install_visidata() {
   fi
 
   if command -v pipx >/dev/null 2>&1; then
-    echo "Injecting openpyxl into visidata pipx environment..."
-    pipx inject visidata openpyxl || true
+    echo "Injecting common workbook and compression packages into the visidata pipx environment..."
+    pipx inject visidata openpyxl pyxlsb xlrd zstandard || true
   fi
 
   echo ""

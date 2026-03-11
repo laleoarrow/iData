@@ -599,14 +599,20 @@ final class AppModel: ObservableObject {
             chinese: "`.xlsx` 文件通常依赖 `openpyxl`。如果缺少对应 loader，可执行 `pipx inject visidata openpyxl`。"
         ),
         VisiDataFormatDependencyAdvice(
-            extensions: ["xls", "xlsb"],
-            english: "For `.xls` and `.xlsb` files, VisiData uses `xlrd`. Install it with `pipx inject visidata xlrd` if loader support is missing.",
-            chinese: "`.xls` 和 `.xlsb` 文件通常依赖 `xlrd`。如果缺少对应 loader，可执行 `pipx inject visidata xlrd`。"
+            extensions: ["xls"],
+            english: "For `.xls` files, VisiData uses `xlrd`. Install it with `pipx inject visidata xlrd` if loader support is missing.",
+            chinese: "`.xls` 文件通常依赖 `xlrd`。如果缺少对应 loader，可执行 `pipx inject visidata xlrd`。"
+        ),
+        // VisiData 3.3 ships a dedicated xlsb loader which imports `pyxlsb`.
+        VisiDataFormatDependencyAdvice(
+            extensions: ["xlsb"],
+            english: "For `.xlsb` files, VisiData uses `pyxlsb`. Install it with `pipx inject visidata pyxlsb` if loader support is missing.",
+            chinese: "`.xlsb` 文件通常依赖 `pyxlsb`。如果缺少对应 loader，可执行 `pipx inject visidata pyxlsb`。"
         ),
         VisiDataFormatDependencyAdvice(
             extensions: ["parquet"],
-            english: "For `.parquet` files, VisiData needs `pyarrow` or the pandas-backed loader. Install support with `pipx inject visidata pyarrow pandas` if needed.",
-            chinese: "`.parquet` 文件通常依赖 `pyarrow`，也可走 pandas loader。若缺少支持，可执行 `pipx inject visidata pyarrow pandas`。"
+            english: "For `.parquet` files, VisiData uses `pyarrow`. Install it with `pipx inject visidata pyarrow` if loader support is missing.",
+            chinese: "`.parquet` 文件通常依赖 `pyarrow`。如果缺少对应 loader，可执行 `pipx inject visidata pyarrow`。"
         ),
         VisiDataFormatDependencyAdvice(
             extensions: ["ods"],
@@ -1303,8 +1309,8 @@ final class AppModel: ObservableObject {
         echo ""
 
         # ── Step 3: Inject Excel & common format plugins ──
-        echo "▸ Injecting Excel and compression plugins (openpyxl, xlrd, zstandard)..."
-        pipx inject visidata openpyxl xlrd zstandard || true
+        echo "▸ Injecting Excel and compression plugins (openpyxl, pyxlsb, xlrd, zstandard)..."
+        pipx inject visidata openpyxl pyxlsb xlrd zstandard || true
         echo ""
 
         # ── Verification ──

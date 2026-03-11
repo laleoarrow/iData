@@ -34,7 +34,7 @@ Expected guidance:
 - Users can click the "Install VisiData via Terminal" button for a one-click automated setup (`brew` or `pipx`)
 - Recommended manual path:
   - `pipx install visidata`
-  - `pipx inject visidata openpyxl`
+  - `pipx inject visidata openpyxl pyxlsb xlrd zstandard`
 - Optional manual path: `brew install visidata`
 - Or users can set a custom executable path in Preferences
 

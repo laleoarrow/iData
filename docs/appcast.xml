@@ -4,7 +4,7 @@
         <title>iData</title>
         <item>
             <title>0.1.10</title>
-            <pubDate>Wed, 11 Mar 2026 23:42:03 +0800</pubDate>
+            <pubDate>Thu, 12 Mar 2026 00:11:07 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
             <sparkle:version>10</sparkle:version>
             <sparkle:shortVersionString>0.1.10</sparkle:shortVersionString>
@@ -26,9 +26,9 @@ This release fixes the VisiData failure path so users keep the session view and 
   - `brew install --cask laleoarrow/tap/idata`
 - Recommended VisiData install path:
   - `pipx install visidata`
-  - `pipx inject visidata openpyxl xlrd zstandard`
+  - `pipx inject visidata openpyxl pyxlsb xlrd zstandard`
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.10/iData-v0.1.10-macos-universal.zip" length="3825278" type="application/octet-stream" sparkle:edSignature="+Zp14YdF5wkilFCrLar4Cnr5haQhWVKFCWsSzCzCMBJNFAg8RpVZGGRKalS+s5n4UTp+ZKIHhsgLCVEJs8lhCQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.10/iData-v0.1.10-macos-universal.zip" length="3825328" type="application/octet-stream" sparkle:edSignature="0QS/+xOwGJrXukX9/rmbPSKr37iz6VNTlcHlRFoq9/Xjp5+XAxOzIeN2AHcJyEs6KpItK58i3e9Nd4dW6Pn6Dg=="/>
         </item>
     </channel>
 </rss>

@@ -32,7 +32,7 @@ brew upgrade --cask laleoarrow/tap/idata
 
 ```bash
 pipx install visidata
-pipx inject visidata openpyxl
+pipx inject visidata openpyxl pyxlsb xlrd zstandard
 ```
 
 可选方式：

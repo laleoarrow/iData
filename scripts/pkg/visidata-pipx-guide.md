@@ -41,18 +41,18 @@ vd --version
 
 `pipx` commonly exposes apps in `~/.local/bin` on macOS, so `pipx ensurepath` is the important step that makes `vd` discoverable by `iData`.
 
-## 3. Add Excel support with `openpyxl`
+## 3. Add common workbook and compression support
 
-The VisiData format reference lists `openpyxl` as the dependency for Excel `.xlsx` loaders. Keep VisiData isolated and add the dependency into the existing `pipx` environment:
+VisiData 3.3 uses `openpyxl` for `.xlsx`, `xlrd` for `.xls`, and `pyxlsb` for `.xlsb`. `iData` also recommends `zstandard` for compressed inputs. Keep VisiData isolated and add those dependencies into the existing `pipx` environment:
 
 ```bash
-pipx inject visidata openpyxl
+pipx inject visidata openpyxl pyxlsb xlrd zstandard
 ```
 
-Verify the Excel dependency:
+Verify the workbook and compression dependencies:
 
 ```bash
-pipx runpip visidata show openpyxl
+pipx runpip visidata show openpyxl pyxlsb xlrd zstandard
 ```
 
 ## 4. Point iData at `vd` if auto-discovery misses it
@@ -75,7 +75,7 @@ Typical `pipx` location:
 command -v pipx
 command -v vd
 pipx list
-pipx runpip visidata show openpyxl
+pipx runpip visidata show openpyxl pyxlsb xlrd zstandard
 ```
 
 ## Official references

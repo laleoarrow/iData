@@ -47,7 +47,7 @@ Recommended install:
 
 ```bash
 pipx install visidata
-pipx inject visidata openpyxl
+pipx inject visidata openpyxl pyxlsb xlrd zstandard
 ```
 
 Optional alternative:

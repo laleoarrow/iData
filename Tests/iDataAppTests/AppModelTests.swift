@@ -259,7 +259,19 @@ struct AppModelTests {
     }
 
     @Test
-    func parquetDependencyGuidanceMentionsPyarrowOrPandas() {
+    func xlsbDependencyGuidanceMentionsPyxlsb() {
+        let guidance = AppModel.visiDataFormatDependencyGuidance(
+            for: URL(fileURLWithPath: "/tmp/report.xlsb"),
+            language: .english
+        )
+
+        #expect(guidance?.contains(".xlsb") == true)
+        #expect(guidance?.contains("pyxlsb") == true)
+        #expect(guidance?.contains("pipx inject visidata pyxlsb") == true)
+    }
+
+    @Test
+    func parquetDependencyGuidanceMentionsOnlyPyarrow() {
         let guidance = AppModel.visiDataFormatDependencyGuidance(
             for: URL(fileURLWithPath: "/tmp/table.parquet"),
             language: .english
@@ -267,7 +279,8 @@ struct AppModelTests {
 
         #expect(guidance?.contains(".parquet") == true)
         #expect(guidance?.contains("pyarrow") == true)
-        #expect(guidance?.contains("pandas") == true)
+        #expect(guidance?.contains("pipx inject visidata pyarrow") == true)
+        #expect(guidance?.contains("pandas") == false)
     }
 
     @Test
@@ -753,7 +766,7 @@ struct AppModelTests {
 
         #expect(script.contains("brew install pipx"))
         #expect(script.contains("pipx install visidata"))
-        #expect(script.contains("pipx inject visidata openpyxl xlrd zstandard"))
+        #expect(script.contains("pipx inject visidata openpyxl pyxlsb xlrd zstandard"))
     }
 }
 
