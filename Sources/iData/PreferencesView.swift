@@ -9,6 +9,10 @@ struct PreferencesView: View {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
+    private var isChinese: Bool {
+        model.effectiveLanguage == .chinese
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -36,10 +40,10 @@ struct PreferencesView: View {
                     .background(Color.accentColor.opacity(0.26), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Preferences")
+                    Text(isChinese ? "偏好设置" : "Preferences")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
 
-                    Text("Configure where `iData` finds `VisiData`, control update behavior, and verify the current runtime state before opening large files.")
+                    Text(isChinese ? "配置 `iData` 查找 `VisiData` 的位置，控制更新行为，并在打开大文件前确认当前运行状态。" : "Configure where `iData` finds `VisiData`, control update behavior, and verify the current runtime state before opening large files.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -49,9 +53,9 @@ struct PreferencesView: View {
 
                         switch model.visiDataDependencyState {
                         case .available:
-                            PreferencePill(title: "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill", animated: motionEnabled)
+                            PreferencePill(title: isChinese ? "VisiData 已就绪" : "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill", animated: motionEnabled)
                         case .missing:
-                            PreferencePill(title: "VisiData Missing", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill", animated: motionEnabled)
+                            PreferencePill(title: isChinese ? "缺少 VisiData" : "VisiData Missing", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill", animated: motionEnabled)
                         }
                     }
                 }
@@ -67,12 +71,12 @@ struct PreferencesView: View {
     }
 
     private var animationsCard: some View {
-        PreferencesCard(title: "Appearance", icon: "sparkles") {
+        PreferencesCard(title: isChinese ? "外观" : "Appearance", icon: "sparkles") {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("Reduce iData animations", isOn: $model.reduceAnimations)
+                Toggle(isChinese ? "减少 iData 动画效果" : "Reduce iData animations", isOn: $model.reduceAnimations)
                     .toggleStyle(.switch)
 
-                Text("Turns down most spring, hover, and reveal animations across the app. System Reduce Motion is still respected.")
+                Text(isChinese ? "降低应用内的大部分弹性、悬停和渐显动画强度。系统的“减少动态效果”设置仍然会被优先遵循。" : "Turns down most spring, hover, and reveal animations across the app. System Reduce Motion is still respected.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -81,27 +85,27 @@ struct PreferencesView: View {
     }
 
     private var runtimeCard: some View {
-        PreferencesCard(title: "VisiData Runtime", icon: "terminal") {
+        PreferencesCard(title: isChinese ? "VisiData 运行环境" : "VisiData Runtime", icon: "terminal") {
             VStack(alignment: .leading, spacing: 14) {
                 TextField("/opt/homebrew/bin/vd", text: $model.vdExecutablePath)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
 
                 HStack(spacing: 10) {
-                    Button("Choose Executable…") {
+                    Button(isChinese ? "选择可执行文件…" : "Choose Executable…") {
                         model.chooseVDExecutable()
                     }
                     .buttonStyle(.borderedProminent)
                     .quietInteractiveSurface(enabled: motionEnabled)
 
-                    Button("Auto Detect") {
+                    Button(isChinese ? "自动检测" : "Auto Detect") {
                         model.vdExecutablePath = ""
                     }
                     .buttonStyle(.bordered)
                     .quietInteractiveSurface(enabled: motionEnabled)
 
                     if case .missing = model.visiDataDependencyState {
-                        Button("One-Click Setup") {
+                        Button(isChinese ? "一键安装" : "One-Click Setup") {
                             model.runVisiDataOneClickSetup()
                         }
                         .buttonStyle(.bordered)
@@ -120,9 +124,9 @@ struct PreferencesView: View {
     }
 
     private var appLanguageCard: some View {
-        PreferencesCard(title: model.isChinese ? "通用与语言" : "Language", icon: "globe") {
+        PreferencesCard(title: isChinese ? "通用与语言" : "Language", icon: "globe") {
             VStack(alignment: .leading, spacing: 14) {
-                Picker(model.isChinese ? "应用语言" : "App language", selection: $model.appLanguagePreference) {
+                Picker(isChinese ? "应用语言" : "App language", selection: $model.appLanguagePreference) {
                     ForEach(AppModel.AppLanguagePreference.allCases) { option in
                         Text(model.appLanguageOptionTitle(option))
                             .tag(option)
@@ -130,7 +134,7 @@ struct PreferencesView: View {
                 }
                 .pickerStyle(.segmented)
 
-                Text(model.isChinese ? "通常跟随 macOS 首选语言。应用主界面和交互式教程均会同步切换。" : "`System` follows macOS preferred language. Applies to Welcome UI and Tutorials.")
+                Text(isChinese ? "“系统”会跟随 macOS 首选语言。整个原生界面和交互式教程都会同步切换。" : "`System` follows macOS preferred language. Applies across the native app shell and interactive tutorials.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -143,15 +147,15 @@ struct PreferencesView: View {
     }
 
     private var updatesCard: some View {
-        PreferencesCard(title: "Updates", icon: "square.and.arrow.down") {
+        PreferencesCard(title: isChinese ? "更新" : "Updates", icon: "square.and.arrow.down") {
             VStack(alignment: .leading, spacing: 14) {
-                Toggle("Automatically check for updates", isOn: Binding(
+                Toggle(isChinese ? "自动检查更新" : "Automatically check for updates", isOn: Binding(
                     get: { updater.automaticallyChecksForUpdates },
                     set: { updater.setAutomaticallyChecksForUpdates($0) }
                 ))
                 .toggleStyle(.switch)
 
-                Toggle("Automatically download updates", isOn: Binding(
+                Toggle(isChinese ? "自动下载更新" : "Automatically download updates", isOn: Binding(
                     get: { updater.automaticallyDownloadsUpdates },
                     set: { updater.setAutomaticallyDownloadsUpdates($0) }
                 ))
@@ -159,13 +163,13 @@ struct PreferencesView: View {
                 .disabled(!updater.automaticallyChecksForUpdates)
 
                 HStack(spacing: 10) {
-                    Button("Check for Updates Now") {
+                    Button(isChinese ? "立即检查更新" : "Check for Updates Now") {
                         updater.checkForUpdates()
                     }
                     .buttonStyle(.borderedProminent)
                     .quietInteractiveSurface(enabled: motionEnabled)
 
-                    Button("Open Releases") {
+                    Button(isChinese ? "打开发布页" : "Open Releases") {
                         NSWorkspace.shared.open(updater.releasesURL)
                     }
                     .buttonStyle(.bordered)

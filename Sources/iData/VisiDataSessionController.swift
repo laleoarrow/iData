@@ -72,7 +72,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         currentFileURL = fileURL
         errorMessage = nil
-        statusMessage = "Opening \(fileURL.lastPathComponent)…"
+        statusMessage = AppModel.localized(
+            english: "Opening \(fileURL.lastPathComponent)…",
+            chinese: "正在打开 \(fileURL.lastPathComponent)…"
+        )
         transcript.reset()
         requiresDisplayReset = true
 
@@ -89,7 +92,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         )
 
         isRunning = true
-        statusMessage = "Running VisiData for \(fileURL.lastPathComponent)."
+        statusMessage = AppModel.localized(
+            english: "Running VisiData for \(fileURL.lastPathComponent).",
+            chinese: "正在为 \(fileURL.lastPathComponent) 运行 VisiData。"
+        )
     }
 
     @MainActor
@@ -143,7 +149,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         displayRefreshGeneration &+= 1
         stopCurrentProcessIfNeeded(reapSynchronously: true)
         isRunning = false
-        statusMessage = "Session ended."
+        statusMessage = AppModel.localized(
+            english: "Session ended.",
+            chinese: "会话已结束。"
+        )
     }
 
     private func startProcess(
@@ -415,18 +424,36 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             if didExitNormally(exitStatus) {
                 let code = exitCode(from: exitStatus)
                 if code == 0 {
-                    self.statusMessage = "VisiData exited."
+                    self.statusMessage = AppModel.localized(
+                        english: "VisiData exited.",
+                        chinese: "VisiData 已退出。"
+                    )
                     self.errorMessage = nil
                 } else {
-                    self.statusMessage = "VisiData exited with code \(code)."
-                    self.errorMessage = "VisiData exited with code \(code)."
+                    self.statusMessage = AppModel.localized(
+                        english: "VisiData exited with code \(code).",
+                        chinese: "VisiData 已退出，代码为 \(code)。"
+                    )
+                    self.errorMessage = AppModel.localized(
+                        english: "VisiData exited with code \(code).",
+                        chinese: "VisiData 已退出，代码为 \(code)。"
+                    )
                 }
             } else if didTerminateBySignal(exitStatus) {
                 let signal = terminatingSignal(from: exitStatus)
-                self.statusMessage = "VisiData terminated."
-                self.errorMessage = "VisiData was interrupted by signal \(signal)."
+                self.statusMessage = AppModel.localized(
+                    english: "VisiData terminated.",
+                    chinese: "VisiData 已终止。"
+                )
+                self.errorMessage = AppModel.localized(
+                    english: "VisiData was interrupted by signal \(signal).",
+                    chinese: "VisiData 被信号 \(signal) 中断。"
+                )
             } else {
-                self.statusMessage = "VisiData ended."
+                self.statusMessage = AppModel.localized(
+                    english: "VisiData ended.",
+                    chinese: "VisiData 已结束。"
+                )
             }
         }
     }

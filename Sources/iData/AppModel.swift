@@ -52,7 +52,17 @@ final class AppModel: ObservableObject {
 
     struct SupportedFormat {
         let displayName: String
+        let chineseDisplayName: String
         let fileExtension: String
+
+        func localizedDisplayName(for language: AppResolvedLanguage) -> String {
+            switch language {
+            case .english:
+                displayName
+            case .chinese:
+                chineseDisplayName
+            }
+        }
     }
 
     @Published var activeSession: VisiDataSessionController?
@@ -98,53 +108,53 @@ final class AppModel: ObservableObject {
     private let preferredLanguagesProvider: () -> [String]
     private let formatAssociationRestoreStore: FormatAssociationRestoreStore
 
-    static let vdExecutablePathKey = "vdExecutablePath"
-    static let pinnedRecentFilesKey = "pinnedRecentFiles"
-    static let reduceAnimationsKey = "reduceAnimations"
-    static let isSidebarCollapsedKey = "isSidebarCollapsed"
-    static let appLanguagePreferenceKey = "appLanguagePreference"
-    static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
-    static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
-    static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
-    static let defaultTutorialChapterID = "basic"
-    static let recentFilesLimit = 10
+    nonisolated static let vdExecutablePathKey = "vdExecutablePath"
+    nonisolated static let pinnedRecentFilesKey = "pinnedRecentFiles"
+    nonisolated static let reduceAnimationsKey = "reduceAnimations"
+    nonisolated static let isSidebarCollapsedKey = "isSidebarCollapsed"
+    nonisolated static let appLanguagePreferenceKey = "appLanguagePreference"
+    nonisolated static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
+    nonisolated static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
+    nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
+    nonisolated static let defaultTutorialChapterID = "basic"
+    nonisolated static let recentFilesLimit = 10
     static let sharedVisiDataHelperPath = "/Users/Shared/iData/Configure VisiData.command"
     static let supportedFormats: [SupportedFormat] = [
-        SupportedFormat(displayName: "CSV", fileExtension: "csv"),
-        SupportedFormat(displayName: "TSV", fileExtension: "tsv"),
-        SupportedFormat(displayName: "TXT / Delimited Text", fileExtension: "txt"),
-        SupportedFormat(displayName: "TAB / Delimited Text", fileExtension: "tab"),
-        SupportedFormat(displayName: "JSON", fileExtension: "json"),
-        SupportedFormat(displayName: "JSON Lines", fileExtension: "jsonl"),
-        SupportedFormat(displayName: "Excel Workbook", fileExtension: "xlsx"),
-        SupportedFormat(displayName: "Excel Legacy", fileExtension: "xls"),
-        SupportedFormat(displayName: "Parquet", fileExtension: "parquet"),
-        SupportedFormat(displayName: "Feather", fileExtension: "feather"),
-        SupportedFormat(displayName: "MA / GWAS", fileExtension: "ma"),
-        SupportedFormat(displayName: "PLINK Assoc", fileExtension: "assoc"),
-        SupportedFormat(displayName: "PLINK QAssoc", fileExtension: "qassoc"),
-        SupportedFormat(displayName: "PLINK GLM", fileExtension: "glm"),
-        SupportedFormat(displayName: "Meta Analysis", fileExtension: "meta"),
-        SupportedFormat(displayName: "10x Matrix", fileExtension: "mtx"),
-        SupportedFormat(displayName: "10x Barcodes", fileExtension: "barcodes.tsv"),
-        SupportedFormat(displayName: "10x Features", fileExtension: "features.tsv"),
-        SupportedFormat(displayName: "10x HDF5 Matrix", fileExtension: "h5"),
-        SupportedFormat(displayName: "PLINK BED", fileExtension: "bed"),
-        SupportedFormat(displayName: "PLINK BIM", fileExtension: "bim"),
-        SupportedFormat(displayName: "PLINK FAM", fileExtension: "fam"),
-        SupportedFormat(displayName: "PLINK 2 PGEN", fileExtension: "pgen"),
-        SupportedFormat(displayName: "PLINK 2 PVAR", fileExtension: "pvar"),
-        SupportedFormat(displayName: "PLINK 2 PSAM", fileExtension: "psam"),
-        SupportedFormat(displayName: "VCF", fileExtension: "vcf"),
-        SupportedFormat(displayName: "BCF", fileExtension: "bcf"),
-        SupportedFormat(displayName: "BED / Interval", fileExtension: "bedgraph"),
-        SupportedFormat(displayName: "GTF / GFF", fileExtension: "gtf"),
-        SupportedFormat(displayName: "GFF", fileExtension: "gff"),
-        SupportedFormat(displayName: "GFF3", fileExtension: "gff3"),
-        SupportedFormat(displayName: "AnnData", fileExtension: "h5ad"),
-        SupportedFormat(displayName: "Loom", fileExtension: "loom"),
-        SupportedFormat(displayName: "Compressed GZip", fileExtension: "gz"),
-        SupportedFormat(displayName: "Compressed BGZip", fileExtension: "bgz"),
+        SupportedFormat(displayName: "CSV", chineseDisplayName: "CSV", fileExtension: "csv"),
+        SupportedFormat(displayName: "TSV", chineseDisplayName: "TSV", fileExtension: "tsv"),
+        SupportedFormat(displayName: "TXT / Delimited Text", chineseDisplayName: "TXT / 分隔文本", fileExtension: "txt"),
+        SupportedFormat(displayName: "TAB / Delimited Text", chineseDisplayName: "TAB / 分隔文本", fileExtension: "tab"),
+        SupportedFormat(displayName: "JSON", chineseDisplayName: "JSON", fileExtension: "json"),
+        SupportedFormat(displayName: "JSON Lines", chineseDisplayName: "JSON 行", fileExtension: "jsonl"),
+        SupportedFormat(displayName: "Excel Workbook", chineseDisplayName: "Excel 工作簿", fileExtension: "xlsx"),
+        SupportedFormat(displayName: "Excel Legacy", chineseDisplayName: "Excel 旧版", fileExtension: "xls"),
+        SupportedFormat(displayName: "Parquet", chineseDisplayName: "Parquet", fileExtension: "parquet"),
+        SupportedFormat(displayName: "Feather", chineseDisplayName: "Feather", fileExtension: "feather"),
+        SupportedFormat(displayName: "MA / GWAS", chineseDisplayName: "MA / GWAS", fileExtension: "ma"),
+        SupportedFormat(displayName: "PLINK Assoc", chineseDisplayName: "PLINK Assoc", fileExtension: "assoc"),
+        SupportedFormat(displayName: "PLINK QAssoc", chineseDisplayName: "PLINK QAssoc", fileExtension: "qassoc"),
+        SupportedFormat(displayName: "PLINK GLM", chineseDisplayName: "PLINK GLM", fileExtension: "glm"),
+        SupportedFormat(displayName: "Meta Analysis", chineseDisplayName: "Meta 分析", fileExtension: "meta"),
+        SupportedFormat(displayName: "10x Matrix", chineseDisplayName: "10x 矩阵", fileExtension: "mtx"),
+        SupportedFormat(displayName: "10x Barcodes", chineseDisplayName: "10x 条形码", fileExtension: "barcodes.tsv"),
+        SupportedFormat(displayName: "10x Features", chineseDisplayName: "10x 特征", fileExtension: "features.tsv"),
+        SupportedFormat(displayName: "10x HDF5 Matrix", chineseDisplayName: "10x HDF5 矩阵", fileExtension: "h5"),
+        SupportedFormat(displayName: "PLINK BED", chineseDisplayName: "PLINK BED", fileExtension: "bed"),
+        SupportedFormat(displayName: "PLINK BIM", chineseDisplayName: "PLINK BIM", fileExtension: "bim"),
+        SupportedFormat(displayName: "PLINK FAM", chineseDisplayName: "PLINK FAM", fileExtension: "fam"),
+        SupportedFormat(displayName: "PLINK 2 PGEN", chineseDisplayName: "PLINK 2 PGEN", fileExtension: "pgen"),
+        SupportedFormat(displayName: "PLINK 2 PVAR", chineseDisplayName: "PLINK 2 PVAR", fileExtension: "pvar"),
+        SupportedFormat(displayName: "PLINK 2 PSAM", chineseDisplayName: "PLINK 2 PSAM", fileExtension: "psam"),
+        SupportedFormat(displayName: "VCF", chineseDisplayName: "VCF", fileExtension: "vcf"),
+        SupportedFormat(displayName: "BCF", chineseDisplayName: "BCF", fileExtension: "bcf"),
+        SupportedFormat(displayName: "BED / Interval", chineseDisplayName: "BED / 区间", fileExtension: "bedgraph"),
+        SupportedFormat(displayName: "GTF / GFF", chineseDisplayName: "GTF / GFF", fileExtension: "gtf"),
+        SupportedFormat(displayName: "GFF", chineseDisplayName: "GFF", fileExtension: "gff"),
+        SupportedFormat(displayName: "GFF3", chineseDisplayName: "GFF3", fileExtension: "gff3"),
+        SupportedFormat(displayName: "AnnData", chineseDisplayName: "AnnData", fileExtension: "h5ad"),
+        SupportedFormat(displayName: "Loom", chineseDisplayName: "Loom", fileExtension: "loom"),
+        SupportedFormat(displayName: "Compressed GZip", chineseDisplayName: "压缩 GZip", fileExtension: "gz"),
+        SupportedFormat(displayName: "Compressed BGZip", chineseDisplayName: "压缩 BGZip", fileExtension: "bgz"),
     ]
     static var supportedFormatHelpText: String {
         supportedFormats
@@ -396,15 +406,7 @@ final class AppModel: ObservableObject {
     }
 
     var effectiveLanguage: AppResolvedLanguage {
-        switch appLanguagePreference {
-        case .english:
-            return .english
-        case .chinese:
-            return .chinese
-        case .system:
-            let preferredLanguage = preferredLanguagesProvider().first?.lowercased() ?? "en"
-            return preferredLanguage.hasPrefix("zh") ? .chinese : .english
-        }
+        Self.resolvedLanguage(preference: appLanguagePreference, preferredLanguages: preferredLanguagesProvider())
     }
 
     var isChinese: Bool {
@@ -462,9 +464,12 @@ final class AppModel: ObservableObject {
             isTutorialActive,
             let chapter = tutorialCurrentChapter
         else {
-            return "Tutorial"
+            return localized(english: "Tutorial", chinese: "教程")
         }
-        return "\(chapter.title) · Step \(tutorialStepIndex + 1) of \(chapter.steps.count)"
+        return localized(
+            english: "\(chapter.title) · Step \(tutorialStepIndex + 1) of \(chapter.steps.count)",
+            chinese: "\(chapter.title) · 第 \(tutorialStepIndex + 1) / \(chapter.steps.count) 步"
+        )
     }
 
     var isTutorialLastStep: Bool {
@@ -495,12 +500,67 @@ final class AppModel: ObservableObject {
     func appLanguageOptionTitle(_ preference: AppLanguagePreference) -> String {
         switch preference {
         case .system:
-            return "System"
+            return localized(english: "System", chinese: "系统")
         case .english:
-            return "English"
+            return localized(english: "English", chinese: "英文")
         case .chinese:
             return "中文"
         }
+    }
+
+    nonisolated static func resolvedLanguage(
+        preference: AppLanguagePreference,
+        preferredLanguages: [String]
+    ) -> AppResolvedLanguage {
+        switch preference {
+        case .english:
+            return .english
+        case .chinese:
+            return .chinese
+        case .system:
+            let preferredLanguage = preferredLanguages.first?.lowercased() ?? "en"
+            return preferredLanguage.hasPrefix("zh") ? .chinese : .english
+        }
+    }
+
+    nonisolated static func resolvedLanguage(
+        defaults: UserDefaults = .standard,
+        preferredLanguagesProvider: () -> [String] = { Locale.preferredLanguages }
+    ) -> AppResolvedLanguage {
+        let preference = AppLanguagePreference(
+            rawValue: defaults.string(forKey: Self.appLanguagePreferenceKey) ?? ""
+        ) ?? .system
+        return resolvedLanguage(preference: preference, preferredLanguages: preferredLanguagesProvider())
+    }
+
+    nonisolated static func localized(
+        _ language: AppResolvedLanguage,
+        english: String,
+        chinese: String
+    ) -> String {
+        switch language {
+        case .english:
+            return english
+        case .chinese:
+            return chinese
+        }
+    }
+
+    nonisolated static func localized(
+        defaults: UserDefaults = .standard,
+        preferredLanguagesProvider: () -> [String] = { Locale.preferredLanguages },
+        english: String,
+        chinese: String
+    ) -> String {
+        localized(
+            resolvedLanguage(defaults: defaults, preferredLanguagesProvider: preferredLanguagesProvider),
+            english: english,
+            chinese: chinese
+        )
+    }
+
+    func localized(english: String, chinese: String) -> String {
+        Self.localized(effectiveLanguage, english: english, chinese: chinese)
     }
 
     func appVersionDisplay(revealingBuild _: Bool) -> String {
@@ -523,9 +583,15 @@ final class AppModel: ObservableObject {
     var visiDataDependencySummary: String {
         switch visiDataDependencyState {
         case let .available(path):
-            return "VisiData detected at \(path)"
+            return localized(
+                english: "VisiData detected at \(path)",
+                chinese: "已检测到 VisiData：\(path)"
+            )
         case .missing:
-            return "VisiData not found. Install with `brew install visidata` or set the executable path in Preferences."
+            return localized(
+                english: "VisiData not found. Install with `brew install visidata` or set the executable path in Preferences.",
+                chinese: "未找到 VisiData。可用 `brew install visidata` 安装，或在偏好设置里指定可执行文件路径。"
+            )
         }
     }
 
@@ -550,7 +616,10 @@ final class AppModel: ObservableObject {
                 throw NSError(
                     domain: "io.github.leoarrow.idata.tutorial",
                     code: 1,
-                    userInfo: [NSLocalizedDescriptionKey: "Requested tutorial chapter was not found."]
+                    userInfo: [NSLocalizedDescriptionKey: localized(
+                        english: "Requested tutorial chapter was not found.",
+                        chinese: "未找到所请求的教程章节。"
+                    )]
                 )
             }
 
@@ -561,19 +630,28 @@ final class AppModel: ObservableObject {
             guard activeSession?.currentFileURL?.standardizedFileURL == sampleURL.standardizedFileURL else {
                 finishTutorial()
                 if errorMessage == nil {
-                    errorMessage = "Could not start tutorial because the sample table failed to open. Check VisiData path in Preferences."
+                    errorMessage = localized(
+                        english: "Could not start tutorial because the sample table failed to open. Check VisiData path in Preferences.",
+                        chinese: "无法启动教程，因为示例表格未能打开。请在偏好设置中检查 VisiData 路径。"
+                    )
                 }
                 return
             }
 
             beginTutorialGuide(chapterID: chapter.id)
             isTutorialHubPresented = false
-            statusMessage = "Tutorial started with \(sampleURL.lastPathComponent). Follow the floating coach in the session."
+            statusMessage = localized(
+                english: "Tutorial started with \(sampleURL.lastPathComponent). Follow the floating coach in the session.",
+                chinese: "已用 \(sampleURL.lastPathComponent) 启动教程。请跟随会话中的浮动引导继续操作。"
+            )
             errorMessage = nil
         } catch {
             finishTutorial()
             statusMessage = nil
-            errorMessage = "Could not prepare tutorial sample data: \(error.localizedDescription)"
+            errorMessage = localized(
+                english: "Could not prepare tutorial sample data: \(error.localizedDescription)",
+                chinese: "无法准备教程示例数据：\(error.localizedDescription)"
+            )
         }
     }
 
@@ -637,7 +715,10 @@ final class AppModel: ObservableObject {
             markTutorialChapterCompleted(chapterID)
         }
         finishTutorial()
-        statusMessage = "Tutorial completed. Open any file to continue exploring with VisiData."
+        statusMessage = localized(
+            english: "Tutorial completed. Open any file to continue exploring with VisiData.",
+            chinese: "教程已完成。打开任意文件即可继续探索 VisiData。"
+        )
         errorMessage = nil
     }
 
@@ -658,7 +739,10 @@ final class AppModel: ObservableObject {
             }
 
             statusMessage = nil
-            errorMessage = "Drop a regular file, not a folder. iData streams compressed .gz/.bgz files without extracting."
+            errorMessage = localized(
+                english: "Drop a regular file, not a folder. iData streams compressed .gz/.bgz files without extracting.",
+                chinese: "请拖入普通文件，不要拖文件夹。iData 会直接流式读取 .gz/.bgz 压缩文件，不会先解压。"
+            )
             return
         }
 
@@ -668,7 +752,10 @@ final class AppModel: ObservableObject {
     func openExternalFile(_ url: URL) {
         guard Self.supportsTableFile(url) else {
             statusMessage = nil
-            errorMessage = "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting."
+            errorMessage = localized(
+                english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
+                chinese: "所选内容不是普通文件。iData 会直接打开大多数文件后缀，并对 .gz/.bgz 文件进行流式读取而不解压。"
+            )
             return
         }
 
@@ -686,11 +773,17 @@ final class AppModel: ObservableObject {
             }
             if isTutorialActive, let tutorialSampleFileURL, tutorialSampleFileURL.standardizedFileURL != url.standardizedFileURL {
                 finishTutorial()
-                statusMessage = "Opened \(url.lastPathComponent) inside iData. Tutorial ended because a different file is active."
+                statusMessage = localized(
+                    english: "Opened \(url.lastPathComponent) inside iData. Tutorial ended because a different file is active.",
+                    chinese: "已在 iData 中打开 \(url.lastPathComponent)。由于当前激活的是其他文件，教程已结束。"
+                )
                 errorMessage = nil
                 return
             }
-            statusMessage = "Opened \(url.lastPathComponent) inside iData."
+            statusMessage = localized(
+                english: "Opened \(url.lastPathComponent) inside iData.",
+                chinese: "已在 iData 中打开 \(url.lastPathComponent)。"
+            )
             errorMessage = nil
         } catch {
             if isTutorialActive {
@@ -712,7 +805,7 @@ final class AppModel: ObservableObject {
     func copyPathToPasteboard(_ url: URL) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.path, forType: .string)
-        statusMessage = "Copied file path."
+        statusMessage = localized(english: "Copied file path.", chinese: "已复制文件路径。")
         errorMessage = nil
     }
 
@@ -726,7 +819,10 @@ final class AppModel: ObservableObject {
             unpinRecentFileIfNeeded(url)
             refreshRecentFiles()
         }
-        statusMessage = "Removed \(url.lastPathComponent) from recent files."
+        statusMessage = localized(
+            english: "Removed \(url.lastPathComponent) from recent files.",
+            chinese: "已将 \(url.lastPathComponent) 从最近文件中移除。"
+        )
         errorMessage = nil
     }
 
@@ -736,7 +832,7 @@ final class AppModel: ObservableObject {
             defaults.removeObject(forKey: Self.pinnedRecentFilesKey)
             recentFiles = []
         }
-        statusMessage = "Cleared recent files."
+        statusMessage = localized(english: "Cleared recent files.", chinese: "已清空最近文件。")
         errorMessage = nil
     }
 
@@ -752,10 +848,16 @@ final class AppModel: ObservableObject {
 
             if let existingIndex = pinnedFiles.firstIndex(where: { $0.standardizedFileURL == url.standardizedFileURL }) {
                 pinnedFiles.remove(at: existingIndex)
-                statusMessage = "Unpinned \(url.lastPathComponent)."
+                statusMessage = localized(
+                    english: "Unpinned \(url.lastPathComponent).",
+                    chinese: "已取消置顶 \(url.lastPathComponent)。"
+                )
             } else {
                 pinnedFiles.insert(url, at: 0)
-                statusMessage = "Pinned \(url.lastPathComponent) to the top."
+                statusMessage = localized(
+                    english: "Pinned \(url.lastPathComponent) to the top.",
+                    chinese: "已将 \(url.lastPathComponent) 置顶。"
+                )
             }
 
             savePinnedRecentFiles(pinnedFiles)
@@ -789,7 +891,10 @@ final class AppModel: ObservableObject {
 
     func runVisiDataOneClickSetup() {
         if case let .available(path) = visiDataDependencyState {
-            statusMessage = "VisiData is already available at \(path)."
+            statusMessage = localized(
+                english: "VisiData is already available at \(path).",
+                chinese: "VisiData 已可用：\(path)。"
+            )
             errorMessage = nil
             return
         }
@@ -800,11 +905,17 @@ final class AppModel: ObservableObject {
         do {
             let tempScriptURL = try Self.writeTemporaryExecutableScript(contents: scriptContents)
             try Self.openScriptInTerminal(tempScriptURL)
-            statusMessage = "Opened Terminal for one-click VisiData setup."
+            statusMessage = localized(
+                english: "Opened Terminal for one-click VisiData setup.",
+                chinese: "已打开终端，开始一键配置 VisiData。"
+            )
             errorMessage = nil
         } catch {
             statusMessage = nil
-            errorMessage = "Could not start one-click VisiData setup: \(error.localizedDescription)"
+            errorMessage = localized(
+                english: "Could not start one-click VisiData setup: \(error.localizedDescription)",
+                chinese: "无法启动一键配置 VisiData：\(error.localizedDescription)"
+            )
         }
     }
 
@@ -833,7 +944,10 @@ final class AppModel: ObservableObject {
         guard !isSettingFormatDefault else { return }
         let lookupExtension = Self.associationExtension(for: fileExtension)
         guard !lookupExtension.isEmpty else {
-            errorMessage = "无法识别 .\(fileExtension) 的后缀。"
+            errorMessage = localized(
+                english: "Could not recognize the .\(fileExtension) suffix.",
+                chinese: "无法识别 .\(fileExtension) 的后缀。"
+            )
             statusMessage = nil
             return
         }
@@ -846,38 +960,55 @@ final class AppModel: ObservableObject {
 
         Task {
             if wasIDataDefault {
-                let previousDefaultApp = await MainActor.run { [lookupExtension] in
+                let storedPreviousDefaultApp = await MainActor.run { [lookupExtension] in
                     previousDefaultAppByExtension[lookupExtension]
                 }
+                let restoreTarget = preferredRestoreApplication(storedPreviousDefault: storedPreviousDefaultApp)
                 let restoreResult: FileTypeAssociationSetResult
-                if let previousDefaultApp {
+                if let restoreTarget {
                     restoreResult = await FileTypeAssociation.setDefaultApp(
-                        at: previousDefaultApp.url,
+                        at: restoreTarget.url,
                         forExtension: lookupExtension
                     )
                 } else {
                     restoreResult = .missingPreviousDefault
                 }
+                let isNowDefault = await settledIDataDefaultState(
+                    forExtension: lookupExtension,
+                    expectedIsDefault: false,
+                    afterRequestSucceeded: restoreResult == .success
+                )
 
                 await MainActor.run {
-                    let isNowDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
                     updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isNowDefault)
                     let shownExtension = lookupExtension
 
                     if !isNowDefault {
                         forgetPreviousDefaultApp(forLookupExtension: lookupExtension)
-                        if let previousDefaultApp {
-                            statusMessage = "已恢复 .\(shownExtension) 默认应用为 \(previousDefaultApp.displayName)"
+                        if let storedPreviousDefaultApp {
+                            statusMessage = localized(
+                                english: "Restored the default app for .\(shownExtension) to \(storedPreviousDefaultApp.displayName).",
+                                chinese: "已恢复 .\(shownExtension) 默认应用为 \(storedPreviousDefaultApp.displayName)。"
+                            )
                             errorMessage = nil
                         } else {
-                            statusMessage = "已取消 .\(shownExtension) 默认用 iData 打开"
+                            statusMessage = localized(
+                                english: "Removed iData as the default app for .\(shownExtension).",
+                                chinese: "已取消 .\(shownExtension) 默认用 iData 打开。"
+                            )
                             errorMessage = nil
                         }
                     } else if restoreResult == .success {
-                        statusMessage = "系统已收到恢复请求，但 .\(shownExtension) 仍默认 iData。请再试一次并确认系统提示。"
+                        statusMessage = localized(
+                            english: "macOS accepted the restore request, but .\(shownExtension) is still set to iData. Try again and confirm the system prompt.",
+                            chinese: "系统已收到恢复请求，但 .\(shownExtension) 仍默认 iData。请再试一次并确认系统提示。"
+                        )
                         errorMessage = nil
                     } else {
-                        errorMessage = "无法恢复 .\(shownExtension) 的默认应用：\(restoreResult.userMessage)"
+                        errorMessage = localized(
+                            english: "Could not restore the default app for .\(shownExtension): \(restoreResult.userMessage)",
+                            chinese: "无法恢复 .\(shownExtension) 的默认应用：\(restoreResult.userMessage)"
+                        )
                         statusMessage = nil
                     }
 
@@ -902,22 +1033,35 @@ final class AppModel: ObservableObject {
             }
 
             let setResult = await FileTypeAssociation.setIDataAsDefaultApp(forExtension: lookupExtension)
+            let isNowDefault = await settledIDataDefaultState(
+                forExtension: lookupExtension,
+                expectedIsDefault: true,
+                afterRequestSucceeded: setResult == .success
+            )
 
             await MainActor.run {
-                let isNowDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
                 updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isNowDefault)
                 let shownExtension = lookupExtension
 
                 if isNowDefault {
-                    statusMessage = "已设置 .\(shownExtension) 默认用 iData 打开"
+                    statusMessage = localized(
+                        english: "Set iData as the default app for .\(shownExtension).",
+                        chinese: "已设置 .\(shownExtension) 默认用 iData 打开。"
+                    )
                     errorMessage = nil
                 } else if setResult == .success {
-                    statusMessage = "系统已收到设置请求，但 .\(shownExtension) 还未切换到 iData。请再试一次并确认系统提示。"
+                    statusMessage = localized(
+                        english: "macOS accepted the request, but .\(shownExtension) has not switched to iData yet. Try again and confirm the system prompt.",
+                        chinese: "系统已收到设置请求，但 .\(shownExtension) 还未切换到 iData。请再试一次并确认系统提示。"
+                    )
                     errorMessage = nil
                 } else {
                     // Setting failed, forget the saved previous default since no change was made
                     forgetPreviousDefaultApp(forLookupExtension: lookupExtension)
-                    errorMessage = "无法设置 .\(shownExtension) 默认应用：\(setResult.userMessage)"
+                    errorMessage = localized(
+                        english: "Could not set the default app for .\(shownExtension): \(setResult.userMessage)",
+                        chinese: "无法设置 .\(shownExtension) 默认应用：\(setResult.userMessage)"
+                    )
                     statusMessage = nil
                 }
 
@@ -935,7 +1079,10 @@ final class AppModel: ObservableObject {
             }
 
             statusMessage = nil
-            errorMessage = "Drop a regular file, not a folder. iData opens most file suffixes directly and streams .gz/.bgz files without extracting."
+            errorMessage = localized(
+                english: "Drop a regular file, not a folder. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
+                chinese: "请拖入普通文件，不要拖文件夹。iData 会直接打开大多数文件后缀，并对 .gz/.bgz 文件进行流式读取而不解压。"
+            )
             return false
         }
 
@@ -1222,10 +1369,44 @@ private enum FileTypeAssociationSetResult: Equatable {
     }
 }
 
-private struct DefaultApplicationHandler: Equatable, Sendable {
+struct DefaultApplicationHandler: Equatable, Sendable {
     let url: URL
     let bundleIdentifier: String
     let displayName: String
+}
+
+func preferredRestoreApplication(
+    storedPreviousDefault: DefaultApplicationHandler?
+) -> DefaultApplicationHandler? {
+    storedPreviousDefault
+}
+
+@MainActor
+func settledIDataDefaultState(
+    forExtension fileExtension: String,
+    expectedIsDefault: Bool,
+    afterRequestSucceeded requestSucceeded: Bool,
+    checker: @MainActor (String) -> Bool = FileTypeAssociation.isIDataDefaultApp(forExtension:),
+    maxAttempts: Int = 10,
+    pollIntervalNanoseconds: UInt64 = 200_000_000
+) async -> Bool {
+    var latest = checker(fileExtension)
+    guard requestSucceeded, latest != expectedIsDefault else {
+        return latest
+    }
+
+    for _ in 0..<maxAttempts {
+        if pollIntervalNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        }
+
+        latest = checker(fileExtension)
+        if latest == expectedIsDefault {
+            return latest
+        }
+    }
+
+    return latest
 }
 
 private struct PersistedDefaultApplicationHandler: Codable {
@@ -1346,23 +1527,12 @@ private enum FileTypeAssociation {
     static func currentDefaultApp(forExtension fileExtension: String) -> DefaultApplicationHandler? {
         guard
             let contentType = contentType(forExtension: fileExtension),
-            let defaultAppURL = NSWorkspace.shared.urlForApplication(toOpen: contentType),
-            let defaultBundle = Bundle(url: defaultAppURL),
-            let defaultBundleIdentifier = defaultBundle.bundleIdentifier
+            let defaultAppURL = NSWorkspace.shared.urlForApplication(toOpen: contentType)
         else {
             return nil
         }
 
-        let displayName =
-            (defaultBundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
-                ?? (defaultBundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String)
-                ?? FileManager.default.displayName(atPath: defaultAppURL.path)
-
-        return DefaultApplicationHandler(
-            url: defaultAppURL,
-            bundleIdentifier: defaultBundleIdentifier,
-            displayName: displayName
-        )
+        return applicationHandler(for: defaultAppURL)
     }
 
     static func setIDataAsDefaultApp(forExtension fileExtension: String) async -> FileTypeAssociationSetResult {
@@ -1403,5 +1573,46 @@ private enum FileTypeAssociation {
                 continuation.resume(returning: .unexpected(nsError.localizedDescription))
             }
         }
+    }
+
+    private static func withProbeURL<T>(forExtension fileExtension: String, _ body: (URL) -> T?) -> T? {
+        let trimmed = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let probeDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("idata-content-type-probe", isDirectory: true)
+        try? FileManager.default.createDirectory(at: probeDirectory, withIntermediateDirectories: true)
+        let probeURL = probeDirectory.appendingPathComponent("probe-\(UUID().uuidString).\(trimmed)")
+
+        do {
+            try Data("idata".utf8).write(to: probeURL, options: [.atomic])
+            defer {
+                try? FileManager.default.removeItem(at: probeURL)
+            }
+            return body(probeURL)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func applicationHandler(for appURL: URL) -> DefaultApplicationHandler? {
+        guard
+            let bundle = Bundle(url: appURL),
+            let bundleIdentifier = bundle.bundleIdentifier
+        else {
+            return nil
+        }
+
+        let displayName =
+            (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                ?? (bundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String)
+                ?? FileManager.default.displayName(atPath: appURL.path)
+
+        return DefaultApplicationHandler(
+            url: appURL,
+            bundleIdentifier: bundleIdentifier,
+            displayName: displayName
+        )
     }
 }

@@ -26,13 +26,25 @@ enum LaunchError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .fileMissing(path):
-            "The selected file no longer exists: \(path)"
+            AppModel.localized(
+                english: "The selected file no longer exists: \(path)",
+                chinese: "所选文件已不存在：\(path)"
+            )
         case .visiDataNotFound:
-            "Could not find `vd`. Install VisiData with `brew install visidata`, or set its executable path in Preferences."
+            AppModel.localized(
+                english: "Could not find `vd`. Install VisiData with `brew install visidata`, or set its executable path in Preferences.",
+                chinese: "找不到 `vd`。请用 `brew install visidata` 安装 VisiData，或在偏好设置中指定其可执行文件路径。"
+            )
         case let .pseudoTerminalUnavailable(message):
-            "Could not create a terminal session for VisiData: \(message)"
+            AppModel.localized(
+                english: "Could not create a terminal session for VisiData: \(message)",
+                chinese: "无法为 VisiData 创建终端会话：\(message)"
+            )
         case let .processLaunchFailed(message):
-            "Could not launch VisiData inside iData: \(message)"
+            AppModel.localized(
+                english: "Could not launch VisiData inside iData: \(message)",
+                chinese: "无法在 iData 内启动 VisiData：\(message)"
+            )
         }
     }
 }

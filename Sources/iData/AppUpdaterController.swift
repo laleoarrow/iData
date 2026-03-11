@@ -11,7 +11,11 @@ final class AppUpdaterController: ObservableObject {
     @Published private(set) var isConfigured = false
     @Published var automaticallyChecksForUpdates = true
     @Published var automaticallyDownloadsUpdates = true
-    @Published private(set) var statusMessage = "Automatic updates are not configured yet."
+    @Published private var statusState: StatusState = .notConfiguredYet
+
+    var statusMessage: String {
+        statusState.localizedMessage
+    }
 
     let releasesURL = URL(string: "https://github.com/laleoarrow/iData/releases")!
     let appcastURL = URL(string: "https://laleoarrow.github.io/iData/appcast.xml")!
@@ -29,7 +33,7 @@ final class AppUpdaterController: ObservableObject {
             let controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
             self.updaterController = controller
             self.isConfigured = true
-            self.statusMessage = "Automatic updates are enabled through Sparkle."
+            self.statusState = .enabledThroughSparkle
 
             controller.updater.publisher(for: \.canCheckForUpdates)
                 .receive(on: RunLoop.main)
@@ -52,11 +56,11 @@ final class AppUpdaterController: ObservableObject {
         } else {
             self.updaterController = nil
             self.isConfigured = false
-            self.statusMessage = "Automatic updates will activate after Sparkle feed URL and signing keys are configured."
+            self.statusState = .waitingForSparkleConfiguration
         }
         #else
         self.isConfigured = false
-        self.statusMessage = "This build does not include Sparkle yet. You can still download updates from GitHub Releases."
+        self.statusState = .sparkleMissingInBuild
         #endif
     }
 
@@ -107,7 +111,7 @@ final class AppUpdaterController: ObservableObject {
         }
 
         guard await isUpdateFeedReachable() else {
-            statusMessage = "Update feed is not published yet. GitHub Releases remains available for manual installs."
+            statusState = .feedNotPublishedYet
             return
         }
 
@@ -119,7 +123,7 @@ final class AppUpdaterController: ObservableObject {
         #if canImport(Sparkle)
         if let updaterController {
             guard await isUpdateFeedReachable() else {
-                statusMessage = "Update feed is not live yet. Opening GitHub Releases instead."
+                statusState = .feedNotLiveOpeningReleases
                 NSWorkspace.shared.open(releasesURL)
                 return
             }
@@ -129,7 +133,7 @@ final class AppUpdaterController: ObservableObject {
         }
         #endif
 
-        statusMessage = "Sparkle is unavailable in this build. Opening GitHub Releases."
+        statusState = .sparkleUnavailableOpeningReleases
         NSWorkspace.shared.open(releasesURL)
     }
 
@@ -147,6 +151,56 @@ final class AppUpdaterController: ObservableObject {
             return (200..<300).contains(httpResponse.statusCode)
         } catch {
             return false
+        }
+    }
+
+    private enum StatusState {
+        case notConfiguredYet
+        case enabledThroughSparkle
+        case waitingForSparkleConfiguration
+        case sparkleMissingInBuild
+        case feedNotPublishedYet
+        case feedNotLiveOpeningReleases
+        case sparkleUnavailableOpeningReleases
+
+        var localizedMessage: String {
+            switch self {
+            case .notConfiguredYet:
+                return AppModel.localized(
+                    english: "Automatic updates are not configured yet.",
+                    chinese: "自动更新尚未配置。"
+                )
+            case .enabledThroughSparkle:
+                return AppModel.localized(
+                    english: "Automatic updates are enabled through Sparkle.",
+                    chinese: "自动更新已通过 Sparkle 启用。"
+                )
+            case .waitingForSparkleConfiguration:
+                return AppModel.localized(
+                    english: "Automatic updates will activate after Sparkle feed URL and signing keys are configured.",
+                    chinese: "完成 Sparkle feed 地址和签名密钥配置后，自动更新就会启用。"
+                )
+            case .sparkleMissingInBuild:
+                return AppModel.localized(
+                    english: "This build does not include Sparkle yet. You can still download updates from GitHub Releases.",
+                    chinese: "当前构建还没有包含 Sparkle。你仍然可以从 GitHub 发布页下载更新。"
+                )
+            case .feedNotPublishedYet:
+                return AppModel.localized(
+                    english: "Update feed is not published yet. GitHub Releases remains available for manual installs.",
+                    chinese: "更新 feed 还没有发布。你仍然可以从 GitHub 发布页手动安装。"
+                )
+            case .feedNotLiveOpeningReleases:
+                return AppModel.localized(
+                    english: "Update feed is not live yet. Opening GitHub Releases instead.",
+                    chinese: "更新 feed 还没有上线，正在改为打开 GitHub 发布页。"
+                )
+            case .sparkleUnavailableOpeningReleases:
+                return AppModel.localized(
+                    english: "Sparkle is unavailable in this build. Opening GitHub Releases.",
+                    chinese: "这个构建当前无法使用 Sparkle，正在打开 GitHub 发布页。"
+                )
+            }
         }
     }
 }

@@ -170,11 +170,149 @@ struct AppModelTests {
     }
 
     @Test
+    func dependencySummaryLocalizesToChinese() {
+        let checker = FakeExecutableChecker(executablePaths: [])
+        let model = AppModel(
+            executableChecker: checker,
+            environmentPathProvider: { "/usr/bin" },
+            preferredLanguagesProvider: { ["zh-Hans-CN"] }
+        )
+
+        #expect(model.visiDataDependencySummary.contains("未找到"))
+        #expect(model.visiDataDependencySummary.contains("偏好设置"))
+    }
+
+    @Test
+    func supportedFormatLocalizedDisplayNameSwitchesToChinese() {
+        let excel = AppModel.supportedFormats.first { $0.fileExtension == "xlsx" }
+        let gzip = AppModel.supportedFormats.first { $0.fileExtension == "gz" }
+
+        #expect(excel?.localizedDisplayName(for: .english) == "Excel Workbook")
+        #expect(excel?.localizedDisplayName(for: .chinese) == "Excel 工作簿")
+        #expect(gzip?.localizedDisplayName(for: .chinese) == "压缩 GZip")
+    }
+
+    @Test
+    func preferredRestoreApplicationReturnsNilWithoutStoredPreviousDefault() {
+        let chosen = preferredRestoreApplication(
+            storedPreviousDefault: nil
+        )
+
+        #expect(chosen == nil)
+    }
+
+    @Test
+    func preferredRestoreApplicationPrefersStoredPreviousDefault() {
+        let stored = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Numbers.app"),
+            bundleIdentifier: "com.apple.Numbers",
+            displayName: "Numbers"
+        )
+
+        let chosen = preferredRestoreApplication(
+            storedPreviousDefault: stored
+        )
+
+        #expect(chosen == stored)
+    }
+
+    @Test
+    func settledIDataDefaultStateWaitsForDelayedRestorePropagation() async {
+        final class Probe: @unchecked Sendable {
+            private var readings: [Bool]
+
+            init(_ readings: [Bool]) {
+                self.readings = readings
+            }
+
+            func current(_ fileExtension: String) -> Bool {
+                _ = fileExtension
+                guard !readings.isEmpty else {
+                    return false
+                }
+
+                if readings.count == 1 {
+                    return readings[0]
+                }
+
+                return readings.removeFirst()
+            }
+        }
+
+        let probe = Probe([true, true, false])
+
+        let settled = await settledIDataDefaultState(
+            forExtension: "csv",
+            expectedIsDefault: false,
+            afterRequestSucceeded: true,
+            checker: probe.current(_:),
+            maxAttempts: 3,
+            pollIntervalNanoseconds: 0
+        )
+
+        #expect(!settled)
+    }
+
+    @Test
+    func settledIDataDefaultStateLeavesStatusUnchangedWhenPropagationNeverFinishes() async {
+        final class Probe: @unchecked Sendable {
+            private var readings: [Bool]
+
+            init(_ readings: [Bool]) {
+                self.readings = readings
+            }
+
+            func current(_ fileExtension: String) -> Bool {
+                _ = fileExtension
+                guard !readings.isEmpty else {
+                    return false
+                }
+
+                if readings.count == 1 {
+                    return readings[0]
+                }
+
+                return readings.removeFirst()
+            }
+        }
+
+        let probe = Probe([true, true, true])
+
+        let settled = await settledIDataDefaultState(
+            forExtension: "tsv",
+            expectedIsDefault: false,
+            afterRequestSucceeded: true,
+            checker: probe.current(_:),
+            maxAttempts: 2,
+            pollIntervalNanoseconds: 0
+        )
+
+        #expect(settled)
+    }
+
+    @Test
     func updaterStartsUnconfiguredWithoutSparkleKeys() {
         let updater = AppUpdaterController()
 
         #expect(!updater.isConfigured)
         #expect(updater.statusMessage.contains("Sparkle") || updater.statusMessage.contains("GitHub Releases"))
+    }
+
+    @Test
+    func updaterStatusMessageLocalizesToChinesePreference() {
+        let previous = UserDefaults.standard.string(forKey: AppModel.appLanguagePreferenceKey)
+        UserDefaults.standard.set(AppModel.AppLanguagePreference.chinese.rawValue, forKey: AppModel.appLanguagePreferenceKey)
+        defer {
+            if let previous {
+                UserDefaults.standard.set(previous, forKey: AppModel.appLanguagePreferenceKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: AppModel.appLanguagePreferenceKey)
+            }
+        }
+
+        let updater = AppUpdaterController()
+
+        #expect(updater.statusMessage.contains("自动更新") || updater.statusMessage.contains("GitHub 发布页"))
     }
 
     @Test
@@ -362,7 +500,7 @@ struct AppModelTests {
     @Test
     func statusPanelRunningTintDependsOnVisiDataStatusOnly() {
         #expect(statusPanelUsesRunningTint(for: "Running VisiData for sample.tsv."))
-        #expect(statusPanelUsesRunningTint(for: "正在运行 VisiData：sample.tsv"))
+        #expect(statusPanelUsesRunningTint(for: "正在为 sample.tsv 运行 VisiData。"))
         #expect(!statusPanelUsesRunningTint(for: "Ready to open a file"))
     }
 
@@ -434,6 +572,31 @@ struct AppModelTests {
         #expect(model.appLanguagePreference == .system)
         #expect(model.effectiveLanguage == .chinese)
         #expect(model.tutorialChapters.first?.title == "基础")
+    }
+
+    @Test
+    func tutorialProgressTextLocalizesToChinese() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults, preferredLanguagesProvider: { ["zh-Hans-CN"] })
+        model.beginTutorialGuide()
+
+        #expect(model.tutorialProgressText.contains("第 1"))
+        #expect(model.tutorialProgressText.contains("步"))
+    }
+
+    @Test
+    func folderDropErrorLocalizesToChinese() {
+        let model = AppModel(preferredLanguagesProvider: { ["zh-Hans-CN"] })
+
+        model.openExternalFiles([URL(fileURLWithPath: "/tmp/results", isDirectory: true)])
+
+        #expect(model.errorMessage?.contains("不要拖文件夹") == true)
+        #expect(model.errorMessage?.contains("不会先解压") == true)
     }
 
     @Test

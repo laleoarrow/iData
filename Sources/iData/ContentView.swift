@@ -2,6 +2,14 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
+private func localizedText(_ isChinese: Bool, english: String, chinese: String) -> String {
+    isChinese ? chinese : english
+}
+
+private func appShellLanguage() -> AppModel.AppResolvedLanguage {
+    AppModel.resolvedLanguage(defaults: .standard, preferredLanguagesProvider: { Locale.preferredLanguages })
+}
+
 struct ContentView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
@@ -21,6 +29,10 @@ struct ContentView: View {
         motionEnabled
             ? .spring(response: 0.44, dampingFraction: 0.90, blendDuration: 0.18)
             : nil
+    }
+
+    private var isChinese: Bool {
+        model.effectiveLanguage == .chinese
     }
 
     var body: some View {
@@ -45,19 +57,19 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
-                Button("Open…") {
+                Button(localizedText(isChinese, english: "Open…", chinese: "打开…")) {
                     model.openDocument()
                 }
                 .keyboardShortcut("o")
 
-                Button("Reopen") {
+                Button(localizedText(isChinese, english: "Reopen", chinese: "重新打开")) {
                     model.reopenLastFile()
                 }
                 .disabled(model.lastOpenedFile == nil)
             }
         }
         .sheet(isPresented: $model.isHelpPresented) {
-            HelpView()
+            HelpView(model: model)
         }
         .sheet(isPresented: $model.isTutorialHubPresented) {
             TutorialHubView(model: model)
@@ -114,7 +126,7 @@ private struct SidebarView: View {
                     if model.isSidebarCollapsed {
                         EmptySidebarRailState()
                     } else {
-                        EmptySidebarState()
+                        EmptySidebarState(isChinese: model.effectiveLanguage == .chinese)
                     }
                 } else {
                     ScrollView {
@@ -125,6 +137,7 @@ private struct SidebarView: View {
                                         CollapsedRecentFileRow(
                                             fileURL: fileURL,
                                             isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                            isChinese: model.effectiveLanguage == .chinese,
                                             openAction: { model.openExternalFile(fileURL) },
                                             removeAction: { model.removeRecentFile(fileURL) }
                                         )
@@ -133,6 +146,7 @@ private struct SidebarView: View {
                                             fileURL: fileURL,
                                             isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
                                             isPinned: model.isPinnedRecentFile(fileURL),
+                                            isChinese: model.effectiveLanguage == .chinese,
                                             openAction: { model.openExternalFile(fileURL) },
                                             togglePinAction: { model.togglePinnedRecentFile(fileURL) },
                                             removeAction: { model.removeRecentFile(fileURL) }
@@ -181,6 +195,10 @@ private struct SidebarHeaderCard: View {
         )
     }
 
+    private var isChinese: Bool {
+        model.effectiveLanguage == .chinese
+    }
+
     var body: some View {
         Group {
             if model.isSidebarCollapsed {
@@ -212,23 +230,28 @@ private struct SidebarHeaderCard: View {
                         Spacer(minLength: 0)
 
                         if !model.recentFiles.isEmpty {
-                            Button("Clear All") {
+                            Button(localizedText(isChinese, english: "Clear All", chinese: "清空全部")) {
                                 model.clearRecentFiles()
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(.secondary)
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
-                            .help("Clear all recent file records")
+                            .help(localizedText(isChinese, english: "Clear all recent file records", chinese: "清除所有最近文件记录"))
                         }
 
                         SidebarCollapseToggleButton(
                             isCollapsed: false,
+                            isChinese: isChinese,
                             motionEnabled: motionEnabled,
                             action: { model.toggleSidebarCollapsed() }
                         )
                     }
 
-                    Text("Native shell for large-table workflows with VisiData")
+                    Text(localizedText(
+                        isChinese,
+                        english: "Native shell for large-table workflows with VisiData",
+                        chinese: "面向超大表格工作流的原生 VisiData 壳层"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -296,6 +319,10 @@ private struct SidebarFooter: View {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
+    private var isChinese: Bool {
+        model.effectiveLanguage == .chinese
+    }
+
     var body: some View {
         Group {
             if model.isSidebarCollapsed {
@@ -305,7 +332,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help("Settings")
+                    .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
 
                     Button {
                         model.isHelpPresented = true
@@ -314,7 +341,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help("Help")
+                    .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
 
                     Button {
                         model.presentTutorialHub()
@@ -323,7 +350,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help(model.effectiveLanguage == .chinese ? "教程" : "Tutorial")
+                    .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
                 }
                 .frame(maxWidth: .infinity)
             } else {
@@ -333,7 +360,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help("Settings")
+                    .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
 
                     Button {
                         model.isHelpPresented = true
@@ -342,7 +369,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help("Help")
+                    .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
 
                     Button {
                         model.presentTutorialHub()
@@ -351,7 +378,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help(model.effectiveLanguage == .chinese ? "教程" : "Tutorial")
+                    .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
 
                     Spacer(minLength: 0)
                 }
@@ -362,15 +389,20 @@ private struct SidebarFooter: View {
 }
 
 private struct EmptySidebarState: View {
+    let isChinese: Bool
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("No recent files yet", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+            Label(localizedText(isChinese, english: "No recent files yet", chinese: "还没有最近文件"), systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                 .font(.headline)
 
-            Text("Open a table or drag one into the window. Recent items stay here for one-click reopening.")
+            Text(localizedText(
+                isChinese,
+                english: "Open a table or drag one into the window. Recent items stay here for one-click reopening.",
+                chinese: "打开一个表格，或直接把文件拖进窗口。最近文件会保留在这里，方便一键重新打开。"
+            ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -423,6 +455,7 @@ private struct RecentFileRow: View {
     let fileURL: URL
     let isActive: Bool
     let isPinned: Bool
+    let isChinese: Bool
     let openAction: () -> Void
     let togglePinAction: () -> Void
     let removeAction: () -> Void
@@ -467,7 +500,9 @@ private struct RecentFileRow: View {
             .buttonStyle(.plain)
             .opacity(isHovering ? 1 : 0)
             .allowsHitTesting(isHovering)
-            .help(isPinned ? "Unpin from top" : "Pin to top")
+            .help(isPinned
+                ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
+                : localizedText(isChinese, english: "Pin to top", chinese: "置顶到顶部"))
 
             Button(action: removeAction) {
                 Image(systemName: "xmark")
@@ -486,7 +521,7 @@ private struct RecentFileRow: View {
             .buttonStyle(.plain)
             .opacity(isHovering ? 1 : 0)
             .allowsHitTesting(isHovering)
-            .help("Remove from recent files")
+            .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
         }
         .padding(14)
         .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -540,6 +575,7 @@ private struct RecentFileRow: View {
 private struct CollapsedRecentFileRow: View {
     let fileURL: URL
     let isActive: Bool
+    let isChinese: Bool
     let openAction: () -> Void
     let removeAction: () -> Void
 
@@ -595,9 +631,17 @@ private struct CollapsedRecentFileRow: View {
 
     private var primaryHelpText: String {
         if isCommandHovering {
-            return "Remove \(fileURL.lastPathComponent) from recent files"
+            return localizedText(
+                isChinese,
+                english: "Remove \(fileURL.lastPathComponent) from recent files",
+                chinese: "从最近文件中移除 \(fileURL.lastPathComponent)"
+            )
         }
-        return "Open \(fileURL.lastPathComponent)"
+        return localizedText(
+            isChinese,
+            english: "Open \(fileURL.lastPathComponent)",
+            chinese: "打开 \(fileURL.lastPathComponent)"
+        )
     }
 
     private func primaryAction() {
@@ -650,6 +694,7 @@ func collapsedRecentFilePrimaryAction(isCommandHovering: Bool) -> CollapsedRecen
 
 private struct SidebarCollapseToggleButton: View {
     let isCollapsed: Bool
+    let isChinese: Bool
     let motionEnabled: Bool
     let action: () -> Void
 
@@ -676,7 +721,9 @@ private struct SidebarCollapseToggleButton: View {
                 )
         }
         .buttonStyle(.plain)
-        .help(isCollapsed ? "Expand sidebar" : "Collapse sidebar")
+        .help(isCollapsed
+            ? localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏")
+            : localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
         .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1, shadowOpacity: 0.08, shadowRadius: 10)
     }
 }
@@ -800,40 +847,100 @@ private struct SessionStageView: View {
 }
 
 private struct HelpView: View {
+    @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    private let onboardingTips: [QuickTip] = [
-        QuickTip(keys: "Open… / Drag File", title: "Open Data", detail: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData."),
-        QuickTip(keys: "Recent + Pin", title: "Keep Key Files", detail: "Click a recent item to reopen it. Pin important files so they stay fixed at the top of the sidebar."),
-        QuickTip(keys: "⌘,", title: "Settings", detail: "Adjust the `vd` path, automatic update behavior, or run a manual update check."),
-    ]
-
-    private let softwareTips: [QuickTip] = [
-        QuickTip(keys: ".csv / .tsv / .ma", title: "Direct Open", detail: "Most regular text-like table files open directly, including unusual bioinformatics suffixes such as `.ma`."),
-        QuickTip(keys: ".gz / .bgz", title: "Stream Compression", detail: "Compressed files are streamed into VisiData without extracting them to disk first."),
-        QuickTip(keys: "Excel", title: "About `.xlsx`", detail: "VisiData can read Excel, but that depends on the Python environment having the required loader installed. If Excel fails, install the missing VisiData dependency in the same Python environment as `vd`."),
-    ]
-
-    private let visiDataTips: [QuickTip] = [
-        QuickTip(keys: "hjkl / ←↑↓→", title: "Move", detail: "Navigate cells and columns without leaving the keyboard."),
-        QuickTip(keys: "/  ?  n  N", title: "Search", detail: "Search forward or backward, then jump through matches."),
-        QuickTip(keys: "[  ]", title: "Sort", detail: "Sort the current column ascending or descending."),
-        QuickTip(keys: "s  t  u", title: "Select", detail: "Select, toggle, or unselect rows for later commands."),
-        QuickTip(keys: "z?", title: "Command Help", detail: "Discover sheet-specific commands and see what VisiData can do on the current data."),
-        QuickTip(keys: "q", title: "Back / Quit Sheet", detail: "Go back from a derived sheet or quit the session when you are done."),
-    ]
 
     private var motionEnabled: Bool {
         !accessibilityReduceMotion
+    }
+
+    private var isChinese: Bool {
+        model.effectiveLanguage == .chinese
+    }
+
+    private var onboardingTips: [QuickTip] {
+        [
+            QuickTip(
+                keys: localizedText(isChinese, english: "Open… / Drag File", chinese: "打开… / 拖拽文件"),
+                title: localizedText(isChinese, english: "Open Data", chinese: "打开数据"),
+                detail: localizedText(
+                    isChinese,
+                    english: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData.",
+                    chinese: "用工具栏打开文件，或直接把文件拖进主窗口。iData 会把真实文件转交给内嵌的 VisiData。"
+                )
+            ),
+            QuickTip(
+                keys: localizedText(isChinese, english: "Recent + Pin", chinese: "最近文件 + 置顶"),
+                title: localizedText(isChinese, english: "Keep Key Files", chinese: "保留关键文件"),
+                detail: localizedText(
+                    isChinese,
+                    english: "Click a recent item to reopen it. Pin important files so they stay fixed at the top of the sidebar.",
+                    chinese: "点击最近文件即可重新打开。把重要文件置顶后，它们会固定显示在侧边栏顶部。"
+                )
+            ),
+            QuickTip(
+                keys: "⌘,",
+                title: localizedText(isChinese, english: "Settings", chinese: "设置"),
+                detail: localizedText(
+                    isChinese,
+                    english: "Adjust the `vd` path, automatic update behavior, or run a manual update check.",
+                    chinese: "可以调整 `vd` 路径、自动更新行为，或手动检查更新。"
+                )
+            ),
+        ]
+    }
+
+    private var softwareTips: [QuickTip] {
+        [
+            QuickTip(
+                keys: ".csv / .tsv / .ma",
+                title: localizedText(isChinese, english: "Direct Open", chinese: "直接打开"),
+                detail: localizedText(
+                    isChinese,
+                    english: "Most regular text-like table files open directly, including unusual bioinformatics suffixes such as `.ma`.",
+                    chinese: "大多数常规文本类表格文件都能直接打开，包括 `.ma` 这类生信里常见但不标准的后缀。"
+                )
+            ),
+            QuickTip(
+                keys: ".gz / .bgz",
+                title: localizedText(isChinese, english: "Stream Compression", chinese: "压缩流式读取"),
+                detail: localizedText(
+                    isChinese,
+                    english: "Compressed files are streamed into VisiData without extracting them to disk first.",
+                    chinese: "压缩文件会直接流式送入 VisiData，不需要先解压到磁盘。"
+                )
+            ),
+            QuickTip(
+                keys: "Excel",
+                title: localizedText(isChinese, english: "About `.xlsx`", chinese: "关于 `.xlsx`"),
+                detail: localizedText(
+                    isChinese,
+                    english: "VisiData can read Excel, but that depends on the Python environment having the required loader installed. If Excel fails, install the missing VisiData dependency in the same Python environment as `vd`.",
+                    chinese: "VisiData 可以读取 Excel，但前提是 `vd` 所在的 Python 环境已经装好了对应的读取依赖。如果 Excel 打不开，请在同一个 `vd` 环境里补装缺失依赖。"
+                )
+            ),
+        ]
+    }
+
+    private var visiDataTips: [QuickTip] {
+        [
+            QuickTip(keys: "hjkl / ←↑↓→", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "不离开键盘也能在单元格和列之间快速移动。")),
+            QuickTip(keys: "/  ?  n  N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward, then jump through matches.", chinese: "支持向前或向后搜索，并在匹配结果间跳转。")),
+            QuickTip(keys: "[  ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "对当前列执行升序或降序排序。")),
+            QuickTip(keys: "s  t  u", title: localizedText(isChinese, english: "Select", chinese: "选择"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows for later commands.", chinese: "选择、切换或取消选择行，供后续命令使用。")),
+            QuickTip(keys: "z?", title: localizedText(isChinese, english: "Command Help", chinese: "命令帮助"), detail: localizedText(isChinese, english: "Discover sheet-specific commands and see what VisiData can do on the current data.", chinese: "查看当前数据表可用的专属命令，快速了解 VisiData 还能做什么。")),
+            QuickTip(keys: "q", title: localizedText(isChinese, english: "Back / Quit Sheet", chinese: "返回 / 退出表"), detail: localizedText(isChinese, english: "Go back from a derived sheet or quit the session when you are done.", chinese: "从派生表返回上一层，或在完成后退出当前会话。")),
+        ]
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 helpHero
-                helpSection(title: "Using iData", tips: onboardingTips)
-                helpSection(title: "File Loading Notes", tips: softwareTips)
-                helpSection(title: "Common VisiData Shortcuts", tips: visiDataTips)
+                helpSection(title: localizedText(isChinese, english: "Using iData", chinese: "如何使用 iData"), tips: onboardingTips)
+                helpSection(title: localizedText(isChinese, english: "File Loading Notes", chinese: "文件加载说明"), tips: softwareTips)
+                helpSection(title: localizedText(isChinese, english: "Common VisiData Shortcuts", chinese: "常用 VisiData 快捷键"), tips: visiDataTips)
             }
             .padding(28)
         }
@@ -887,7 +994,7 @@ private struct HelpView: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top, spacing: 12) {
-                        Text("iData Help")
+                        Text(localizedText(isChinese, english: "iData Help", chinese: "iData 帮助"))
                             .font(.system(size: 34, weight: .bold, design: .rounded))
 
                         Spacer(minLength: 0)
@@ -907,18 +1014,22 @@ private struct HelpView: View {
                         }
                         .buttonStyle(.plain)
                         .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.03, hoverYOffset: -1)
-                        .help("Close Help")
+                        .help(localizedText(isChinese, english: "Close Help", chinese: "关闭帮助"))
                         .keyboardShortcut(.cancelAction)
                     }
 
-                    Text("iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.")
+                    Text(localizedText(
+                        isChinese,
+                        english: "iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.",
+                        chinese: "iData 是包裹真实 VisiData 的原生 macOS 外壳。外层应用负责打开文件、历史记录、更新和设置；中间的主表格区域仍然是真正的 VisiData，因此你熟悉的 VisiData 命令在会话里依然有效。"
+                    ))
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 10) {
-                        StatusPill(title: "Native macOS shell", tint: .white.opacity(0.12), icon: "macwindow")
-                        StatusPill(title: "Real VisiData core", tint: Color.accentColor.opacity(0.20), icon: "terminal")
+                        StatusPill(title: localizedText(isChinese, english: "Native macOS shell", chinese: "原生 macOS 壳层"), tint: .white.opacity(0.12), icon: "macwindow")
+                        StatusPill(title: localizedText(isChinese, english: "Real VisiData core", chinese: "真实 VisiData 内核"), tint: Color.accentColor.opacity(0.20), icon: "terminal")
                     }
                 }
             }
@@ -988,7 +1099,7 @@ private struct TutorialHubView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(isChinese ? "Tutorial 清单" : "Tutorial Checklist")
+                    Text(isChinese ? "教程清单" : "Tutorial Checklist")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
                     Text(isChinese ? "选择一个章节开始练习。完成的章节会自动打勾。" : "Choose a chapter to practice. Completed chapters are checked automatically.")
@@ -1112,14 +1223,6 @@ private struct WelcomeDetailView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var customAssociationInput = ""
 
-    private let quickTips: [QuickTip] = [
-        QuickTip(keys: "hjkl / ←↑↓→", title: "Move", detail: "Navigate rows and columns quickly without leaving the keyboard."),
-        QuickTip(keys: "/  ?  n  N", title: "Search", detail: "Search forward or backward in the current sheet, then jump to next or previous match."),
-        QuickTip(keys: "s  t  u", title: "Select Rows", detail: "Select, toggle, or unselect rows before profiling or exporting."),
-        QuickTip(keys: "[  ]", title: "Sort", detail: "Sort the current column ascending or descending."),
-        QuickTip(keys: "Ctrl+H", title: "Help", detail: "Open the command and help menu to discover any VisiData action.")
-    ]
-
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
     }
@@ -1132,6 +1235,16 @@ private struct WelcomeDetailView: View {
 
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
+    }
+
+    private var quickTips: [QuickTip] {
+        [
+            QuickTip(keys: "hjkl / ←↑↓→", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate rows and columns quickly without leaving the keyboard.", chinese: "不离开键盘也能快速移动行和列。")),
+            QuickTip(keys: "/  ?  n  N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward in the current sheet, then jump to next or previous match.", chinese: "在当前工作表中向前或向后搜索，然后跳到下一个或上一个匹配项。")),
+            QuickTip(keys: "s  t  u", title: localizedText(isChinese, english: "Select Rows", chinese: "选择行"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows before profiling or exporting.", chinese: "在统计分析或导出之前，先选择、切换或取消选择行。")),
+            QuickTip(keys: "[  ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "对当前列执行升序或降序排序。")),
+            QuickTip(keys: "Ctrl+H", title: localizedText(isChinese, english: "Help", chinese: "帮助"), detail: localizedText(isChinese, english: "Open the command and help menu to discover any VisiData action.", chinese: "打开命令与帮助菜单，查看 VisiData 的可用操作。"))
+        ]
     }
 
     private var normalizedCustomAssociationExtension: String {
@@ -1188,13 +1301,13 @@ private struct WelcomeDetailView: View {
 
                 if let errorMessage = model.errorMessage {
                     MessageCard(
-                        title: "Launch Error",
+                        title: localizedText(isChinese, english: "Launch Error", chinese: "启动错误"),
                         message: errorMessage,
                         color: .red.opacity(0.14)
                     )
                 } else if let statusMessage = model.statusMessage {
                     MessageCard(
-                        title: "Status",
+                        title: localizedText(isChinese, english: "Status", chinese: "状态"),
                         message: statusMessage,
                         color: .green.opacity(0.14)
                     )
@@ -1422,23 +1535,27 @@ private struct WelcomeDetailView: View {
     private var dependencyPill: some View {
         switch model.visiDataDependencyState {
         case .available:
-            return AnyView(StatusPill(title: "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill"))
+            return AnyView(StatusPill(title: localizedText(isChinese, english: "VisiData Ready", chinese: "VisiData 已就绪"), tint: .green.opacity(0.20), icon: "checkmark.circle.fill"))
         case .missing:
-            return AnyView(StatusPill(title: "Install VisiData", tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill"))
+            return AnyView(StatusPill(title: localizedText(isChinese, english: "Install VisiData", chinese: "安装 VisiData"), tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill"))
         }
     }
 
     private var summaryCards: some View {
         HStack(alignment: .top, spacing: 14) {
             SummaryCard(
-                title: "Runtime",
+                title: localizedText(isChinese, english: "Runtime", chinese: "运行环境"),
                 icon: "waveform.path.ecg.rectangle",
-                detail: "\(model.visiDataDependencySummary) Files are no longer restricted by suffix; iData only special-cases compressed gzip-like inputs."
+                detail: localizedText(
+                    isChinese,
+                    english: "\(model.visiDataDependencySummary) Files are no longer restricted by suffix; iData only special-cases compressed gzip-like inputs.",
+                    chinese: "\(model.visiDataDependencySummary) 现在文件不再受后缀限制；iData 只会对 gzip 类压缩输入做少量特殊处理。"
+                )
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             SummaryCard(
-                title: "Updates",
+                title: localizedText(isChinese, english: "Updates", chinese: "更新"),
                 icon: "square.and.arrow.down",
                 detail: updater.statusMessage
             )
@@ -1448,10 +1565,14 @@ private struct WelcomeDetailView: View {
 
     private var quickTipsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("VisiData Quick Start")
+            Text(localizedText(isChinese, english: "VisiData Quick Start", chinese: "VisiData 快速上手"))
                 .font(.headline)
 
-            Text("These are common starter shortcuts. All normal VisiData commands still work inside the embedded session.")
+            Text(localizedText(
+                isChinese,
+                english: "These are common starter shortcuts. All normal VisiData commands still work inside the embedded session.",
+                chinese: "这里列出的是常见入门快捷键。内嵌会话里其余标准 VisiData 命令仍然都可以正常使用。"
+            ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -1485,24 +1606,33 @@ private struct WelcomeDetailView: View {
 
     private var formatsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Supported Formats")
+            Text(localizedText(isChinese, english: "Supported Formats", chinese: "支持的格式"))
                 .font(.headline)
 
-            Text("These are common examples. iData now forwards most regular files directly to VisiData and only special-cases gzip-like compression.")
+            Text(localizedText(
+                isChinese,
+                english: "These are common examples. iData now forwards most regular files directly to VisiData and only special-cases gzip-like compression.",
+                chinese: "下面列的是常见示例。iData 现在会把大多数常规文件直接转交给 VisiData，只对 gzip 一类压缩文件做少量特殊处理。"
+            ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Text("Tip: click once to set iData as default; click again to restore the previous default app.")
+            Text(localizedText(
+                isChinese,
+                english: "Tip: click once to set iData as default; click again to restore the previous default app.",
+                chinese: "提示：点一次可把 iData 设为默认应用；再次点击会恢复到之前的默认应用。"
+            ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
                 ForEach(orderedSupportedFormats, id: \.format.fileExtension) { entry in
                     FormatChip(
-                        title: entry.format.displayName,
+                        title: entry.format.localizedDisplayName(for: model.effectiveLanguage),
                         extensionText: entry.format.fileExtension,
                         isDefault: entry.isDefault,
                         isLoading: model.isSettingFormatDefault && model.settingFormatExtension == entry.format.fileExtension,
+                        isChinese: isChinese,
                         onTap: {
                             model.setFormatAsDefault(forExtension: entry.format.fileExtension)
                         }
@@ -1514,7 +1644,7 @@ private struct WelcomeDetailView: View {
                 .overlay(Color.white.opacity(0.08))
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Custom Suffix")
+                Text(localizedText(isChinese, english: "Custom Suffix", chinese: "自定义后缀"))
                     .font(.subheadline.weight(.semibold))
 
                 HStack(spacing: 10) {
@@ -1531,7 +1661,7 @@ private struct WelcomeDetailView: View {
                     Button {
                         model.setFormatAsDefault(forExtension: customAssociationInput)
                     } label: {
-                        Label("Set Default to iData", systemImage: "checkmark.circle.fill")
+                        Label(localizedText(isChinese, english: "Set Default to iData", chinese: "设为 iData 默认打开"), systemImage: "checkmark.circle.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canSubmitCustomAssociation)
@@ -1540,27 +1670,35 @@ private struct WelcomeDetailView: View {
 
                 if !normalizedCustomAssociationExtension.isEmpty {
                     HStack(spacing: 8) {
-                        Text("Suffix: .\(normalizedCustomAssociationExtension)")
+                        Text(localizedText(
+                            isChinese,
+                            english: "Suffix: .\(normalizedCustomAssociationExtension)",
+                            chinese: "后缀：.\(normalizedCustomAssociationExtension)"
+                        ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
                         if isSettingCustomAssociation {
                             ProgressView()
                                 .controlSize(.small)
-                            Text("Setting...")
+                            Text(localizedText(isChinese, english: "Setting...", chinese: "正在设置..."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if isCustomAssociationDefault {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundStyle(.green)
-                            Text("Default: iData")
+                            Text(localizedText(isChinese, english: "Default: iData", chinese: "默认应用：iData"))
                                 .font(.caption)
                                 .foregroundStyle(.green)
                         }
                     }
                 } else {
-                    Text("Enter a suffix to set its default handler to iData.")
+                    Text(localizedText(
+                        isChinese,
+                        english: "Enter a suffix to set its default handler to iData.",
+                        chinese: "输入一个后缀，把它的默认打开方式设为 iData。"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1618,9 +1756,9 @@ private struct SessionDetailView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(session.currentFileURL?.lastPathComponent ?? "VisiData Session")
+                    Text(session.currentFileURL?.lastPathComponent ?? localizedText(isChinese, english: "VisiData Session", chinese: "VisiData 会话"))
                         .font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text(session.currentFileURL?.path ?? "No file loaded")
+                    Text(session.currentFileURL?.path ?? localizedText(isChinese, english: "No file loaded", chinese: "尚未加载文件"))
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
@@ -1633,7 +1771,7 @@ private struct SessionDetailView: View {
                             Button {
                                 model.revealInFinder(fileURL)
                             } label: {
-                                Label("Show in Finder", systemImage: "finder")
+                                Label(localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"), systemImage: "finder")
                             }
                             .buttonStyle(.bordered)
                             .quietInteractiveSurface(enabled: motionEnabled)
@@ -1641,7 +1779,7 @@ private struct SessionDetailView: View {
                             Button {
                                 model.copyPathToPasteboard(fileURL)
                             } label: {
-                                Label("Copy Path", systemImage: "doc.on.doc")
+                                Label(localizedText(isChinese, english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
                             }
                             .buttonStyle(.bordered)
                             .quietInteractiveSurface(enabled: motionEnabled)
@@ -1682,13 +1820,13 @@ private struct SessionDetailView: View {
 
             if let errorMessage = model.errorMessage {
                 MessageCard(
-                    title: "Launch Error",
+                    title: localizedText(isChinese, english: "Launch Error", chinese: "启动错误"),
                     message: errorMessage,
                     color: .red.opacity(0.12)
                 )
             } else if let errorMessage = session.errorMessage {
                 MessageCard(
-                    title: "Session Error",
+                    title: localizedText(isChinese, english: "Session Error", chinese: "会话错误"),
                     message: errorMessage,
                     color: .red.opacity(0.12)
                 )
@@ -1743,7 +1881,9 @@ private struct SessionDetailView: View {
 
 func statusPanelUsesRunningTint(for statusMessage: String) -> Bool {
     let normalized = statusMessage.lowercased()
-    return normalized.contains("running visidata") || normalized.contains("正在运行 visidata")
+    return normalized.contains("running visidata")
+        || normalized.contains("正在运行 visidata")
+        || normalized.contains("运行 visidata")
 }
 
 private struct StatusAndInputCard: View {
@@ -2014,7 +2154,11 @@ private struct TutorialCoachOverlay: View {
                                 .frame(width: 8, height: 8)
                         }
                         .buttonStyle(.plain)
-                        .help("Jump to step \(item.index + 1)")
+                        .help(localizedText(
+                            isChinese,
+                            english: "Jump to step \(item.index + 1)",
+                            chinese: "跳到第 \(item.index + 1) 步"
+                        ))
                     }
                 }
 
@@ -2154,7 +2298,7 @@ final class CommandKeyMonitor: ObservableObject {
 }
 
 final class InputSourceMonitor: NSObject, ObservableObject {
-    @Published private(set) var displayName = "Unknown"
+    @Published private(set) var displayName = localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
     @Published private(set) var isLikelyEnglish = false
 
     private let notificationName = Notification.Name(rawValue: kTISNotifySelectedKeyboardInputSourceChanged as String)
@@ -2192,12 +2336,12 @@ final class InputSourceMonitor: NSObject, ObservableObject {
         }
 
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else {
-            displayName = "Unknown"
+            displayName = localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
             isLikelyEnglish = false
             return
         }
 
-        let localizedName = Self.readInputSourceString(source: source, key: kTISPropertyLocalizedName) ?? "Unknown"
+        let localizedName = Self.readInputSourceString(source: source, key: kTISPropertyLocalizedName) ?? localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
         let sourceID = Self.readInputSourceString(source: source, key: kTISPropertyInputSourceID) ?? ""
         let inputModeID = Self.readInputSourceString(source: source, key: kTISPropertyInputModeID) ?? ""
 
@@ -2463,6 +2607,7 @@ private struct FormatChip: View {
     let extensionText: String
     let isDefault: Bool
     let isLoading: Bool
+    let isChinese: Bool
     let onTap: () -> Void
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
@@ -2473,7 +2618,7 @@ private struct FormatChip: View {
                 ProgressView()
                     .scaleEffect(0.5)
                     .frame(width: 12, height: 12)
-                Text("Setting...")
+                Text(localizedText(isChinese, english: "Setting...", chinese: "正在设置..."))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
@@ -2481,7 +2626,7 @@ private struct FormatChip: View {
                     .fill(Color.green)
                     .frame(width: 6, height: 6)
                     .opacity(isDefault ? 1 : 0)
-                Text("Default")
+                Text(localizedText(isChinese, english: "Default", chinese: "默认"))
                     .font(.caption2)
                     .foregroundStyle(.green)
                     .opacity(isDefault ? 1 : 0)

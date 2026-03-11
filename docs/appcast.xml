@@ -3,30 +3,28 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.1.7</title>
-            <pubDate>Wed, 11 Mar 2026 14:18:57 +0800</pubDate>
+            <title>0.1.8</title>
+            <pubDate>Wed, 11 Mar 2026 16:52:31 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>8</sparkle:version>
-            <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>0.1.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# iData v0.1.7
+            <description sparkle:format="markdown"><![CDATA[# iData v0.1.8
 
 Released: 2026-03-11
 
 ## Highlights
 
-- Fixed terminal redraw/layout glitches that could leave large tables horizontally misaligned on first render.
-- Fixed same-window file switches so small result sheets no longer open into a mostly blank terminal until the user clicks or presses a key.
-- Hardened embedded terminal layout synchronization by waiting for a real resize before marking the display ready and by rebuilding the xterm instance when the display is cleared.
-- Added one-click VisiData setup from the welcome screen and Preferences by launching the bundled helper in the user's session instead of attempting installation inside the pkg installer.
-- Added file format association: click any supported format chip to set iData as the default opener, or enter a custom suffix. Click again to restore the previous default app.
-- Polished the welcome hero so the `VisiData Ready` badge now appears inline with the app title and version, reducing visual weight while keeping readiness status visible.
+- Added app-wide Chinese and English localization for the native iData shell, including Welcome, Preferences, Help, Tutorial Hub, Tutorial Coach, updater state, and native status/error messages.
+- Kept language switching user-controlled in Preferences, with `System`, `English`, and `中文` options that update the native UI immediately.
+- Fixed supported-format chips so clicking an already selected format reliably restores the recorded previous default app once macOS finishes propagating the handler change.
+- Preserved the inline `VisiData Ready` hero badge layout from the previous release candidate while carrying forward the one-click VisiData setup flow.
 
 ## Notes
 
 - Build remains unsigned/not notarized for local distribution.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.7/iData-v0.1.7-macos-universal.zip" length="3764618" type="application/octet-stream" sparkle:edSignature="CBbRJs+dpYoqE+rRcZuG0kXCrlmXe5PyFbxJIUnk1AaHMrZZpp7K16l5BSJFkVMp5eqLw5ute2fI9okoT6EaAQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.8/iData-v0.1.8-macos-universal.zip" length="3819388" type="application/octet-stream" sparkle:edSignature="+J0g/Hw9SFNOHgS/5tCQAGrIPB6kxWyWBxejZemnvdXiXbzxGGFiOVKHk6zI/pPFCzA1Ol4+9SGS1IV2CTefCw=="/>
         </item>
     </channel>
 </rss>
