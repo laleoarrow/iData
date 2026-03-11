@@ -19,9 +19,8 @@
   <a href="./README.md">English</a> | <a href="./README_zh.md">简体中文</a>
 </div>
 
-`iData` is a native macOS shell around `VisiData`.
 
-## What it does today
+## What's iData?
 
 - opens most regular files through a native macOS window without hardcoding suffix rules
 - embeds the `VisiData` session inside the app window
