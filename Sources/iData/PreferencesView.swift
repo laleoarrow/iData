@@ -45,7 +45,7 @@ struct PreferencesView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 10) {
-                        VersionRevealPill(model: model, tint: .white.opacity(0.12), icon: "shippingbox")
+                        VersionPill(model: model, tint: .white.opacity(0.12), icon: "shippingbox")
 
                         switch model.visiDataDependencyState {
                         case .available:

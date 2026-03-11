@@ -14,7 +14,14 @@
       "Bash(gh release list --limit 5)",
       "Bash(git add iDataApp/Info.plist)",
       "Bash(git tag v0.1.6)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(gh release:*)",
+      "Bash(ls -la *.xcodeproj)",
+      "Bash(xcodebuild -list)",
+      "Bash(./scripts/build_app.sh)",
+      "Bash(./scripts/package_release.sh 0.1.6)",
+      "Bash(./scripts/create_dmg.sh 0.1.6)",
+      "WebSearch"
     ],
     "deny": [
       "Bash(rm -rf:*)",

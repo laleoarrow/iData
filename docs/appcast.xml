@@ -19,6 +19,7 @@ Released: 2026-03-11
 - Fixed same-window file switches so small result sheets no longer open into a mostly blank terminal until the user clicks or presses a key.
 - Hardened embedded terminal layout synchronization by waiting for a real resize before marking the display ready and by rebuilding the xterm instance when the display is cleared.
 - Added one-click VisiData setup from the welcome screen and Preferences by launching the bundled helper in the user's session instead of attempting installation inside the pkg installer.
+- Added file format association: click any supported format chip to set iData as the default opener, or enter a custom suffix. Click again to restore the previous default app.
 - Polished the welcome hero so the `VisiData Ready` badge now appears inline with the app title and version, reducing visual weight while keeping readiness status visible.
 
 ## Notes

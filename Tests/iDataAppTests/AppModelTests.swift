@@ -187,11 +187,12 @@ struct AppModelTests {
     }
 
     @Test
-    func versionDisplayCanRevealBuildNumber() {
+    func versionDisplayNeverShowsBuildNumber() {
         let model = AppModel()
 
         #expect(model.appVersionDisplay(revealingBuild: false) == model.appVersionSummary)
-        #expect(model.appVersionDisplay(revealingBuild: true).contains("("))
+        #expect(model.appVersionDisplay(revealingBuild: true) == model.appVersionSummary)
+        #expect(!model.appVersionDisplay(revealingBuild: true).contains("("))
     }
 
     @Test
@@ -234,6 +235,54 @@ struct AppModelTests {
         #expect(AppModel.collapsedRecentFileBadgeText(for: URL(fileURLWithPath: "/tmp/report.tsv")) == "R")
         #expect(AppModel.collapsedRecentFileBadgeText(for: URL(fileURLWithPath: "/tmp/αlpha.csv")) == "Α")
         #expect(AppModel.collapsedRecentFileBadgeText(for: URL(fileURLWithPath: "/tmp/.hidden")) == ".")
+    }
+
+    @Test
+    func associationExtensionUsesFinalSuffixComponent() {
+        #expect(AppModel.associationExtension(for: "csv") == "csv")
+        #expect(AppModel.associationExtension(for: "barcodes.tsv") == "tsv")
+        #expect(AppModel.associationExtension(for: ".bgz") == "bgz")
+        #expect(AppModel.associationExtension(for: "  MA  ") == "ma")
+        #expect(AppModel.associationExtension(for: "") == "")
+    }
+
+    @Test
+    func customAssociationInputValidationRequiresNonEmptySuffix() {
+        #expect(!AppModel.canSetAssociationExtensionInput(""))
+        #expect(!AppModel.canSetAssociationExtensionInput("   .   "))
+        #expect(AppModel.canSetAssociationExtensionInput(" .vcf "))
+        #expect(AppModel.canSetAssociationExtensionInput("barcodes.tsv"))
+    }
+
+    @Test
+    func previousDefaultAssociationHandlersReloadFromDefaults() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let persistedMapping = [
+            "csv": [
+                "url": "/Applications/Numbers.app",
+                "bundleIdentifier": "com.apple.Numbers",
+                "displayName": "Numbers",
+            ],
+        ]
+        defaults.set(
+            try JSONEncoder().encode(persistedMapping),
+            forKey: "previousDefaultAppsByExtension"
+        )
+
+        let model = AppModel(defaults: defaults)
+        let restoredMapping = Mirror(reflecting: model)
+            .children
+            .first(where: { $0.label == "previousDefaultAppByExtension" })?
+            .value
+        let restoredDescription = String(describing: restoredMapping)
+
+        #expect(restoredDescription.contains("csv"))
+        #expect(restoredDescription.contains("com.apple.Numbers"))
     }
 
     @Test

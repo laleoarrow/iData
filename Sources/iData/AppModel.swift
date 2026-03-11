@@ -4,6 +4,7 @@ import SwiftUI
 #if canImport(iDataCore)
 import iDataCore
 #endif
+import UniformTypeIdentifiers
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -85,18 +86,24 @@ final class AppModel: ObservableObject {
             defaults.set(vdExecutablePath, forKey: Self.vdExecutablePathKey)
         }
     }
+    @Published var formatAssociationStatus: [String: Bool] = [:] // extension -> isDefault
+    @Published var isSettingFormatDefault = false
+    @Published var settingFormatExtension: String?
+    private var previousDefaultAppByExtension: [String: DefaultApplicationHandler] = [:]
 
     private let defaults: UserDefaults
     private let recentFilesStore: RecentFilesStore
     private let executableChecker: any ExecutableChecking
     private let environmentPathProvider: () -> String
     private let preferredLanguagesProvider: () -> [String]
+    private let formatAssociationRestoreStore: FormatAssociationRestoreStore
 
     static let vdExecutablePathKey = "vdExecutablePath"
     static let pinnedRecentFilesKey = "pinnedRecentFiles"
     static let reduceAnimationsKey = "reduceAnimations"
     static let isSidebarCollapsedKey = "isSidebarCollapsed"
     static let tutorialLanguagePreferenceKey = "tutorialLanguagePreference"
+    static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
     static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
     static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     static let defaultTutorialChapterID = "basic"
@@ -357,6 +364,7 @@ final class AppModel: ObservableObject {
         self.executableChecker = executableChecker
         self.environmentPathProvider = environmentPathProvider
         self.preferredLanguagesProvider = preferredLanguagesProvider
+        self.formatAssociationRestoreStore = FormatAssociationRestoreStore(defaults: defaults)
         let initialRecentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
         self.recentFiles = Self.orderedRecentFiles(
             initialRecentFiles,
@@ -368,6 +376,7 @@ final class AppModel: ObservableObject {
         self.tutorialLanguagePreference = TutorialLanguagePreference(
             rawValue: defaults.string(forKey: Self.tutorialLanguagePreferenceKey) ?? ""
         ) ?? .system
+        self.previousDefaultAppByExtension = formatAssociationRestoreStore.loadAll()
     }
 
     var displayedSession: VisiDataSessionController? {
@@ -380,10 +389,6 @@ final class AppModel: ObservableObject {
 
     var appVersionSummary: String {
         appVersionDisplay(revealingBuild: false)
-    }
-
-    var appBuildNumber: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
     }
 
     var animationsEnabled: Bool {
@@ -494,11 +499,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func appVersionDisplay(revealingBuild: Bool) -> String {
+    func appVersionDisplay(revealingBuild _: Bool) -> String {
         let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
-        if revealingBuild {
-            return "v\(shortVersion) (\(appBuildNumber))"
-        }
         return "v\(shortVersion)"
     }
 
@@ -811,6 +813,107 @@ final class AppModel: ObservableObject {
         activeSession = nil
     }
 
+    func checkFormatAssociation(forExtension fileExtension: String) -> Bool {
+        let lookupExtension = Self.associationExtension(for: fileExtension)
+        guard !lookupExtension.isEmpty else {
+            formatAssociationStatus[fileExtension] = false
+            return false
+        }
+
+        let isDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
+        updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isDefault)
+        return isDefault
+    }
+
+    func setFormatAsDefault(forExtension fileExtension: String) {
+        guard !isSettingFormatDefault else { return }
+        let lookupExtension = Self.associationExtension(for: fileExtension)
+        guard !lookupExtension.isEmpty else {
+            errorMessage = "无法识别 .\(fileExtension) 的后缀。"
+            statusMessage = nil
+            return
+        }
+
+        let wasIDataDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
+        updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: wasIDataDefault)
+
+        isSettingFormatDefault = true
+        settingFormatExtension = fileExtension
+
+        Task {
+            if wasIDataDefault {
+                let previousDefaultApp = await MainActor.run { [lookupExtension] in
+                    previousDefaultAppByExtension[lookupExtension]
+                }
+                let restoreResult: FileTypeAssociationSetResult
+                if let previousDefaultApp {
+                    restoreResult = await FileTypeAssociation.setDefaultApp(
+                        at: previousDefaultApp.url,
+                        forExtension: lookupExtension
+                    )
+                } else {
+                    restoreResult = .missingPreviousDefault
+                }
+
+                await MainActor.run {
+                    let isNowDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
+                    updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isNowDefault)
+                    let shownExtension = lookupExtension
+
+                    if !isNowDefault {
+                        forgetPreviousDefaultApp(forLookupExtension: lookupExtension)
+                        if let previousDefaultApp {
+                            statusMessage = "已恢复 .\(shownExtension) 默认应用为 \(previousDefaultApp.displayName)"
+                            errorMessage = nil
+                        } else {
+                            statusMessage = "已取消 .\(shownExtension) 默认用 iData 打开"
+                            errorMessage = nil
+                        }
+                    } else if restoreResult == .success {
+                        statusMessage = "系统已收到恢复请求，但 .\(shownExtension) 仍默认 iData。请再试一次并确认系统提示。"
+                        errorMessage = nil
+                    } else {
+                        errorMessage = "无法恢复 .\(shownExtension) 的默认应用：\(restoreResult.userMessage)"
+                        statusMessage = nil
+                    }
+
+                    isSettingFormatDefault = false
+                    settingFormatExtension = nil
+                }
+                return
+            }
+
+            let previousDefaultApp = FileTypeAssociation.currentDefaultApp(forExtension: lookupExtension)
+            let setResult = await FileTypeAssociation.setIDataAsDefaultApp(forExtension: lookupExtension)
+
+            await MainActor.run {
+                let isNowDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
+                updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isNowDefault)
+                let shownExtension = lookupExtension
+
+                if isNowDefault {
+                    if
+                        let previousDefaultApp,
+                        !FileTypeAssociation.isIDataBundleIdentifier(previousDefaultApp.bundleIdentifier)
+                    {
+                        rememberPreviousDefaultApp(previousDefaultApp, forLookupExtension: lookupExtension)
+                    }
+                    statusMessage = "已设置 .\(shownExtension) 默认用 iData 打开"
+                    errorMessage = nil
+                } else if setResult == .success {
+                    statusMessage = "系统已收到设置请求，但 .\(shownExtension) 还未切换到 iData。请再试一次并确认系统提示。"
+                    errorMessage = nil
+                } else {
+                    errorMessage = "无法设置 .\(shownExtension) 默认应用：\(setResult.userMessage)"
+                    statusMessage = nil
+                }
+
+                isSettingFormatDefault = false
+                settingFormatExtension = nil
+            }
+        }
+    }
+
     @discardableResult
     func handleDroppedFiles(_ urls: [URL]) -> Bool {
         guard let fileURL = Self.firstSupportedFile(in: urls) else {
@@ -965,6 +1068,35 @@ final class AppModel: ObservableObject {
         return .expand
     }
 
+    static func associationExtension(for fileExtension: String) -> String {
+        fileExtension
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: ".")
+            .last
+            .map { String($0).lowercased() } ?? ""
+    }
+
+    static func canSetAssociationExtensionInput(_ rawInput: String) -> Bool {
+        !associationExtension(for: rawInput).isEmpty
+    }
+
+    private func updateAssociationStatus(forLookupExtension lookupExtension: String, isDefault: Bool) {
+        formatAssociationStatus[lookupExtension] = isDefault
+        for format in Self.supportedFormats where Self.associationExtension(for: format.fileExtension) == lookupExtension {
+            formatAssociationStatus[format.fileExtension] = isDefault
+        }
+    }
+
+    private func rememberPreviousDefaultApp(_ handler: DefaultApplicationHandler, forLookupExtension lookupExtension: String) {
+        previousDefaultAppByExtension[lookupExtension] = handler
+        formatAssociationRestoreStore.save(handler, forLookupExtension: lookupExtension)
+    }
+
+    private func forgetPreviousDefaultApp(forLookupExtension lookupExtension: String) {
+        previousDefaultAppByExtension.removeValue(forKey: lookupExtension)
+        formatAssociationRestoreStore.remove(forLookupExtension: lookupExtension)
+    }
+
     private func refreshRecentFiles() {
         recentFiles = Self.orderedRecentFiles(
             recentFilesStore.load(),
@@ -1029,5 +1161,221 @@ final class AppModel: ObservableObject {
         let pinnedSet = Set(pinnedFiles.map(\.standardizedFileURL))
         let unpinnedFiles = recentFiles.filter { !pinnedSet.contains($0.standardizedFileURL) }
         return pinnedFiles + unpinnedFiles
+    }
+}
+
+private enum FileTypeAssociationSetResult: Equatable {
+    case success
+    case missingAppBundle
+    case missingTargetApplication
+    case unresolvedContentType
+    case permissionDenied
+    case missingPreviousDefault
+    case launchServicesError(String)
+    case unexpected(String)
+
+    var userMessage: String {
+        switch self {
+        case .success:
+            return "成功"
+        case .missingAppBundle:
+            return "未找到 iData 应用标识"
+        case .missingTargetApplication:
+            return "未找到要恢复的默认应用"
+        case .unresolvedContentType:
+            return "系统无法解析该后缀对应的文件类型"
+        case .permissionDenied:
+            return "系统拒绝了修改默认应用的请求"
+        case .missingPreviousDefault:
+            return "没有记录此前的默认应用"
+        case let .launchServicesError(reason):
+            return reason
+        case let .unexpected(reason):
+            return reason
+        }
+    }
+}
+
+private struct DefaultApplicationHandler: Equatable, Sendable {
+    let url: URL
+    let bundleIdentifier: String
+    let displayName: String
+}
+
+private struct PersistedDefaultApplicationHandler: Codable {
+    let url: URL
+    let bundleIdentifier: String
+    let displayName: String
+
+    init(_ handler: DefaultApplicationHandler) {
+        url = handler.url
+        bundleIdentifier = handler.bundleIdentifier
+        displayName = handler.displayName
+    }
+
+    var handler: DefaultApplicationHandler {
+        DefaultApplicationHandler(
+            url: url,
+            bundleIdentifier: bundleIdentifier,
+            displayName: displayName
+        )
+    }
+}
+
+@MainActor
+private struct FormatAssociationRestoreStore {
+    let defaults: UserDefaults
+
+    func loadAll() -> [String: DefaultApplicationHandler] {
+        loadPersistedMappings().reduce(into: [:]) { result, entry in
+            let lookupExtension = AppModel.associationExtension(for: entry.key)
+            guard !lookupExtension.isEmpty else {
+                return
+            }
+            result[lookupExtension] = entry.value.handler
+        }
+    }
+
+    func save(_ handler: DefaultApplicationHandler, forLookupExtension lookupExtension: String) {
+        var mappings = loadPersistedMappings()
+        mappings[lookupExtension] = PersistedDefaultApplicationHandler(handler)
+        store(mappings)
+    }
+
+    func remove(forLookupExtension lookupExtension: String) {
+        var mappings = loadPersistedMappings()
+        mappings.removeValue(forKey: lookupExtension)
+        store(mappings)
+    }
+
+    private func loadPersistedMappings() -> [String: PersistedDefaultApplicationHandler] {
+        guard
+            let data = defaults.data(forKey: AppModel.previousDefaultAppsByExtensionKey),
+            let mappings = try? JSONDecoder().decode([String: PersistedDefaultApplicationHandler].self, from: data)
+        else {
+            return [:]
+        }
+
+        return mappings
+    }
+
+    private func store(_ mappings: [String: PersistedDefaultApplicationHandler]) {
+        if mappings.isEmpty {
+            defaults.removeObject(forKey: AppModel.previousDefaultAppsByExtensionKey)
+            return
+        }
+
+        if let data = try? JSONEncoder().encode(mappings) {
+            defaults.set(data, forKey: AppModel.previousDefaultAppsByExtensionKey)
+        }
+    }
+}
+
+@MainActor
+private enum FileTypeAssociation {
+    static var iDataBundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? "io.github.leoarrow.idata"
+    }
+
+    private static func appURL() -> URL? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: iDataBundleIdentifier)
+    }
+
+    static func isIDataBundleIdentifier(_ bundleIdentifier: String) -> Bool {
+        bundleIdentifier == iDataBundleIdentifier
+    }
+
+    private static func contentType(forExtension fileExtension: String) -> UTType? {
+        let trimmed = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let probeDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("idata-content-type-probe", isDirectory: true)
+        try? FileManager.default.createDirectory(at: probeDirectory, withIntermediateDirectories: true)
+        let probeURL = probeDirectory.appendingPathComponent("probe-\(UUID().uuidString).\(trimmed)")
+
+        do {
+            try Data("idata".utf8).write(to: probeURL, options: [.atomic])
+            defer {
+                try? FileManager.default.removeItem(at: probeURL)
+            }
+            let values = try probeURL.resourceValues(forKeys: [.contentTypeKey])
+            guard let contentType = values.contentType else {
+                return nil
+            }
+            return contentType
+        } catch {
+            return nil
+        }
+    }
+
+    static func isIDataDefaultApp(forExtension fileExtension: String) -> Bool {
+        guard let currentDefaultApp = currentDefaultApp(forExtension: fileExtension) else {
+            return false
+        }
+        return currentDefaultApp.bundleIdentifier == iDataBundleIdentifier
+    }
+
+    static func currentDefaultApp(forExtension fileExtension: String) -> DefaultApplicationHandler? {
+        guard
+            let contentType = contentType(forExtension: fileExtension),
+            let defaultAppURL = NSWorkspace.shared.urlForApplication(toOpen: contentType),
+            let defaultBundle = Bundle(url: defaultAppURL),
+            let defaultBundleIdentifier = defaultBundle.bundleIdentifier
+        else {
+            return nil
+        }
+
+        let displayName =
+            (defaultBundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                ?? (defaultBundle.object(forInfoDictionaryKey: kCFBundleNameKey as String) as? String)
+                ?? FileManager.default.displayName(atPath: defaultAppURL.path)
+
+        return DefaultApplicationHandler(
+            url: defaultAppURL,
+            bundleIdentifier: defaultBundleIdentifier,
+            displayName: displayName
+        )
+    }
+
+    static func setIDataAsDefaultApp(forExtension fileExtension: String) async -> FileTypeAssociationSetResult {
+        guard let appURL = appURL() else {
+            return .missingAppBundle
+        }
+        return await setDefaultApp(at: appURL, forExtension: fileExtension)
+    }
+
+    static func setDefaultApp(at appURL: URL, forExtension fileExtension: String) async -> FileTypeAssociationSetResult {
+        guard FileManager.default.fileExists(atPath: appURL.path) else {
+            return .missingTargetApplication
+        }
+        guard let contentType = contentType(forExtension: fileExtension) else {
+            return .unresolvedContentType
+        }
+        return await setDefaultApplication(at: appURL, toOpen: contentType)
+    }
+
+    private static func setDefaultApplication(at appURL: URL, toOpen contentType: UTType) async -> FileTypeAssociationSetResult {
+        return await withCheckedContinuation { continuation in
+            NSWorkspace.shared.setDefaultApplication(at: appURL, toOpen: contentType) { error in
+                guard let nsError = error as NSError? else {
+                    continuation.resume(returning: .success)
+                    return
+                }
+
+                if nsError.domain == NSCocoaErrorDomain, nsError.code == NSUserCancelledError {
+                    continuation.resume(returning: .permissionDenied)
+                    return
+                }
+
+                if nsError.domain == NSOSStatusErrorDomain {
+                    continuation.resume(returning: .launchServicesError(nsError.localizedDescription))
+                    return
+                }
+
+                continuation.resume(returning: .unexpected(nsError.localizedDescription))
+            }
+        }
     }
 }

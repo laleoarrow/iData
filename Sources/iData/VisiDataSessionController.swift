@@ -24,7 +24,12 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var isDisplayReady = false
     private var transcript = TerminalTranscript()
     private var requiresDisplayReset = true
-    private var masterFileDescriptor: Int32 = -1
+    private let ptyLock = NSLock()
+    private var _masterFileDescriptor: Int32 = -1
+    private var masterFileDescriptor: Int32 {
+        get { ptyLock.withLock { _masterFileDescriptor } }
+        set { ptyLock.withLock { _masterFileDescriptor = newValue } }
+    }
     private var childPID: pid_t = 0
     private var readSource: DispatchSourceRead?
     private var processSource: DispatchSourceProcess?

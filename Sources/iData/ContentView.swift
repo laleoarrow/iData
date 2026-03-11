@@ -1110,6 +1110,7 @@ private struct WelcomeDetailView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var customAssociationInput = ""
 
     private let quickTips: [QuickTip] = [
         QuickTip(keys: "hjkl / ←↑↓→", title: "Move", detail: "Navigate rows and columns quickly without leaving the keyboard."),
@@ -1131,6 +1132,47 @@ private struct WelcomeDetailView: View {
 
     private var isChinese: Bool {
         model.effectiveTutorialLanguage == .chinese
+    }
+
+    private var normalizedCustomAssociationExtension: String {
+        AppModel.associationExtension(for: customAssociationInput)
+    }
+
+    private var canSubmitCustomAssociation: Bool {
+        AppModel.canSetAssociationExtensionInput(customAssociationInput) && !model.isSettingFormatDefault
+    }
+
+    private var isSettingCustomAssociation: Bool {
+        guard model.isSettingFormatDefault else {
+            return false
+        }
+        return AppModel.associationExtension(for: model.settingFormatExtension ?? "") == normalizedCustomAssociationExtension
+            && !normalizedCustomAssociationExtension.isEmpty
+    }
+
+    private var isCustomAssociationDefault: Bool {
+        guard !normalizedCustomAssociationExtension.isEmpty else {
+            return false
+        }
+        return model.formatAssociationStatus[normalizedCustomAssociationExtension]
+            ?? model.checkFormatAssociation(forExtension: normalizedCustomAssociationExtension)
+    }
+
+    private var orderedSupportedFormats: [(format: AppModel.SupportedFormat, isDefault: Bool)] {
+        let snapshot = AppModel.supportedFormats.enumerated().map { index, format in
+            let isDefault = model.formatAssociationStatus[format.fileExtension]
+                ?? model.checkFormatAssociation(forExtension: format.fileExtension)
+            return (index: index, format: format, isDefault: isDefault)
+        }
+
+        return snapshot
+            .sorted { lhs, rhs in
+                if lhs.isDefault != rhs.isDefault {
+                    return lhs.isDefault && !rhs.isDefault
+                }
+                return lhs.index < rhs.index
+            }
+            .map { (format: $0.format, isDefault: $0.isDefault) }
     }
 
     private let repositoryURL = URL(string: "https://github.com/laleoarrow/iData")!
@@ -1178,7 +1220,7 @@ private struct WelcomeDetailView: View {
                         Text("iData")
                             .font(.system(size: 38, weight: .bold, design: .rounded))
 
-                        VersionRevealPill(model: model, tint: .white.opacity(0.14), icon: "shippingbox")
+                        VersionPill(model: model, tint: .white.opacity(0.14), icon: "shippingbox")
 
                         if showsReadyDependencyPillInTitleRow {
                             dependencyPill
@@ -1449,9 +1491,77 @@ private struct WelcomeDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
+            Text("Tip: click once to set iData as default; click again to restore the previous default app.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                ForEach(AppModel.supportedFormats, id: \.fileExtension) { format in
-                    FormatChip(title: format.displayName, extensionText: format.fileExtension)
+                ForEach(orderedSupportedFormats, id: \.format.fileExtension) { entry in
+                    FormatChip(
+                        title: entry.format.displayName,
+                        extensionText: entry.format.fileExtension,
+                        isDefault: entry.isDefault,
+                        isLoading: model.isSettingFormatDefault && model.settingFormatExtension == entry.format.fileExtension,
+                        onTap: {
+                            model.setFormatAsDefault(forExtension: entry.format.fileExtension)
+                        }
+                    )
+                }
+            }
+
+            Divider()
+                .overlay(Color.white.opacity(0.08))
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Custom Suffix")
+                    .font(.subheadline.weight(.semibold))
+
+                HStack(spacing: 10) {
+                    TextField(".vcf / vcf / my.ext", text: $customAssociationInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.subheadline, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .onSubmit {
+                            if canSubmitCustomAssociation {
+                                model.setFormatAsDefault(forExtension: customAssociationInput)
+                            }
+                        }
+
+                    Button {
+                        model.setFormatAsDefault(forExtension: customAssociationInput)
+                    } label: {
+                        Label("Set Default to iData", systemImage: "checkmark.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canSubmitCustomAssociation)
+                    .quietInteractiveSurface(enabled: motionEnabled)
+                }
+
+                if !normalizedCustomAssociationExtension.isEmpty {
+                    HStack(spacing: 8) {
+                        Text("Suffix: .\(normalizedCustomAssociationExtension)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if isSettingCustomAssociation {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Setting...")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if isCustomAssociationDefault {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                            Text("Default: iData")
+                                .font(.caption)
+                                .foregroundStyle(.green)
+                        }
+                    }
+                } else {
+                    Text("Enter a suffix to set its default handler to iData.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -2256,22 +2366,10 @@ extension View {
     }
 }
 
-struct VersionRevealPill: View {
+struct VersionPill: View {
     @ObservedObject var model: AppModel
     let tint: Color
     var icon: String? = "shippingbox"
-
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @StateObject private var commandMonitor = CommandKeyMonitor()
-    @State private var isHovering = false
-
-    private var motionEnabled: Bool {
-        model.animationsEnabled && !accessibilityReduceMotion
-    }
-
-    private var revealsBuild: Bool {
-        isHovering && commandMonitor.isCommandPressed
-    }
 
     var body: some View {
         HStack(spacing: 7) {
@@ -2282,19 +2380,6 @@ struct VersionRevealPill: View {
 
             Text(model.appVersionSummary)
                 .font(.subheadline.weight(.semibold))
-
-            if revealsBuild {
-                Text("build \(model.appBuildNumber)")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.10))
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            }
         }
         .lineLimit(1)
         .padding(.horizontal, 10)
@@ -2302,26 +2387,9 @@ struct VersionRevealPill: View {
         .background(tint, in: Capsule())
         .overlay(
             Capsule()
-                .strokeBorder(Color.white.opacity(revealsBuild ? 0.14 : 0.04))
+                .strokeBorder(Color.white.opacity(0.04))
         )
-        .quietInteractiveSurface(
-            enabled: motionEnabled,
-            hoverScale: 1.015,
-            hoverYOffset: -1,
-            shadowOpacity: 0.10,
-            shadowRadius: 10
-        )
-        .animation(motionEnabled ? .easeOut(duration: 0.28) : nil, value: revealsBuild)
-        .onHover { hovering in
-            if motionEnabled {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    isHovering = hovering
-                }
-            } else {
-                isHovering = hovering
-            }
-        }
-        .help("Hold Command while hovering to reveal the build number")
+        .quietInteractiveSurface(enabled: false)
     }
 }
 
@@ -2392,8 +2460,35 @@ private struct SummaryCard: View {
 private struct FormatChip: View {
     let title: String
     let extensionText: String
+    let isDefault: Bool
+    let isLoading: Bool
+    let onTap: () -> Void
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
+    private var statusRow: some View {
+        HStack(spacing: 4) {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .frame(width: 12, height: 12)
+                Text("Setting...")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            } else {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 6, height: 6)
+                    .opacity(isDefault ? 1 : 0)
+                Text("Default")
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+                    .opacity(isDefault ? 1 : 0)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 14, alignment: .leading)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -2402,15 +2497,31 @@ private struct FormatChip: View {
             Text(".\(extensionText)")
                 .font(.system(.caption, design: .monospaced))
                 .foregroundStyle(.secondary)
+            statusRow
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.06))
+                .strokeBorder(isDefault ? Color.green.opacity(0.3) : Color.white.opacity(0.06))
         )
+        .overlay(alignment: .bottom) {
+            if isDefault && !isLoading {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.green)
+                    .frame(height: 3)
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isLoading {
+                onTap()
+            }
+        }
         .quietInteractiveSurface(
             enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
             hoverScale: 1.012,
@@ -2418,6 +2529,7 @@ private struct FormatChip: View {
             shadowOpacity: 0.06,
             shadowRadius: 8
         )
+        .animation(.easeInOut(duration: 0.2), value: isDefault)
     }
 }
 
