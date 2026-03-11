@@ -20,17 +20,12 @@
 </div>
 
 
-## What's iData?
+## What's iData for?
+When working with very large tabular datasets, macOS surprisingly doesn’t offer many native tools that handle them gracefully. VisiData is an excellent solution—but as a command-line tool, it sometimes feels like bringing a terminal to a double-click fight.
 
-- opens most regular files through a native macOS window without hardcoding suffix rules
-- embeds the `VisiData` session inside the app window
-- includes multi-chapter interactive tutorials with sample data, checklist progress, and an in-session floating coach (English/Chinese)
-- remembers recent files
-- supports drag-and-drop and Finder opening
-- streams `.gz` / `.bgz` files without extracting them to disk
-- checks GitHub-hosted updates through Sparkle
-- lets you configure the `vd` executable path
-- packages a standalone `iData.app` and drag-to-Applications `.dmg`
+That’s where iData comes in. Built with Swift and SwiftUI, iData provides a smooth, native macOS interface while quietly running VisiData under the hood. Instead of launching a terminal, you can simply double-click a giant table file and start exploring—a small convenience that becomes surprisingly valuable in data-heavy fields like bioinformatics.
+
+It also supports gzipped tabular files directly, meaning you can open compressed datasets without the ritual of manual decompression. If you regularly wrestle with large data files, you probably already know how nice that feels.
 
 ## Install iData
 
