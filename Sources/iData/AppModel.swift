@@ -1016,44 +1016,57 @@ final class AppModel: ObservableObject {
         set -euo pipefail
 
         echo "iData one-click VisiData setup"
-        echo "--------------------------------"
+        echo "================================"
+        echo ""
 
         if command -v vd >/dev/null 2>&1; then
-          echo "vd already detected at: $(command -v vd)"
+          echo "✓ vd already detected at: $(command -v vd)"
+          echo ""
         fi
 
-        if command -v brew >/dev/null 2>&1; then
-          echo "Installing or upgrading VisiData with Homebrew..."
-          brew install visidata || brew upgrade visidata || true
-        else
-          if ! command -v pipx >/dev/null 2>&1; then
-            if command -v python3 >/dev/null 2>&1; then
-              echo "pipx not found. Installing pipx with python3 --user..."
-              python3 -m pip install --user pipx
-              python3 -m pipx ensurepath || true
-              export PATH="$HOME/.local/bin:$PATH"
-            else
-              echo "python3 is missing. Install Homebrew or python3, then retry."
-              exit 1
-            fi
+        # ── Step 1: Ensure pipx is available ──
+        if ! command -v pipx >/dev/null 2>&1; then
+          if command -v brew >/dev/null 2>&1; then
+            echo "▸ Installing pipx via Homebrew..."
+            brew install pipx || true
+          elif command -v python3 >/dev/null 2>&1; then
+            echo "▸ Installing pipx via python3..."
+            python3 -m pip install --user pipx
+            python3 -m pipx ensurepath || true
+          else
+            echo "✗ Neither Homebrew nor python3 found. Please install one first."
+            read '?Press Return to close...'
+            exit 1
           fi
-
-          echo "Installing or upgrading VisiData with pipx..."
-          pipx install visidata || pipx upgrade visidata || true
+          export PATH="$HOME/.local/bin:$(brew --prefix 2>/dev/null || echo /opt/homebrew)/bin:$PATH"
         fi
 
-        if command -v pipx >/dev/null 2>&1; then
-          echo "Injecting openpyxl for Excel loaders..."
-          pipx inject visidata openpyxl || true
+        echo "✓ pipx is available at: $(command -v pipx)"
+        echo ""
+
+        # ── Step 2: Install or upgrade VisiData via pipx ──
+        if pipx list 2>/dev/null | grep -q visidata; then
+          echo "▸ Upgrading VisiData..."
+          pipx upgrade visidata || true
+        else
+          echo "▸ Installing VisiData via pipx..."
+          pipx install visidata || true
         fi
-
         echo ""
-        echo "Verification"
-        command -v vd || true
-        vd --version || true
 
+        # ── Step 3: Inject Excel & common format plugins ──
+        echo "▸ Injecting Excel plugins (openpyxl, xlrd)..."
+        pipx inject visidata openpyxl xlrd || true
         echo ""
-        echo "Return to iData and use Auto Detect in Preferences if needed."
+
+        # ── Verification ──
+        echo "================================"
+        echo "Verification:"
+        echo "  vd path:    $(command -v vd || echo 'not found')"
+        echo "  vd version: $(vd --version 2>/dev/null || echo 'unknown')"
+        echo ""
+        echo "✓ Setup complete. Return to iData and reopen your file."
+        echo "  If iData does not detect vd, use Auto Detect in Preferences."
         read '?Press Return to close this installer...'
         """
     }

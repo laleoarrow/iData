@@ -449,9 +449,9 @@ struct AppModelTests {
     func visidataInstallerScriptFallsBackToBrewAndPipx() {
         let script = AppModel.makeVisiDataInstallerScript(helperPath: nil)
 
-        #expect(script.contains("brew install visidata"))
+        #expect(script.contains("brew install pipx"))
         #expect(script.contains("pipx install visidata"))
-        #expect(script.contains("pipx inject visidata openpyxl"))
+        #expect(script.contains("pipx inject visidata openpyxl xlrd"))
     }
 }
 
