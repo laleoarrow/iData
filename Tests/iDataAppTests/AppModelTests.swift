@@ -431,8 +431,8 @@ struct AppModelTests {
     @Test
     func tutorialLanguageDefaultsToSystemAndFollowsChineseLocale() {
         let model = AppModel(preferredLanguagesProvider: { ["zh-Hans-CN"] })
-        #expect(model.tutorialLanguagePreference == .system)
-        #expect(model.effectiveTutorialLanguage == .chinese)
+        #expect(model.appLanguagePreference == .system)
+        #expect(model.effectiveLanguage == .chinese)
         #expect(model.tutorialChapters.first?.title == "基础")
     }
 

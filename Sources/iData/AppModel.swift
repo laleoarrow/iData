@@ -13,7 +13,7 @@ final class AppModel: ObservableObject {
         case missing
     }
 
-    enum TutorialLanguagePreference: String, CaseIterable, Identifiable {
+    enum AppLanguagePreference: String, CaseIterable, Identifiable {
         case system
         case english
         case chinese
@@ -21,7 +21,7 @@ final class AppModel: ObservableObject {
         var id: String { rawValue }
     }
 
-    enum TutorialResolvedLanguage: Equatable {
+    enum AppResolvedLanguage: Equatable {
         case english
         case chinese
     }
@@ -71,9 +71,9 @@ final class AppModel: ObservableObject {
             defaults.set(isSidebarCollapsed, forKey: Self.isSidebarCollapsedKey)
         }
     }
-    @Published var tutorialLanguagePreference: TutorialLanguagePreference {
+    @Published var appLanguagePreference: AppLanguagePreference {
         didSet {
-            defaults.set(tutorialLanguagePreference.rawValue, forKey: Self.tutorialLanguagePreferenceKey)
+            defaults.set(appLanguagePreference.rawValue, forKey: Self.appLanguagePreferenceKey)
         }
     }
     @Published var reduceAnimations: Bool {
@@ -102,7 +102,7 @@ final class AppModel: ObservableObject {
     static let pinnedRecentFilesKey = "pinnedRecentFiles"
     static let reduceAnimationsKey = "reduceAnimations"
     static let isSidebarCollapsedKey = "isSidebarCollapsed"
-    static let tutorialLanguagePreferenceKey = "tutorialLanguagePreference"
+    static let appLanguagePreferenceKey = "appLanguagePreference"
     static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
     static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
     static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
@@ -156,7 +156,7 @@ final class AppModel: ObservableObject {
         let english: String
         let chinese: String
 
-        func localized(for language: TutorialResolvedLanguage) -> String {
+        func localized(for language: AppResolvedLanguage) -> String {
             switch language {
             case .english:
                 english
@@ -373,8 +373,8 @@ final class AppModel: ObservableObject {
         self.reduceAnimations = defaults.object(forKey: Self.reduceAnimationsKey) as? Bool ?? false
         self.vdExecutablePath = defaults.string(forKey: Self.vdExecutablePathKey) ?? ""
         self.isSidebarCollapsed = defaults.object(forKey: Self.isSidebarCollapsedKey) as? Bool ?? false
-        self.tutorialLanguagePreference = TutorialLanguagePreference(
-            rawValue: defaults.string(forKey: Self.tutorialLanguagePreferenceKey) ?? ""
+        self.appLanguagePreference = AppLanguagePreference(
+            rawValue: defaults.string(forKey: Self.appLanguagePreferenceKey) ?? ""
         ) ?? .system
         self.previousDefaultAppByExtension = formatAssociationRestoreStore.loadAll()
     }
@@ -395,8 +395,8 @@ final class AppModel: ObservableObject {
         !reduceAnimations
     }
 
-    var effectiveTutorialLanguage: TutorialResolvedLanguage {
-        switch tutorialLanguagePreference {
+    var effectiveLanguage: AppResolvedLanguage {
+        switch appLanguagePreference {
         case .english:
             return .english
         case .chinese:
@@ -405,6 +405,10 @@ final class AppModel: ObservableObject {
             let preferredLanguage = preferredLanguagesProvider().first?.lowercased() ?? "en"
             return preferredLanguage.hasPrefix("zh") ? .chinese : .english
         }
+    }
+
+    var isChinese: Bool {
+        effectiveLanguage == .chinese
     }
 
     var tutorialChapters: [TutorialChapter] {
@@ -417,16 +421,16 @@ final class AppModel: ObservableObject {
                 TutorialStep(
                     id: stepDefinition.id,
                     index: index,
-                    title: stepDefinition.title.localized(for: effectiveTutorialLanguage),
+                    title: stepDefinition.title.localized(for: effectiveLanguage),
                     command: stepDefinition.command,
-                    instruction: stepDefinition.instruction.localized(for: effectiveTutorialLanguage),
-                    detail: stepDefinition.detail.localized(for: effectiveTutorialLanguage)
+                    instruction: stepDefinition.instruction.localized(for: effectiveLanguage),
+                    detail: stepDefinition.detail.localized(for: effectiveLanguage)
                 )
             }
             return TutorialChapter(
                 id: definition.id,
-                title: definition.title.localized(for: effectiveTutorialLanguage),
-                subtitle: definition.subtitle.localized(for: effectiveTutorialLanguage),
+                title: definition.title.localized(for: effectiveLanguage),
+                subtitle: definition.subtitle.localized(for: effectiveLanguage),
                 icon: definition.icon,
                 steps: steps,
                 completedStepCount: completedStepCount,
@@ -470,17 +474,17 @@ final class AppModel: ObservableObject {
         return tutorialStepIndex >= chapter.steps.count - 1
     }
 
-    var tutorialLanguageSummary: String {
-        switch effectiveTutorialLanguage {
+    var appLanguageSummary: String {
+        switch effectiveLanguage {
         case .english:
-            return "Tutorial currently shown in English."
+            return "App interface currently shown in English."
         case .chinese:
-            return "教程当前显示为中文。"
+            return "App 界面当前显示为中文。"
         }
     }
 
-    var tutorialLanguageBadgeText: String {
-        switch effectiveTutorialLanguage {
+    var appLanguageBadgeText: String {
+        switch effectiveLanguage {
         case .english:
             return "Language: English"
         case .chinese:
@@ -488,7 +492,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func tutorialLanguageOptionTitle(_ preference: TutorialLanguagePreference) -> String {
+    func appLanguageOptionTitle(_ preference: AppLanguagePreference) -> String {
         switch preference {
         case .system:
             return "System"

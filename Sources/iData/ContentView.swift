@@ -323,7 +323,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help(model.effectiveTutorialLanguage == .chinese ? "教程" : "Tutorial")
+                    .help(model.effectiveLanguage == .chinese ? "教程" : "Tutorial")
                 }
                 .frame(maxWidth: .infinity)
             } else {
@@ -351,7 +351,7 @@ private struct SidebarFooter: View {
                             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
                     }
                     .buttonStyle(.plain)
-                    .help(model.effectiveTutorialLanguage == .chinese ? "教程" : "Tutorial")
+                    .help(model.effectiveLanguage == .chinese ? "教程" : "Tutorial")
 
                     Spacer(minLength: 0)
                 }
@@ -953,7 +953,7 @@ private struct TutorialHubView: View {
     }
 
     private var isChinese: Bool {
-        model.effectiveTutorialLanguage == .chinese
+        model.effectiveLanguage == .chinese
     }
 
     var body: some View {
@@ -1022,7 +1022,7 @@ private struct TutorialHubView: View {
                     icon: "tablecells"
                 )
                 StatusPill(
-                    title: model.tutorialLanguageBadgeText,
+                    title: model.appLanguageBadgeText,
                     tint: Color.accentColor.opacity(0.22),
                     icon: "character.book.closed"
                 )
@@ -1131,7 +1131,7 @@ private struct WelcomeDetailView: View {
     }
 
     private var isChinese: Bool {
-        model.effectiveTutorialLanguage == .chinese
+        model.effectiveLanguage == .chinese
     }
 
     private var normalizedCustomAssociationExtension: String {
@@ -1227,7 +1227,7 @@ private struct WelcomeDetailView: View {
                         }
                     }
 
-                    Text("Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
+                    Text(isChinese ? "在原生 macOS 壳中打开超大表格文件，同时保留 VisiData 完整的行为、快捷键和运行速度。" : "Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1239,7 +1239,7 @@ private struct WelcomeDetailView: View {
                             }
 
                             if let lastOpenedFile = model.lastOpenedFile {
-                                StatusPill(title: "Last: \(lastOpenedFile.lastPathComponent)", tint: .white.opacity(0.10))
+                                StatusPill(title: isChinese ? "最近打开: \(lastOpenedFile.lastPathComponent)" : "Last: \(lastOpenedFile.lastPathComponent)", tint: .white.opacity(0.10))
                             }
                         }
                     }
@@ -1250,7 +1250,7 @@ private struct WelcomeDetailView: View {
                 Button {
                     model.openDocument()
                 } label: {
-                    Label("Open File", systemImage: "tablecells")
+                    Label(isChinese ? "打开文件" : "Open File", systemImage: "tablecells")
                 }
                 .buttonStyle(.borderedProminent)
                 .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
@@ -1259,7 +1259,7 @@ private struct WelcomeDetailView: View {
                     Button {
                         model.runVisiDataOneClickSetup()
                     } label: {
-                        Label("Install VisiData", systemImage: "shippingbox")
+                        Label(isChinese ? "安装 VisiData" : "Install VisiData", systemImage: "shippingbox")
                     }
                     .buttonStyle(.borderedProminent)
                     .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
@@ -1268,7 +1268,7 @@ private struct WelcomeDetailView: View {
                 Button {
                     model.presentTutorialHub()
                 } label: {
-                    Label("Start Tutorial", systemImage: "graduationcap.fill")
+                    Label(isChinese ? "开始教程" : "Start Tutorial", systemImage: "graduationcap.fill")
                 }
                 .buttonStyle(.bordered)
                 .quietInteractiveSurface(enabled: motionEnabled)
@@ -1276,13 +1276,13 @@ private struct WelcomeDetailView: View {
                 Button {
                     updater.checkForUpdates()
                 } label: {
-                    Label("Check for Updates", systemImage: "arrow.trianglehead.clockwise")
+                    Label(isChinese ? "检查更新" : "Check for Updates", systemImage: "arrow.trianglehead.clockwise")
                 }
                 .buttonStyle(.bordered)
                 .quietInteractiveSurface(enabled: motionEnabled)
 
                 SettingsLink {
-                    Label("Preferences", systemImage: "gearshape")
+                    Label(isChinese ? "偏好设置" : "Preferences", systemImage: "gearshape")
                 }
                 .buttonStyle(.bordered)
                 .quietInteractiveSurface(enabled: motionEnabled)
@@ -1291,7 +1291,7 @@ private struct WelcomeDetailView: View {
                     Button {
                         model.revealInFinder(fileURL)
                     } label: {
-                        Label("Show Last File", systemImage: "finder")
+                        Label(isChinese ? "所在位置" : "Show Last File", systemImage: "finder")
                     }
                     .buttonStyle(.bordered)
                     .quietInteractiveSurface(enabled: motionEnabled)
@@ -1302,17 +1302,18 @@ private struct WelcomeDetailView: View {
                 }
                 .buttonStyle(.bordered)
                 .quietInteractiveSurface(enabled: motionEnabled)
-                .help("Give a star if you like iData ✨")
+                .help(isChinese ? "如果你喜欢 iData 就给个 Star 吧 ✨" : "Give a star if you like iData ✨")
             }
 
-            Text("Tip: drag a supported table file into this window to open it directly.")
+            Text(isChinese ? "提示: 拖拽支持的表格文件到此窗口可直接打开。" : "Tip: drag a supported table file into this window to open it directly.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Text("Most bioinformatics suffixes are passed through directly. Compressed `.gz` / `.bgz` files are streamed without extracting.")
+            Text(isChinese ? "大多数生信文件后缀会直接透传。压缩的 `.gz` / `.bgz` 文件会直接流式读取，无需解压。" : "Most bioinformatics suffixes are passed through directly. Compressed `.gz` / `.bgz` files are streamed without extracting.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
         .background(
             LinearGradient(
@@ -1586,7 +1587,7 @@ private struct SessionDetailView: View {
     }
 
     private var isChinese: Bool {
-        model.effectiveTutorialLanguage == .chinese
+        model.effectiveLanguage == .chinese
     }
 
     private var shouldShowSessionInfoHint: Bool {
@@ -1942,7 +1943,7 @@ private struct TutorialCoachOverlay: View {
     }
 
     private var isChinese: Bool {
-        model.effectiveTutorialLanguage == .chinese
+        model.effectiveLanguage == .chinese
     }
 
     var body: some View {
