@@ -32,7 +32,10 @@ Symptoms:
 Expected guidance:
 
 - Users can click the "Install VisiData via Terminal" button for a one-click automated setup (`brew` or `pipx`)
-- Or users can install manually with `brew install visidata`
+- Recommended manual path:
+  - `pipx install visidata`
+  - `pipx inject visidata openpyxl`
+- Optional manual path: `brew install visidata`
 - Or users can set a custom executable path in Preferences
 
 ### 2. Session switches but terminal content does not refresh

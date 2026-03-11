@@ -18,8 +18,10 @@
 - `VisiData` is not bundled
 - Primary iData install path for users:
   - `brew install --cask laleoarrow/tap/idata`
-- Default expectation is a local install such as:
-  - `brew install visidata`
+- Default expectation for VisiData is:
+  - `pipx install visidata`
+  - `pipx inject visidata openpyxl`
+- Homebrew install (`brew install visidata`) is optional, but plugin/dependency guidance must remain explicit.
 - iData includes a **one-click VisiData setup** from the Welcome screen if no executable is found
 - Users can also point `iData` at a custom `vd` path in Preferences
 

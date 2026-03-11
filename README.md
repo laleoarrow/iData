@@ -37,15 +37,17 @@ brew upgrade --cask laleoarrow/tap/idata
 Recommended install:
 
 ```bash
-brew install visidata
-```
-
-Alternative:
-
-```bash
 pipx install visidata
 pipx inject visidata openpyxl
 ```
+
+Optional alternative:
+
+```bash
+brew install visidata
+```
+
+Note: if you use Homebrew and need extra VisiData plugins (for example Excel loaders), install them in the same Python environment used by `vd`.
 
 If you use a custom install path, set the `vd` executable path in Preferences.
 
@@ -118,3 +120,42 @@ Install locally:
 Signing/notarization setup guide:
 
 - `docs/apple-signing-and-notarization.md`
+
+## 中文说明
+
+`iData` 是一个基于 macOS 原生界面的 `VisiData` 外壳应用，用来更方便地打开和处理大体量表格数据。
+
+### 安装 iData（推荐）
+
+```bash
+brew install --cask laleoarrow/tap/idata
+```
+
+升级：
+
+```bash
+brew upgrade --cask laleoarrow/tap/idata
+```
+
+### 安装 VisiData（推荐）
+
+`iData` 不内置 `VisiData`，需要你单独安装：
+
+```bash
+pipx install visidata
+pipx inject visidata openpyxl
+```
+
+可选方式：
+
+```bash
+brew install visidata
+```
+
+如果你使用自定义安装路径，可以在 iData 偏好设置里指定 `vd` 可执行文件路径。
+
+### 发布与更新
+
+- 发布包生成：`./scripts/package_release.sh <version>`
+- Homebrew 安装入口：`brew install --cask laleoarrow/tap/idata`
+- 应用内更新源：`docs/appcast.xml`
