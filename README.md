@@ -1,4 +1,7 @@
 <h1 align="center">iData</h1>
+<div align="center">
+  <a href="./README.md">English</a> | <a href="./README_zh.md">简体中文</a>
+</div>
 
 <div align="center">
   <a href="https://github.com/laleoarrow/iData/actions/workflows/swift.yml">
@@ -14,11 +17,6 @@
     <img src="https://img.shields.io/badge/PLATFORM-macOS%2014%2B-111111?style=for-the-badge&logo=apple&logoColor=white" alt="Platform macOS 14+" />
   </a>
 </div>
-
-<div align="center">
-  <a href="./README.md">English</a> | <a href="./README_zh.md">简体中文</a>
-</div>
-
 
 ## What's iData for?
 When working with very large tabular datasets, macOS surprisingly doesn’t offer many native tools that handle them gracefully. VisiData is an excellent solution—but as a command-line tool, it sometimes feels like bringing a terminal to a double-click fight.
