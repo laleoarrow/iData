@@ -26,6 +26,8 @@ Outputs:
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
 
+Homebrew tap is synced by GitHub Actions after a GitHub Release is published.
+
 Optional signing and notarization inputs:
 
 - `IDATA_DEVELOPER_ID_APP`
@@ -74,6 +76,12 @@ gh release create v0.1.8 \
   --title 'v0.1.8' \
   --notes-file docs/releases/v0.1.8.md
 ```
+
+After `gh release create`, workflow `sync-homebrew-cask.yml` updates `laleoarrow/homebrew-tap` (`Casks/idata.rb`) using the release zip digest.
+
+Required repository secret in `laleoarrow/iData`:
+
+- `HOMEBREW_TAP_TOKEN`: GitHub token with `contents:write` on `laleoarrow/homebrew-tap`
 
 For Apple signing/notarization details:
 

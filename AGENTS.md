@@ -7,7 +7,7 @@ This project is a native macOS wrapper around `VisiData`.
 - Start with `.agent/README.md`.
 - Use `.agent/project.md` for architecture and key files.
 - Use `.agent/debugging.md` for runtime debugging and verification.
-- Use `.agent/release.md` for packaging, GitHub publishing, and release steps.
+- Use `.agent/release.md` for packaging, GitHub publishing, Homebrew sync, and release steps.
 
 ## Project rules
 

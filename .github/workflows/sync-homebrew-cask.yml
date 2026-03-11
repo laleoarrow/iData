@@ -1,0 +1,86 @@
+name: Sync Homebrew Cask
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  sync-cask:
+    runs-on: ubuntu-22.04
+    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      TAP_REPO: laleoarrow/homebrew-tap
+      CASK_PATH: Casks/idata.rb
+    steps:
+      - name: Resolve release version and digest
+        id: release
+        run: |
+          set -euo pipefail
+
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          ASSET_NAME="iData-v${VERSION}-macos-universal.zip"
+
+          DIGEST=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" \
+            --jq ".assets[] | select(.name==\"${ASSET_NAME}\") | .digest" | head -n1)
+
+          if [[ -z "${DIGEST:-}" ]]; then
+            echo "Could not find digest for ${ASSET_NAME} in release ${TAG}" >&2
+            exit 1
+          fi
+
+          SHA256="${DIGEST#sha256:}"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Update cask in tap repo
+        run: |
+          set -euo pipefail
+
+          VERSION="${{ steps.release.outputs.version }}"
+          SHA256="${{ steps.release.outputs.sha256 }}"
+
+          JSON=$(gh api "repos/${TAP_REPO}/contents/${CASK_PATH}")
+          FILE_SHA=$(printf '%s' "$JSON" | jq -r '.sha')
+          CONTENT_B64=$(printf '%s' "$JSON" | jq -r '.content' | tr -d '\n')
+          CONTENT=$(printf '%s' "$CONTENT_B64" | base64 -d)
+
+          UPDATED=$(printf '%s' "$CONTENT" | perl -0777 -pe '
+            s/version\s+"[^"]+"/version "'"$VERSION"'"/;
+            s/sha256\s+"[a-f0-9]{64}"/sha256 "'"$SHA256"'"/;
+          ')
+
+          if ! printf '%s' "$UPDATED" | grep -q 'iData-v#{version}-macos-universal.zip'; then
+            echo "Cask URL template changed unexpectedly; refusing to update." >&2
+            exit 1
+          fi
+
+          if [[ "$CONTENT" == "$UPDATED" ]]; then
+            echo "No cask changes needed."
+            exit 0
+          fi
+
+          UPDATED_B64=$(printf '%s' "$UPDATED" | base64 | tr -d '\n')
+          MESSAGE="chore(cask): update idata to v${VERSION}"
+
+          gh api -X PUT "repos/${TAP_REPO}/contents/${CASK_PATH}" \
+            -f message="$MESSAGE" \
+            -f content="$UPDATED_B64" \
+            -f sha="$FILE_SHA" \
+            -f branch="main" >/dev/null
+
+          echo "Updated ${TAP_REPO}/${CASK_PATH} to v${VERSION} (${SHA256})."
+
+  missing-token:
+    runs-on: ubuntu-22.04
+    if: ${{ secrets.HOMEBREW_TAP_TOKEN == '' }}
+    steps:
+      - name: Explain skipped sync
+        run: |
+          echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap sync."

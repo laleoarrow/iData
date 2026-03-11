@@ -16,6 +16,8 @@
 ## External dependency
 
 - `VisiData` is not bundled
+- Primary iData install path for users:
+  - `brew install --cask laleoarrow/tap/idata`
 - Default expectation is a local install such as:
   - `brew install visidata`
 - iData includes a **one-click VisiData setup** from the Welcome screen if no executable is found

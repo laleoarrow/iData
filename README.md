@@ -18,18 +18,36 @@
 - lets you configure the `vd` executable path
 - packages a standalone `iData.app` and drag-to-Applications `.dmg`
 
-## Dependency
+## Install iData
 
-`iData` does not bundle `VisiData`.
+Install with Homebrew Cask:
+
+```bash
+brew install --cask laleoarrow/tap/idata
+```
+
+Upgrade later:
+
+```bash
+brew upgrade --cask laleoarrow/tap/idata
+```
+
+`iData` does not bundle `VisiData`. Install `VisiData` separately.
 
 Recommended install:
+
+```bash
+brew install visidata
+```
+
+Alternative:
 
 ```bash
 pipx install visidata
 pipx inject visidata openpyxl
 ```
 
-If you use a custom install, set the `vd` executable path in Preferences.
+If you use a custom install path, set the `vd` executable path in Preferences.
 
 If `VisiData` is missing, `iData` stays on the welcome screen and shows install guidance instead of opening a blank terminal pane.
 
@@ -52,10 +70,12 @@ If `VisiData` is missing, `iData` stays on the welcome screen and shows install 
 
 `iData` uses `Sparkle 2` for in-app updates.
 
+- brew install path: `brew install --cask laleoarrow/tap/idata`
 - release assets live on GitHub Releases
 - the update feed lives at `docs/appcast.xml` and is intended for GitHub Pages hosting
 - package a release with `./scripts/package_release.sh <version>`
 - optional Apple signing/notarization is documented in `docs/apple-signing-and-notarization.md`
+- after a GitHub release is published, `.github/workflows/sync-homebrew-cask.yml` updates `laleoarrow/homebrew-tap` automatically when `HOMEBREW_TAP_TOKEN` is configured
 
 ## Development
 
