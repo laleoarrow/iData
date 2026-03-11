@@ -4,27 +4,29 @@
         <title>iData</title>
         <item>
             <title>0.1.8</title>
-            <pubDate>Wed, 11 Mar 2026 16:52:31 +0800</pubDate>
+            <pubDate>Wed, 11 Mar 2026 19:01:30 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
             <sparkle:version>9</sparkle:version>
             <sparkle:shortVersionString>0.1.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# iData v0.1.8
+            <description sparkle:format="markdown"><![CDATA[# iData v0.1.9
 
-Released: 2026-03-11
+This release finalizes the distribution and documentation updates around Homebrew and release workflow stability.
 
 ## Highlights
 
-- Added app-wide Chinese and English localization for the native iData shell, including Welcome, Preferences, Help, Tutorial Hub, Tutorial Coach, updater state, and native status/error messages.
-- Kept language switching user-controlled in Preferences, with `System`, `English`, and `中文` options that update the native UI immediately.
-- Fixed supported-format chips so clicking an already selected format reliably restores the recorded previous default app once macOS finishes propagating the handler change.
-- Preserved the inline `VisiData Ready` hero badge layout from the previous release candidate while carrying forward the one-click VisiData setup flow.
+- README header badges refreshed and streamlined
+- README split into English (`README.md`) and Chinese (`README_zh.md`) with language switch links
+- VisiData install guidance aligned to `pipx install visidata` + `pipx inject visidata openpyxl`
+- Homebrew cask sync workflow hardened for release/prerelease handling
 
 ## Notes
 
-- Build remains unsigned/not notarized for local distribution.
+- Primary install path:
+  - `brew install --cask laleoarrow/tap/idata`
+- VisiData remains an external dependency and should be installed separately.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.8/iData-v0.1.8-macos-universal.zip" length="3819388" type="application/octet-stream" sparkle:edSignature="+J0g/Hw9SFNOHgS/5tCQAGrIPB6kxWyWBxejZemnvdXiXbzxGGFiOVKHk6zI/pPFCzA1Ol4+9SGS1IV2CTefCw=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.9/iData-v0.1.9-macos-universal.zip" length="3819388" type="application/octet-stream" sparkle:edSignature="S8XJdEvaa6eNCw0hf3Z2bHyow1dB/HYEFF30dI1W4zNi5w5GY0gRYDzt4IPxHNpMnE64UMaps0+NERCZI4iyAw=="/>
         </item>
     </channel>
 </rss>
