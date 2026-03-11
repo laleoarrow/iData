@@ -27,11 +27,13 @@ Symptoms:
 
 - welcome screen stays visible and shows install guidance
 - open action reports a launch error instead of showing a blank terminal
+- "Install VisiData via Terminal" button appears on the welcome screen when executable is missing
 
 Expected guidance:
 
-- install with `brew install visidata`
-- or set a custom executable path in Preferences
+- Users can click the "Install VisiData via Terminal" button for a one-click automated setup (`brew` or `pipx`)
+- Or users can install manually with `brew install visidata`
+- Or users can set a custom executable path in Preferences
 
 ### 2. Session switches but terminal content does not refresh
 
@@ -70,6 +72,7 @@ open -a /Users/leoarrow/Project/mypackage/agents/iData/dist/iData.app /tmp/sampl
 ```bash
 ps -Ao pid,ppid,etime,command | egrep 'iData|vd|gzip -dc'
 ```
+*Note: Closing the UI window will automatically terminate both `vd` and any descendant processes (like `gzip -dc`) via its process group.*
 
 ## Terminal frontend
 

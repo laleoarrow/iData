@@ -15,14 +15,14 @@ Output:
 
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
-./scripts/package_release.sh 0.1.4
+./scripts/package_release.sh 0.1.7
 ```
 
 Outputs:
 
-- `dist/iData-v0.1.4-macos-universal.zip`
-- `dist/iData-v0.1.4-macos-universal.dmg`
-- `dist/iData-v0.1.4-macos-universal.pkg`
+- `dist/iData-v0.1.7-macos-universal.zip`
+- `dist/iData-v0.1.7-macos-universal.dmg`
+- `dist/iData-v0.1.7-macos-universal.pkg`
 - `dist/SHA256SUMS.txt`
 - `docs/appcast.xml`
 
@@ -31,7 +31,7 @@ Outputs:
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
 ./scripts/build_app.sh
-./scripts/create_pkg.sh 0.1.4
+./scripts/create_pkg.sh 0.1.7
 ```
 
 Installer behavior:
@@ -52,21 +52,30 @@ gh repo create iData --public --source=. --remote=origin --push
 Create tag:
 
 ```bash
-git tag v0.1.4
+git tag v0.1.7
 git push origin main --tags
 ```
 
 Create release:
 
 ```bash
-gh release create v0.1.4 \
-  dist/iData-v0.1.4-macos-universal.zip \
-  dist/iData-v0.1.4-macos-universal.dmg \
-  dist/iData-v0.1.4-macos-universal.pkg \
+gh release create v0.1.7 \
+  dist/iData-v0.1.7-macos-universal.zip \
+  dist/iData-v0.1.7-macos-universal.dmg \
+  dist/iData-v0.1.7-macos-universal.pkg \
   dist/SHA256SUMS.txt \
-  --title 'v0.1.4' \
-  --notes-file docs/releases/v0.1.4.md
+  --title 'v0.1.7' \
+  --notes-file docs/releases/v0.1.7.md
 ```
+
+## Update Appcast & Website (Crucial Step)
+
+The iData website at `https://laleoarrow.github.io/iData/` serves the `appcast.xml` for seamless Sparkle over-the-air updates. During a release:
+
+1. `package_release.sh` regenerates `docs/appcast.xml`.
+2. You **must commit and push** this file to the `main` branch.
+3. Once pushed, GitHub Pages will automatically publish the changes under `/docs`.
+4. Ensure you perform: `git add docs/appcast.xml && git commit -m "chore: update appcast for vXXX" && git push`
 
 ## Distribution notes
 
