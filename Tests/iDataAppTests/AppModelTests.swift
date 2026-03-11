@@ -386,6 +386,24 @@ struct AppModelTests {
         #expect(model.effectiveTutorialLanguage == .chinese)
         #expect(model.tutorialChapters.first?.title == "基础")
     }
+
+    @Test
+    func visidataInstallerScriptUsesSharedHelperWhenAvailable() {
+        let helperPath = "/Users/Shared/iData/Configure VisiData.command"
+        let script = AppModel.makeVisiDataInstallerScript(helperPath: helperPath)
+
+        #expect(script.contains(helperPath))
+        #expect(script.contains("--install"))
+    }
+
+    @Test
+    func visidataInstallerScriptFallsBackToBrewAndPipx() {
+        let script = AppModel.makeVisiDataInstallerScript(helperPath: nil)
+
+        #expect(script.contains("brew install visidata"))
+        #expect(script.contains("pipx install visidata"))
+        #expect(script.contains("pipx inject visidata openpyxl"))
+    }
 }
 
 private struct FakeExecutableChecker: ExecutableChecking {

@@ -100,6 +100,14 @@ struct PreferencesView: View {
                     .buttonStyle(.bordered)
                     .quietInteractiveSurface(enabled: motionEnabled)
 
+                    if case .missing = model.visiDataDependencyState {
+                        Button("One-Click Setup") {
+                            model.runVisiDataOneClickSetup()
+                        }
+                        .buttonStyle(.bordered)
+                        .quietInteractiveSurface(enabled: motionEnabled)
+                    }
+
                     Spacer(minLength: 0)
                 }
 

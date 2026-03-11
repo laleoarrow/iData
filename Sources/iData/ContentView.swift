@@ -1179,6 +1179,10 @@ private struct WelcomeDetailView: View {
                             .font(.system(size: 38, weight: .bold, design: .rounded))
 
                         VersionRevealPill(model: model, tint: .white.opacity(0.14), icon: "shippingbox")
+
+                        if showsReadyDependencyPillInTitleRow {
+                            dependencyPill
+                        }
                     }
 
                     Text("Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
@@ -1186,11 +1190,15 @@ private struct WelcomeDetailView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    HStack(spacing: 10) {
-                        dependencyPill
+                    if showsHeroMetadataRow {
+                        HStack(spacing: 10) {
+                            if case .missing = model.visiDataDependencyState {
+                                dependencyPill
+                            }
 
-                        if let lastOpenedFile = model.lastOpenedFile {
-                            StatusPill(title: "Last: \(lastOpenedFile.lastPathComponent)", tint: .white.opacity(0.10))
+                            if let lastOpenedFile = model.lastOpenedFile {
+                                StatusPill(title: "Last: \(lastOpenedFile.lastPathComponent)", tint: .white.opacity(0.10))
+                            }
                         }
                     }
                 }
@@ -1204,6 +1212,16 @@ private struct WelcomeDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
+
+                if case .missing = model.visiDataDependencyState {
+                    Button {
+                        model.runVisiDataOneClickSetup()
+                    } label: {
+                        Label("Install VisiData", systemImage: "shippingbox")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
+                }
 
                 Button {
                     model.presentTutorialHub()
@@ -1270,6 +1288,22 @@ private struct WelcomeDetailView: View {
                 .strokeBorder(Color.white.opacity(0.10))
         )
         .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
+    }
+
+    private var showsReadyDependencyPillInTitleRow: Bool {
+        if case .available = model.visiDataDependencyState {
+            return true
+        }
+
+        return false
+    }
+
+    private var showsHeroMetadataRow: Bool {
+        if case .missing = model.visiDataDependencyState {
+            return true
+        }
+
+        return model.lastOpenedFile != nil
     }
 
     private var tutorialEntryCard: some View {

@@ -101,6 +101,7 @@ final class AppModel: ObservableObject {
     static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     static let defaultTutorialChapterID = "basic"
     static let recentFilesLimit = 10
+    static let sharedVisiDataHelperPath = "/Users/Shared/iData/Configure VisiData.command"
     static let supportedFormats: [SupportedFormat] = [
         SupportedFormat(displayName: "CSV", fileExtension: "csv"),
         SupportedFormat(displayName: "TSV", fileExtension: "tsv"),
@@ -780,6 +781,27 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func runVisiDataOneClickSetup() {
+        if case let .available(path) = visiDataDependencyState {
+            statusMessage = "VisiData is already available at \(path)."
+            errorMessage = nil
+            return
+        }
+
+        let helperPath = sharedVisiDataHelperPathIfExecutable()
+        let scriptContents = Self.makeVisiDataInstallerScript(helperPath: helperPath)
+
+        do {
+            let tempScriptURL = try Self.writeTemporaryExecutableScript(contents: scriptContents)
+            try Self.openScriptInTerminal(tempScriptURL)
+            statusMessage = "Opened Terminal for one-click VisiData setup."
+            errorMessage = nil
+        } catch {
+            statusMessage = nil
+            errorMessage = "Could not start one-click VisiData setup: \(error.localizedDescription)"
+        }
+    }
+
     func clearError() {
         errorMessage = nil
     }
@@ -876,6 +898,63 @@ final class AppModel: ObservableObject {
         return String(firstCharacter).uppercased()
     }
 
+    static func makeVisiDataInstallerScript(helperPath: String?) -> String {
+        if let helperPath {
+            return """
+            #!/bin/zsh
+            set -euo pipefail
+
+            \(shellSingleQuoted(helperPath)) --install
+            """
+        }
+
+        return """
+        #!/bin/zsh
+        set -euo pipefail
+
+        echo "iData one-click VisiData setup"
+        echo "--------------------------------"
+
+        if command -v vd >/dev/null 2>&1; then
+          echo "vd already detected at: $(command -v vd)"
+        fi
+
+        if command -v brew >/dev/null 2>&1; then
+          echo "Installing or upgrading VisiData with Homebrew..."
+          brew install visidata || brew upgrade visidata || true
+        else
+          if ! command -v pipx >/dev/null 2>&1; then
+            if command -v python3 >/dev/null 2>&1; then
+              echo "pipx not found. Installing pipx with python3 --user..."
+              python3 -m pip install --user pipx
+              python3 -m pipx ensurepath || true
+              export PATH="$HOME/.local/bin:$PATH"
+            else
+              echo "python3 is missing. Install Homebrew or python3, then retry."
+              exit 1
+            fi
+          fi
+
+          echo "Installing or upgrading VisiData with pipx..."
+          pipx install visidata || pipx upgrade visidata || true
+        fi
+
+        if command -v pipx >/dev/null 2>&1; then
+          echo "Injecting openpyxl for Excel loaders..."
+          pipx inject visidata openpyxl || true
+        fi
+
+        echo ""
+        echo "Verification"
+        command -v vd || true
+        vd --version || true
+
+        echo ""
+        echo "Return to iData and use Auto Detect in Preferences if needed."
+        read '?Press Return to close this installer...'
+        """
+    }
+
     static func collapsedSidebarHeaderAction(
         hasRecentFiles: Bool,
         isCommandPressed: Bool
@@ -902,6 +981,39 @@ final class AppModel: ObservableObject {
 
     private func savePinnedRecentFiles(_ urls: [URL]) {
         defaults.set(urls.map(\.path), forKey: Self.pinnedRecentFilesKey)
+    }
+
+    private func sharedVisiDataHelperPathIfExecutable() -> String? {
+        let helperPath = Self.sharedVisiDataHelperPath
+        return FileManager.default.isExecutableFile(atPath: helperPath) ? helperPath : nil
+    }
+
+    private static func writeTemporaryExecutableScript(contents: String) throws -> URL {
+        let filename = "idata-visidata-setup-\(UUID().uuidString).command"
+        let scriptURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try contents.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int16(0o755))], ofItemAtPath: scriptURL.path)
+        return scriptURL
+    }
+
+    private static func openScriptInTerminal(_ scriptURL: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-a", "Terminal", scriptURL.path]
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "io.github.leoarrow.idata.visidata-setup",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: "open returned exit code \(process.terminationStatus)."]
+            )
+        }
+    }
+
+    private static func shellSingleQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
     }
 
     private static func loadPinnedRecentFiles(defaults: UserDefaults) -> [URL] {
