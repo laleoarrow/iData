@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
-VERSION=${1:-0.1.4}
+VERSION=${1:-0.1.8}
 APP_DIR="$ROOT_DIR/dist/iData.app"
 ZIP_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.zip"
 DMG_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.dmg"
