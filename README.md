@@ -4,11 +4,20 @@
   <a href="https://github.com/laleoarrow/iData/actions/workflows/swift.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/laleoarrow/iData/swift.yml?branch=main&style=for-the-badge" alt="Build" />
   </a>
+  <a href="https://github.com/laleoarrow/homebrew-tap/actions/workflows/tests.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/laleoarrow/homebrew-tap/tests.yml?branch=main&style=for-the-badge&label=brew%20test-bot" alt="Brew Test Bot" />
+  </a>
   <a href="https://github.com/laleoarrow/iData/releases">
     <img src="https://img.shields.io/github/v/release/laleoarrow/iData?style=for-the-badge" alt="Release" />
   </a>
   <a href="https://github.com/laleoarrow/iData">
     <img src="https://img.shields.io/badge/platform-macOS%2014%2B-111111?style=for-the-badge" alt="Platform" />
+  </a>
+  <a href="https://github.com/laleoarrow/homebrew-tap">
+    <img src="https://img.shields.io/badge/Homebrew%20Cask-laleoarrow%2Ftap%2Fidata-FBB040?style=for-the-badge&logo=homebrew&logoColor=black" alt="Homebrew Cask" />
+  </a>
+  <a href="https://github.com/laleoarrow/homebrew-tap">
+    <img src="https://img.shields.io/badge/install-brew%20install%20--cask%20laleoarrow%2Ftap%2Fidata-2e7d32?style=for-the-badge&logo=homebrew&logoColor=white" alt="Install via Brew" />
   </a>
 </div>
 
