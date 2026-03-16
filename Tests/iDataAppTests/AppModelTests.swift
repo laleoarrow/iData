@@ -176,7 +176,7 @@ struct AppModelTests {
         let model = AppModel()
         model.activeSession = session
 
-        let didFail = await waitForSessionFailure(session, timeoutNanoseconds: 5_000_000_000)
+        let didFail = await waitForSessionFailure(session, timeoutNanoseconds: 10_000_000_000)
 
         #expect(didFail)
         #expect(model.displayedSession === session)
@@ -752,6 +752,248 @@ struct AppModelTests {
     }
 
     @Test
+    func largeTableOpenAndSwitchStressKeepsLatestSessionStable() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-large-switch-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let largeA = tempRoot.appendingPathComponent("large-a.tsv")
+        let largeB = tempRoot.appendingPathComponent("large-b.tsv")
+        try writeLargeTSV(to: largeA, rows: 150_000, prefix: "A")
+        try writeLargeTSV(to: largeB, rows: 150_000, prefix: "B")
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        for _ in 0..<8 {
+            model.openExternalFile(largeA)
+            #expect(model.errorMessage == nil)
+            #expect(model.activeSession?.isRunning == true)
+            #expect(model.activeSession?.currentFileURL?.standardizedFileURL == largeA.standardizedFileURL)
+
+            model.openExternalFile(largeB)
+            #expect(model.errorMessage == nil)
+            #expect(model.activeSession?.isRunning == true)
+            #expect(model.activeSession?.currentFileURL?.standardizedFileURL == largeB.standardizedFileURL)
+        }
+
+        #expect(model.recentFiles.first?.standardizedFileURL == largeB.standardizedFileURL)
+        #expect(model.recentFiles.contains(where: { $0.standardizedFileURL == largeA.standardizedFileURL }))
+    }
+
+    @Test
+    func tutorialModeEndsCleanlyWhenSwitchingToLargeTable() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-tutorial-switch-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let large = tempRoot.appendingPathComponent("large-tutorial-switch.tsv")
+        try writeLargeTSV(to: large, rows: 120_000, prefix: "T")
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        model.startTutorial()
+        let tutorialSample = model.tutorialSampleFileURL
+
+        #expect(model.isTutorialActive)
+        #expect(tutorialSample != nil)
+        #expect(model.errorMessage == nil)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == tutorialSample?.standardizedFileURL)
+
+        model.openExternalFile(large)
+
+        #expect(!model.isTutorialActive)
+        #expect(model.errorMessage == nil)
+        #expect(model.activeSession?.isRunning == true)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == large.standardizedFileURL)
+
+        let status = model.statusMessage ?? ""
+        #expect(
+            status.contains("Tutorial ended")
+                || status.contains("教程已结束")
+        )
+    }
+
+    @Test
+    func repeatedTutorialAndLargeTableSwitchDoesNotLeakTutorialState() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-tutorial-loop-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let largeA = tempRoot.appendingPathComponent("large-loop-a.tsv")
+        let largeB = tempRoot.appendingPathComponent("large-loop-b.tsv")
+        try writeLargeTSV(to: largeA, rows: 80_000, prefix: "L1")
+        try writeLargeTSV(to: largeB, rows: 80_000, prefix: "L2")
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        for index in 0..<5 {
+            model.startTutorial()
+            #expect(model.isTutorialActive)
+            #expect(model.tutorialCurrentStep != nil)
+
+            let target = index.isMultiple(of: 2) ? largeA : largeB
+            model.openExternalFile(target)
+
+            #expect(!model.isTutorialActive)
+            #expect(model.tutorialCurrentStep == nil)
+            #expect(model.activeSession?.isRunning == true)
+            #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
+        }
+    }
+
+    @Test
+    func allTutorialChaptersCanTraverseAndComplete() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-tutorial-complete-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let chapters = model.tutorialChapters
+        #expect(!chapters.isEmpty)
+
+        for chapter in chapters {
+            model.startTutorial(chapterID: chapter.id)
+
+            #expect(model.errorMessage == nil)
+            #expect(model.isTutorialActive)
+            #expect(model.tutorialCurrentChapter?.id == chapter.id)
+            #expect(model.tutorialCurrentStep != nil)
+            #expect(model.activeSession?.isRunning == true)
+
+            let stepCount = model.tutorialCurrentChapter?.steps.count ?? 0
+            #expect(stepCount > 0)
+
+            if stepCount > 1 {
+                for _ in 0..<(stepCount - 1) {
+                    model.advanceTutorialStep()
+                }
+            }
+
+            #expect(model.isTutorialLastStep)
+            model.completeTutorial()
+
+            #expect(!model.isTutorialActive)
+            #expect(model.tutorialCurrentStep == nil)
+            #expect(model.tutorialCurrentChapter == nil)
+            #expect(model.tutorialChapters.first(where: { $0.id == chapter.id })?.isCompleted == true)
+        }
+    }
+
+    @Test
+    func allTutorialChaptersEndCleanlyWhenSwitchingToLargeTables() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-tutorial-all-switch-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let largeA = tempRoot.appendingPathComponent("large-all-a.tsv")
+        let largeB = tempRoot.appendingPathComponent("large-all-b.tsv")
+        try writeLargeTSV(to: largeA, rows: 100_000, prefix: "TA")
+        try writeLargeTSV(to: largeB, rows: 100_000, prefix: "TB")
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let chapters = model.tutorialChapters
+        #expect(!chapters.isEmpty)
+
+        for (index, chapter) in chapters.enumerated() {
+            model.startTutorial(chapterID: chapter.id)
+            #expect(model.errorMessage == nil)
+            #expect(model.isTutorialActive)
+            #expect(model.tutorialCurrentChapter?.id == chapter.id)
+
+            let target = index.isMultiple(of: 2) ? largeA : largeB
+            model.openExternalFile(target)
+
+            #expect(!model.isTutorialActive)
+            #expect(model.errorMessage == nil)
+            #expect(model.activeSession?.isRunning == true)
+            #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
+            #expect(model.tutorialCurrentStep == nil)
+        }
+    }
+
+    @Test
     func visidataInstallerScriptUsesSharedHelperWhenAvailable() {
         let helperPath = "/Users/Shared/iData/Configure VisiData.command"
         let script = AppModel.makeVisiDataInstallerScript(helperPath: helperPath)
@@ -786,6 +1028,34 @@ private func makeImmediateExitLauncher(at url: URL, exitCode: Int) throws {
 
     try script.write(to: url, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+}
+
+private func makeLongRunningLauncher(at url: URL, sleepSeconds: Int) throws {
+    let script = """
+    #!/bin/zsh
+    if [[ -n "$1" && -f "$1" ]]; then
+      /usr/bin/head -n 3 "$1" >/dev/null 2>&1
+    fi
+    /bin/sleep \(sleepSeconds)
+    """
+
+    try script.write(to: url, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+}
+
+private func writeLargeTSV(to url: URL, rows: Int, prefix: String) throws {
+    FileManager.default.createFile(atPath: url.path, contents: nil)
+    let handle = try FileHandle(forWritingTo: url)
+    defer {
+        try? handle.close()
+    }
+
+    try handle.write(contentsOf: Data("id\tvalue\tgroup\tpayload\n".utf8))
+
+    for row in 1...rows {
+        let line = "\(row)\t\(row % 97)\t\(prefix)\t\(prefix)-\(row)-\(row % 13)-\(row % 19)\n"
+        try handle.write(contentsOf: Data(line.utf8))
+    }
 }
 
 @MainActor

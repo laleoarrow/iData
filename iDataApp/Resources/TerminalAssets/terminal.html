@@ -85,7 +85,7 @@
     function makeTerminalOptions() {
       return {
         cursorBlink: true,
-        allowTransparency: true,
+        allowTransparency: false,
         macOptionIsMeta: true,
         rightClickSelectsWord: true,
         scrollback: 20000,
@@ -159,18 +159,18 @@
         return;
       }
 
-      const currentTerm = term;
       const binary = atob(base64Value);
       const bytes = new Uint8Array(binary.length);
       for (let index = 0; index < binary.length; index += 1) {
         bytes[index] = binary.charCodeAt(index);
       }
-      currentTerm.write(bytes, () => {
-        if (currentTerm.rows > 0) {
-          currentTerm.refresh(0, Math.max(currentTerm.rows - 1, 0));
-        }
-      });
-      scheduleTerminalLayoutPasses();
+      term.write(bytes);
+
+      // Output streaming should not constantly trigger layout retries.
+      // We only retry sizing if we do not yet have a stable terminal size.
+      if (!lastSentSize) {
+        scheduleTerminalLayoutPasses();
+      }
     }
 
     function renderDimensions() {
@@ -230,12 +230,24 @@
       const cols = Math.max(20, Math.floor(usableWidth / cellWidth));
       const rows = Math.max(8, Math.floor(usableHeight / cellHeight));
       const sizeKey = `${cols}x${rows}`;
-      if (!force && sizeKey === lastSentSize && term.cols === cols && term.rows === rows) {
+
+      const sizeChanged = sizeKey !== lastSentSize;
+      const terminalNeedsResize = term.cols !== cols || term.rows !== rows;
+
+      if (!force && !sizeChanged && !terminalNeedsResize) {
         return true;
       }
+
       lastSentSize = sizeKey;
-      term.resize(cols, rows);
-      post({ type: 'resize', cols, rows });
+
+      if (terminalNeedsResize) {
+        term.resize(cols, rows);
+      }
+
+      if (sizeChanged || terminalNeedsResize) {
+        post({ type: 'resize', cols, rows });
+      }
+
       return true;
     }
 
@@ -244,11 +256,7 @@
         return false;
       }
 
-      const didMeasure = measureAndResize(forceResize);
-      if (term.rows > 0) {
-        term.refresh(0, Math.max(term.rows - 1, 0));
-      }
-      return didMeasure;
+      return measureAndResize(forceResize);
     }
 
     function postTerminalReady() {
@@ -269,9 +277,6 @@
       }
 
       const didMeasure = measureAndResize(true);
-      if (term.rows > 0) {
-        term.refresh(0, Math.max(term.rows - 1, 0));
-      }
 
       if (didMeasure && term.cols > 0 && term.rows > 0) {
         postTerminalReady();
@@ -352,7 +357,7 @@
     scheduleTerminalLayoutPasses({ forceResize: true });
 
     const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(scheduleTerminalLayoutPasses);
+      requestAnimationFrame(() => scheduleTerminalLayoutPasses());
     });
     resizeObserver.observe(terminalRoot);
     resizeObserver.observe(terminalMount);

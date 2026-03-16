@@ -3,22 +3,22 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.1.10</title>
-            <pubDate>Thu, 12 Mar 2026 00:11:07 +0800</pubDate>
+            <title>0.1.11</title>
+            <pubDate>Mon, 16 Mar 2026 13:23:24 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>10</sparkle:version>
-            <sparkle:shortVersionString>0.1.10</sparkle:shortVersionString>
+            <sparkle:version>11</sparkle:version>
+            <sparkle:shortVersionString>0.1.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# iData v0.1.10
+            <description sparkle:format="markdown"><![CDATA[# iData v0.1.11
 
-This release fixes the VisiData failure path so users keep the session view and see actionable dependency guidance instead of being bounced back to the welcome screen.
+This release reduces terminal flicker during table rendering while preserving stable layout behavior across window focus changes, file switches, and tutorial flows.
 
 ## Highlights
 
-- Keep failed sessions visible so loader and launch errors remain readable in the main detail view
-- Add format-specific dependency guidance for common VisiData loaders, including `.xlsx` -> `openpyxl`
-- Align missing-VisiData guidance around one-click setup, `pipx install visidata`, and `pipx inject visidata ...`
-- Extend regression coverage for session display policy and format dependency hints
+- Remove hot-path xterm forced-refresh calls that caused visible flashing under sustained output
+- Keep forced resize on focus/visibility/pageshow events so the table viewport re-aligns when app/window state changes
+- Deduplicate resize signaling to avoid redundant host resize messages when dimensions have not changed
+- Expand regression coverage for large-table open/switch stress and full tutorial chapter traversal/interrupt scenarios
 
 ## Notes
 
@@ -28,7 +28,7 @@ This release fixes the VisiData failure path so users keep the session view and 
   - `pipx install visidata`
   - `pipx inject visidata openpyxl pyxlsb xlrd zstandard`
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.10/iData-v0.1.10-macos-universal.zip" length="3825328" type="application/octet-stream" sparkle:edSignature="0QS/+xOwGJrXukX9/rmbPSKr37iz6VNTlcHlRFoq9/Xjp5+XAxOzIeN2AHcJyEs6KpItK58i3e9Nd4dW6Pn6Dg=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.1.11/iData-v0.1.11-macos-universal.zip" length="3825408" type="application/octet-stream" sparkle:edSignature="kkHsxwEHDXYBne6pBzdkDt0bVo4VfkGdbikW1/iakHBr7zeFRQAcrH/VGP2EzdMwe8IQ+pfXnz2qq2xzg9baAQ=="/>
         </item>
     </channel>
 </rss>

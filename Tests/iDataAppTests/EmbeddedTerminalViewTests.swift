@@ -99,9 +99,14 @@ struct EmbeddedTerminalViewTests {
     func terminalHTMLForcesResizeWhenFocusReenters() throws {
         let html = try terminalHTML()
 
+        #expect(html.contains("window.iDataFocusTerminal = function()"))
+        #expect(html.contains("term?.focus();"))
         #expect(html.contains("scheduleTerminalLayoutPasses({ forceResize: true });"))
+        #expect(html.contains("terminalRoot.addEventListener('focusin', () => {\n      scheduleTerminalLayoutPasses({ forceResize: true });\n    });"))
         #expect(html.contains("document.addEventListener('visibilitychange'"))
+        #expect(html.contains("if (!document.hidden) {\n        scheduleTerminalLayoutPasses({ forceResize: true });\n      }"))
         #expect(html.contains("window.addEventListener('pageshow'"))
+        #expect(html.contains("window.addEventListener('focus', () => {\n      scheduleTerminalLayoutPasses({ forceResize: true });\n    });"))
     }
 
     @Test
@@ -119,6 +124,22 @@ struct EmbeddedTerminalViewTests {
         #expect(html.contains("function createTerminal("))
         #expect(html.contains("term.dispose();"))
         #expect(html.contains("createTerminal();"))
+    }
+
+    @Test
+    func terminalHTMLAvoidsHotPathForcedRefreshCalls() throws {
+        let html = try terminalHTML()
+
+        #expect(!html.contains("currentTerm.refresh(0, Math.max(currentTerm.rows - 1, 0));"))
+        #expect(!html.contains("term.refresh(0, Math.max(term.rows - 1, 0));"))
+    }
+
+    @Test
+    func terminalHTMLDoesNotSendForcedResizeWhenSizeUnchanged() throws {
+        let html = try terminalHTML()
+
+        #expect(!html.contains("if (force || sizeChanged) {"))
+        #expect(html.contains("if (sizeChanged || terminalNeedsResize) {"))
     }
 
     private func displayReadyFlag(for session: VisiDataSessionController) -> Bool {
