@@ -70,6 +70,11 @@ jobs:
             s/sha256\s+"[a-f0-9]{64}"/sha256 "'"$SHA256"'"/;
           ')
 
+          # Command substitution drops trailing newlines; ensure cask keeps final newline.
+          if [[ "$UPDATED" != *$'\n' ]]; then
+            UPDATED="${UPDATED}"$'\n'
+          fi
+
           if ! printf '%s' "$UPDATED" | grep -q 'iData-v#{version}-macos-universal.zip'; then
             echo "Cask URL template changed unexpectedly; refusing to update." >&2
             exit 1
