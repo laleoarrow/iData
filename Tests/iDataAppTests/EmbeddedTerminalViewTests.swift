@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import AppKit
 import WebKit
 @testable import iData
 
@@ -65,6 +66,39 @@ struct EmbeddedTerminalViewTests {
 
         #expect(sink.clearCallCount == 1)
         #expect(sink.writeCallCount == 1)
+    }
+
+    @Test
+    func runningSessionDoesNotTriggerDeferredFocusStormAfterDisplayReady() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-focus-refresh-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let target = tempRoot.appendingPathComponent("large.tsv")
+        try Data("col\nvalue\n".utf8).write(to: target)
+
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkSpy()
+
+        session.bind(displaySink: sink)
+        try session.open(fileURL: target, explicitVDPath: launcher.path)
+        defer {
+            session.terminate()
+        }
+
+        session.markDisplayReady()
+
+        #expect(sink.focusCallCount == 1)
+
+        try await Task.sleep(for: .milliseconds(900))
+
+        #expect(sink.focusCallCount == 1)
     }
 
     @Test
@@ -182,6 +216,33 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func manualActualFixtureSnapshot() async throws {
+        guard
+            let fixturePath = ProcessInfo.processInfo.environment["IDATA_ACTUAL_FIXTURE_PATH"],
+            !fixturePath.isEmpty
+        else {
+            return
+        }
+
+        let fixtureURL = URL(fileURLWithPath: fixturePath)
+        guard FileManager.default.fileExists(atPath: fixtureURL.path) else {
+            Issue.record("Fixture path does not exist: \(fixtureURL.path)")
+            return
+        }
+
+        let harness = ActualTerminalSnapshotHarness()
+        let snapshotURL = try await harness.renderSnapshot(
+            fixtureURL: fixtureURL,
+            outputName: "actual-fixture-snapshot"
+        )
+
+        print("ACTUAL_FIXTURE_SNAPSHOT=\(snapshotURL.path)")
+
+        let image = NSImage(contentsOf: snapshotURL)
+        #expect(image != nil)
+    }
+
+    @Test
     func terminalHTMLResetsViewportStateWhenClearingTerminal() throws {
         let html = try terminalHTML()
 
@@ -226,6 +287,7 @@ struct EmbeddedTerminalViewTests {
 private final class TerminalDisplaySinkSpy: TerminalDisplaySink {
     private(set) var clearCallCount = 0
     private(set) var writeCallCount = 0
+    private(set) var focusCallCount = 0
 
     func clearTerminalDisplay() {
         clearCallCount += 1
@@ -235,7 +297,9 @@ private final class TerminalDisplaySinkSpy: TerminalDisplaySink {
         writeCallCount += 1
     }
 
-    func focusTerminalDisplay() {}
+    func focusTerminalDisplay() {
+        focusCallCount += 1
+    }
 }
 
 private func terminalHTML(filePath: StaticString = #filePath) throws -> String {
@@ -438,4 +502,139 @@ private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
             }
         }
     }
+}
+
+@MainActor
+private final class ActualTerminalSnapshotHarness: NSObject, WKNavigationDelegate {
+    private let session = VisiDataSessionController()
+    private let configuration = WKWebViewConfiguration()
+    private lazy var coordinator = EmbeddedTerminalView.Coordinator(session: session)
+    private lazy var webView: WKWebView = {
+        let contentController = WKUserContentController()
+        contentController.add(coordinator, name: "idata")
+        configuration.userContentController = contentController
+
+        let webView = WKWebView(
+            frame: .init(x: 0, y: 0, width: 1700, height: 980),
+            configuration: configuration
+        )
+        webView.navigationDelegate = self
+        return webView
+    }()
+    private var navigationContinuation: CheckedContinuation<Void, Error>?
+
+    func renderSnapshot(
+        fixtureURL: URL,
+        outputName: String,
+        filePath: StaticString = #filePath
+    ) async throws -> URL {
+        let htmlURL = try terminalHTMLURL(filePath: filePath)
+        let assetsDirectory = htmlURL.deletingLastPathComponent()
+
+        coordinator.bind(session: session, webView: webView)
+
+        try await withCheckedThrowingContinuation { continuation in
+            navigationContinuation = continuation
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: assetsDirectory)
+        }
+
+        try session.open(fileURL: fixtureURL, explicitVDPath: nil)
+        try await Task.sleep(for: .seconds(6))
+
+        let outputURL = try artifactURL(named: outputName, filePath: filePath)
+        try await snapshotWebView(to: outputURL)
+        session.terminate()
+        return outputURL
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        coordinator.webView(webView, didFinish: navigation)
+        navigationContinuation?.resume(returning: ())
+        navigationContinuation = nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFail navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        navigationContinuation?.resume(throwing: error)
+        navigationContinuation = nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        navigationContinuation?.resume(throwing: error)
+        navigationContinuation = nil
+    }
+
+    private func snapshotWebView(to outputURL: URL) async throws {
+        let image: NSImage = try await withCheckedThrowingContinuation { continuation in
+            let configuration = WKSnapshotConfiguration()
+            configuration.rect = webView.bounds
+            webView.takeSnapshot(with: configuration) { image, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let image else {
+                    continuation.resume(throwing: SnapshotError.missingImage)
+                    return
+                }
+                continuation.resume(returning: image)
+            }
+        }
+
+        guard
+            let tiff = image.tiffRepresentation,
+            let bitmap = NSBitmapImageRep(data: tiff),
+            let pngData = bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:])
+        else {
+            throw SnapshotError.missingImageData
+        }
+
+        try FileManager.default.createDirectory(
+            at: outputURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try pngData.write(to: outputURL)
+    }
+}
+
+private enum SnapshotError: Error {
+    case missingImage
+    case missingImageData
+}
+
+private func terminalHTMLURL(filePath: StaticString = #filePath) throws -> URL {
+    let fileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = fileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    return repositoryRoot.appendingPathComponent("iDataApp/Resources/TerminalAssets/terminal.html")
+}
+
+private func artifactURL(named name: String, filePath: StaticString = #filePath) throws -> URL {
+    let fileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = fileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    return repositoryRoot
+        .appendingPathComponent(".artifacts", isDirectory: true)
+        .appendingPathComponent("\(name).png")
+}
+
+private func makeLongRunningLauncher(at url: URL, sleepSeconds: Int) throws {
+    let script = """
+    #!/bin/zsh
+    trap 'exit 0' TERM INT HUP
+    sleep \(sleepSeconds)
+    """
+    try script.write(to: url, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
 }

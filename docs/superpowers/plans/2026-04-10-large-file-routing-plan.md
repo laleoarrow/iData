@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Route externally opened supported files into `iData` only when they are larger than 500 MiB, and silently forward smaller files to a non-`iData` app.
+**Goal:** Route externally opened supported files into `iData` only when they are larger than 100 MiB, and silently forward smaller files to a non-`iData` app.
 
 **Architecture:** Add a small external-open routing decision inside `AppModel`, inject a testable file-forwarding dependency, and defer app activation in `AppDelegate` until the route decision says the file should stay in `iData` or surface an error. Keep the existing `VisiData` session-opening path unchanged once `iData` owns the file.
 
@@ -156,7 +156,7 @@ git commit -m "test: cover external file size routing"
 - [ ] **Step 1: Add the minimal routing types and injected dependencies**
 
 ```swift
-    static let largeFileOpenThresholdBytes = 500 * 1024 * 1024
+    static let largeFileOpenThresholdBytes = 100 * 1024 * 1024
 
     private let externalFileOpener: any ExternalFileOpening
     private let alternateApplicationResolver: @MainActor (URL, String) -> DefaultApplicationHandler?

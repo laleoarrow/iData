@@ -129,8 +129,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var readSource: DispatchSourceRead?
     private var processSource: DispatchSourceProcess?
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
-    private var displayRefreshGeneration: UInt64 = 0
-
     deinit {
         stopCurrentProcessIfNeeded(reapSynchronously: true)
     }
@@ -153,7 +151,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         isDisplayReady = true
         replayTranscript()
         displaySink?.focusTerminalDisplay()
-        scheduleDisplayRefreshes()
     }
 
     @MainActor
@@ -241,7 +238,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     func terminate() {
-        displayRefreshGeneration &+= 1
         stopCurrentProcessIfNeeded(reapSynchronously: true)
         isRunning = false
         statusMessage = AppModel.localized(
@@ -433,39 +429,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         for chunk in transcript.chunks {
             displaySink?.writeToTerminalDisplay(chunk)
         }
-    }
-
-    @MainActor
-    private func scheduleDisplayRefreshes() {
-        displayRefreshGeneration &+= 1
-        let generation = displayRefreshGeneration
-        let delays: [TimeInterval] = [0, 0.12, 0.35, 0.8]
-
-        for delay in delays {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self, self.displayRefreshGeneration == generation else {
-                    return
-                }
-
-                self.forceDisplayRefresh()
-            }
-        }
-    }
-
-    @MainActor
-    private func forceDisplayRefresh() {
-        guard isRunning, currentFileURL != nil else {
-            return
-        }
-
-        let cols = Int(lastKnownSize.cols)
-        let rows = Int(lastKnownSize.rows)
-        guard cols > 0, rows > 0 else {
-            return
-        }
-
-        resize(cols: cols, rows: rows)
-        displaySink?.focusTerminalDisplay()
     }
 
     private func enqueuePTYWrite(_ data: Data) {

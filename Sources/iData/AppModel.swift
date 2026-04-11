@@ -153,7 +153,7 @@ final class AppModel: ObservableObject {
     nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     nonisolated static let defaultTutorialChapterID = "basic"
     nonisolated static let recentFilesLimit = 10
-    static let largeFileOpenThresholdBytes: Int64 = 500 * 1024 * 1024
+    static let largeFileOpenThresholdBytes: Int64 = 100 * 1024 * 1024
     static let sharedVisiDataHelperPath = "/Users/Shared/iData/Configure VisiData.command"
     static let supportedFormats: [SupportedFormat] = [
         SupportedFormat(displayName: "CSV", chineseDisplayName: "CSV", fileExtension: "csv"),

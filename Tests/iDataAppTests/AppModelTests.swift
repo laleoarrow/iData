@@ -121,7 +121,7 @@ struct AppModelTests {
     }
 
     @Test
-    func thresholdBoundaryForwardsExactlyFiveHundredMiB() {
+    func thresholdBoundaryForwardsExactlyOneHundredMiB() {
         let target = URL(fileURLWithPath: "/tmp/boundary.tsv")
         let numbers = DefaultApplicationHandler(
             url: URL(fileURLWithPath: "/Applications/Numbers.app"),
@@ -129,16 +129,58 @@ struct AppModelTests {
             displayName: "Numbers"
         )
         let opener = RecordingExternalFileOpener()
+        let expectedThreshold = Int64(100 * 1024 * 1024)
         let model = AppModel(
             externalFileOpener: opener,
             alternateApplicationResolver: { _, _, _ in numbers },
-            fileSizeProvider: { _ in AppModel.largeFileOpenThresholdBytes }
+            fileSizeProvider: { _ in expectedThreshold }
         )
 
         let action = model.routeExternalFile(target)
 
         #expect(action == .forwardedToAlternateApp(appName: "Numbers"))
         #expect(opener.openedApplicationURL == numbers.url)
+    }
+
+    @Test
+    func fileLargerThanOneHundredMiBStaysInsideIData() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-open-large-100m-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let target = tempRoot.appendingPathComponent("large-101m.xlsx")
+        try Data("ok".utf8).write(to: target)
+
+        let opener = RecordingExternalFileOpener()
+        let expectedThreshold = Int64(100 * 1024 * 1024)
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in nil },
+            fileSizeProvider: { _ in expectedThreshold + 1 }
+        )
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .openedInIData)
+        #expect(opener.openedFileURL == nil)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
     }
 
     @Test
