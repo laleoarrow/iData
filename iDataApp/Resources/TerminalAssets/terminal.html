@@ -70,13 +70,12 @@
 
     let lastSentSize = null;
     let layoutRetryHandle = null;
-    let layoutRetryDeadline = 0;
-    let layoutStablePassesRemaining = 0;
-    let readyRetryDelayMs = 180;
-    let readyProbeFrameBudget = 40;
-    let readyRetryHandle = null;
+    let layoutPassBudgetRemaining = 0;
     let didPostTerminalReady = false;
     let forceResizePassesPending = 0;
+    let deferredResizeObserver = null;
+    let deferredMeasureHandle = null;
+    let deferredMeasureBudgetRemaining = 0;
 
     function post(message) {
       window.webkit?.messageHandlers?.idata?.postMessage(message);
@@ -124,7 +123,80 @@
       }
     }
 
+    function stopDeferredLayoutRecovery() {
+      deferredResizeObserver?.disconnect();
+      deferredResizeObserver = null;
+      if (deferredMeasureHandle !== null) {
+        clearTimeout(deferredMeasureHandle);
+        deferredMeasureHandle = null;
+      }
+      deferredMeasureBudgetRemaining = 0;
+    }
+
+    function armDeferredLayoutRecovery() {
+      if (deferredResizeObserver === null && typeof ResizeObserver !== 'undefined') {
+        deferredResizeObserver = new ResizeObserver(() => {
+          if (!term || !refreshTerminalLayout(forceResizePassesPending > 0)) {
+            return;
+          }
+
+          stopDeferredLayoutRecovery();
+
+          if (term.cols > 0 && term.rows > 0) {
+            postTerminalReady();
+          }
+
+          if (!didPostTerminalReady || forceResizePassesPending > 0) {
+            scheduleTerminalLayoutPasses({ forceResize: forceResizePassesPending > 0 });
+          }
+        });
+        deferredResizeObserver.observe(terminalMount);
+      }
+
+      deferredMeasureBudgetRemaining = Math.max(deferredMeasureBudgetRemaining, 8);
+
+      if (deferredMeasureHandle !== null) {
+        return;
+      }
+
+      const retryDeferredMeasurement = () => {
+        deferredMeasureHandle = null;
+
+        if (deferredMeasureBudgetRemaining > 0) {
+          deferredMeasureBudgetRemaining -= 1;
+        }
+
+        if (!term) {
+          stopDeferredLayoutRecovery();
+          return;
+        }
+
+        if (refreshTerminalLayout(forceResizePassesPending > 0)) {
+          stopDeferredLayoutRecovery();
+
+          if (term.cols > 0 && term.rows > 0) {
+            postTerminalReady();
+          }
+
+          if (!didPostTerminalReady || forceResizePassesPending > 0) {
+            scheduleTerminalLayoutPasses({ forceResize: forceResizePassesPending > 0 });
+          }
+          return;
+        }
+
+        if (deferredMeasureBudgetRemaining > 0) {
+          deferredMeasureHandle = setTimeout(retryDeferredMeasurement, 250);
+          return;
+        }
+
+        deferredMeasureHandle = null;
+      };
+
+      deferredMeasureHandle = setTimeout(retryDeferredMeasurement, 250);
+    }
+
     function createTerminal(resetReadyState = false) {
+      stopDeferredLayoutRecovery();
       disposeTerminalDisposables();
 
       if (term) {
@@ -263,41 +335,8 @@
       if (didPostTerminalReady) {
         return;
       }
-      if (readyRetryHandle !== null) {
-        clearTimeout(readyRetryHandle);
-        readyRetryHandle = null;
-      }
       didPostTerminalReady = true;
       post({ type: 'ready' });
-    }
-
-    function notifyReadyWhenSized(attempts = 0) {
-      if (didPostTerminalReady) {
-        return;
-      }
-
-      const didMeasure = measureAndResize(true);
-
-      if (didMeasure && term.cols > 0 && term.rows > 0) {
-        postTerminalReady();
-        return;
-      }
-
-      if (attempts < readyProbeFrameBudget) {
-        requestAnimationFrame(() => notifyReadyWhenSized(attempts + 1));
-        return;
-      }
-
-      scheduleTerminalLayoutPasses();
-
-      if (readyRetryHandle !== null) {
-        clearTimeout(readyRetryHandle);
-      }
-
-      readyRetryHandle = setTimeout(() => {
-        readyRetryHandle = null;
-        notifyReadyWhenSized(0);
-      }, readyRetryDelayMs);
     }
 
     function scheduleTerminalLayoutPasses(options = {}) {
@@ -305,8 +344,10 @@
         forceResizePassesPending = Math.max(forceResizePassesPending, 1);
       }
 
-      layoutRetryDeadline = Math.max(layoutRetryDeadline, Date.now() + 6000);
-      layoutStablePassesRemaining = Math.max(layoutStablePassesRemaining, 3);
+      layoutPassBudgetRemaining = Math.max(
+        layoutPassBudgetRemaining,
+        options.forceResize ? 6 : 3
+      );
 
       if (layoutRetryHandle !== null) {
         return;
@@ -318,23 +359,31 @@
         if (didMeasure && forceResizePassesPending > 0) {
           forceResizePassesPending -= 1;
         }
-        if (didMeasure && layoutStablePassesRemaining > 0) {
-          layoutStablePassesRemaining -= 1;
+        if (didMeasure) {
+          stopDeferredLayoutRecovery();
+        }
+        if (didMeasure && term.cols > 0 && term.rows > 0) {
+          postTerminalReady();
         }
 
-        const needsMorePasses =
-          !didMeasure ||
-          !lastSentSize ||
-          layoutStablePassesRemaining > 0;
+        if (layoutPassBudgetRemaining > 0) {
+          layoutPassBudgetRemaining -= 1;
+        }
 
-        if (needsMorePasses && Date.now() < layoutRetryDeadline) {
+        const needsAnotherAttempt =
+          layoutPassBudgetRemaining > 0 &&
+          (!didMeasure || !didPostTerminalReady || forceResizePassesPending > 0);
+
+        if (needsAnotherAttempt) {
           layoutRetryHandle = setTimeout(attempt, 120);
           return;
         }
 
         layoutRetryHandle = null;
-        layoutRetryDeadline = 0;
-        layoutStablePassesRemaining = 0;
+
+        if (!didMeasure) {
+          armDeferredLayoutRecovery();
+        }
       };
 
       attempt();
@@ -346,6 +395,7 @@
       scheduleTerminalLayoutPasses({ forceResize: true });
     };
     window.iDataRefreshLayout = function() {
+      lastSentSize = null;
       scheduleTerminalLayoutPasses({ forceResize: true });
     };
     window.iDataFocusTerminal = function() {
@@ -354,13 +404,11 @@
     };
 
     createTerminal(true);
-    scheduleTerminalLayoutPasses({ forceResize: true });
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => scheduleTerminalLayoutPasses());
     });
     resizeObserver.observe(terminalRoot);
-    resizeObserver.observe(terminalMount);
 
     terminalRoot.addEventListener('focusin', () => {
       scheduleTerminalLayoutPasses({ forceResize: true });
@@ -379,7 +427,6 @@
 
     requestAnimationFrame(() => {
       scheduleTerminalLayoutPasses({ forceResize: true });
-      notifyReadyWhenSized();
     });
   </script>
 </body>

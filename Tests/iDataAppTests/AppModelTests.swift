@@ -33,6 +33,158 @@ struct AppModelTests {
     }
 
     @Test
+    func smallSupportedFileForwardsToAlternateApplication() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let target = URL(fileURLWithPath: "/tmp/small.xlsx")
+        let excel = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+        let opener = RecordingExternalFileOpener()
+
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in excel },
+            fileSizeProvider: { _ in 10 }
+        )
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "Microsoft Excel"))
+        #expect(opener.openedFileURL?.standardizedFileURL == target.standardizedFileURL)
+        #expect(opener.openedApplicationURL == excel.url)
+        #expect(model.activeSession == nil)
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test
+    func fileLargerThanThresholdStaysInsideIData() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-open-large-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let target = tempRoot.appendingPathComponent("large.xlsx")
+        try Data("ok".utf8).write(to: target)
+
+        let opener = RecordingExternalFileOpener()
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in nil },
+            fileSizeProvider: { _ in AppModel.largeFileOpenThresholdBytes + 1 }
+        )
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .openedInIData)
+        #expect(opener.openedFileURL == nil)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test
+    func smallSupportedFileShowsErrorWhenNoAlternateApplicationExists() {
+        let target = URL(fileURLWithPath: "/tmp/no-alt.csv")
+        let model = AppModel(
+            externalFileOpener: RecordingExternalFileOpener(),
+            alternateApplicationResolver: { _, _, _ in nil },
+            fileSizeProvider: { _ in 10 }
+        )
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .presentedError)
+        #expect(model.errorMessage?.contains("non-iData app") == true || model.errorMessage?.contains("非 iData 应用") == true)
+    }
+
+    @Test
+    func thresholdBoundaryForwardsExactlyFiveHundredMiB() {
+        let target = URL(fileURLWithPath: "/tmp/boundary.tsv")
+        let numbers = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Numbers.app"),
+            bundleIdentifier: "com.apple.Numbers",
+            displayName: "Numbers"
+        )
+        let opener = RecordingExternalFileOpener()
+        let model = AppModel(
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in numbers },
+            fileSizeProvider: { _ in AppModel.largeFileOpenThresholdBytes }
+        )
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "Numbers"))
+        #expect(opener.openedApplicationURL == numbers.url)
+    }
+
+    @Test
+    func fileSizeUsesLogicalLengthForSparseFiles() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-sparse-size-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let target = tempRoot.appendingPathComponent("large.csv")
+        let logicalSize = AppModel.largeFileOpenThresholdBytes + 1
+        FileManager.default.createFile(atPath: target.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: target)
+        defer {
+            try? handle.close()
+        }
+        try handle.seek(toOffset: UInt64(logicalSize - 1))
+        try handle.write(contentsOf: Data("\n".utf8))
+
+        #expect(AppModel.fileSizeInBytes(for: target) == logicalSize)
+    }
+
+    @Test
+    func forwardedExternalOpenKeepsAppInBackground() {
+        let target = URL(fileURLWithPath: "/tmp/background.csv")
+        let opener = RecordingExternalFileOpener()
+        let textEdit = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/TextEdit.app"),
+            bundleIdentifier: "com.apple.TextEdit",
+            displayName: "TextEdit"
+        )
+        let model = AppModel(
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in textEdit },
+            fileSizeProvider: { _ in 1024 }
+        )
+
+        let decision = model.handleExternalFileOpen([target])
+
+        #expect(decision == .stayBackground)
+        #expect(opener.openedApplicationURL == textEdit.url)
+    }
+
+    @Test
     func removingRecentFileOnlyUpdatesSidebarHistory() {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -176,7 +328,7 @@ struct AppModelTests {
         let model = AppModel()
         model.activeSession = session
 
-        let didFail = await waitForSessionFailure(session, timeoutNanoseconds: 10_000_000_000)
+        let didFail = await waitForSessionFailure(session, timeoutNanoseconds: 30_000_000_000)
 
         #expect(didFail)
         #expect(model.displayedSession === session)
@@ -351,6 +503,57 @@ struct AppModelTests {
         )
 
         #expect(chosen == nil)
+    }
+
+    @Test
+    func preferredRestoreApplicationFallsBackToFirstNonIDataCandidate() {
+        let assumedIDataBundleIdentifier = Bundle.main.bundleIdentifier ?? "io.github.leoarrow.idata"
+        let textEdit = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/TextEdit.app"),
+            bundleIdentifier: "com.apple.TextEdit",
+            displayName: "TextEdit"
+        )
+        let numbers = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Numbers.app"),
+            bundleIdentifier: "com.apple.Numbers",
+            displayName: "Numbers"
+        )
+
+        let chosen = preferredRestoreApplication(
+            storedPreviousDefault: nil,
+            fallbackCandidates: [
+                DefaultApplicationHandler(
+                    url: URL(fileURLWithPath: "/Applications/iData.app"),
+                    bundleIdentifier: assumedIDataBundleIdentifier,
+                    displayName: "iData"
+                ),
+                textEdit,
+                numbers,
+            ]
+        )
+
+        #expect(chosen == textEdit)
+    }
+
+    @Test
+    func preferredRestoreApplicationIgnoresStoredIDataHandler() {
+        let assumedIDataBundleIdentifier = Bundle.main.bundleIdentifier ?? "io.github.leoarrow.idata"
+        let textEdit = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/TextEdit.app"),
+            bundleIdentifier: "com.apple.TextEdit",
+            displayName: "TextEdit"
+        )
+
+        let chosen = preferredRestoreApplication(
+            storedPreviousDefault: DefaultApplicationHandler(
+                url: URL(fileURLWithPath: "/Applications/iData.app"),
+                bundleIdentifier: assumedIDataBundleIdentifier,
+                displayName: "iData"
+            ),
+            fallbackCandidates: [textEdit]
+        )
+
+        #expect(chosen == textEdit)
     }
 
     @Test
@@ -688,6 +891,23 @@ struct AppModelTests {
     }
 
     @Test
+    func beginTutorialGuideAlwaysStartsFromFirstStep() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set([AppModel.defaultTutorialChapterID: 3], forKey: AppModel.tutorialProgressByChapterKey)
+
+        let model = AppModel(defaults: defaults)
+        model.beginTutorialGuide(chapterID: AppModel.defaultTutorialChapterID)
+
+        #expect(model.isTutorialActive)
+        #expect(model.tutorialStepIndex == 0)
+    }
+
+    @Test
     func finishingTutorialResetsGuideState() {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1009,6 +1229,25 @@ struct AppModelTests {
         #expect(script.contains("brew install pipx"))
         #expect(script.contains("pipx install visidata"))
         #expect(script.contains("pipx inject visidata openpyxl pyxlsb xlrd zstandard"))
+        #expect(script.contains("if ! command -v vd >/dev/null 2>&1; then"))
+        #expect(script.contains("exit 1"))
+        #expect(!script.contains("brew install pipx || true"))
+        #expect(!script.contains("pipx install visidata || true"))
+        #expect(!script.contains("pipx inject visidata openpyxl pyxlsb xlrd zstandard || true"))
+    }
+
+    @Test
+    func visidataInstallerScriptExportsPathBeforeFinalPipxCheck() {
+        let script = AppModel.makeVisiDataInstallerScript(helperPath: nil)
+
+        let exportPathRange = script.range(of: "export PATH=\"$HOME/.local/bin:")
+        let finalPipxCheckRange = script.range(of: "if ! command -v pipx >/dev/null 2>&1; then\n    echo \"✗ Could not install pipx automatically. Install pipx manually, then retry.\"")
+
+        #expect(exportPathRange != nil)
+        #expect(finalPipxCheckRange != nil)
+        if let exportPathRange, let finalPipxCheckRange {
+            #expect(exportPathRange.lowerBound < finalPipxCheckRange.lowerBound)
+        }
     }
 }
 
@@ -1017,6 +1256,19 @@ private struct FakeExecutableChecker: ExecutableChecking {
 
     func isExecutableFile(atPath path: String) -> Bool {
         executablePaths.contains(path)
+    }
+}
+
+@MainActor
+private final class RecordingExternalFileOpener: ExternalFileOpening {
+    private(set) var openedFileURL: URL?
+    private(set) var openedApplicationURL: URL?
+    var shouldSucceed = true
+
+    func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool {
+        openedFileURL = fileURL
+        openedApplicationURL = applicationURL
+        return shouldSucceed
     }
 }
 

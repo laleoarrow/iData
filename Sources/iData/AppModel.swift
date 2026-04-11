@@ -7,6 +7,38 @@ import iDataCore
 import UniformTypeIdentifiers
 
 @MainActor
+protocol ExternalFileOpening {
+    func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool
+}
+
+struct WorkspaceExternalFileOpener: ExternalFileOpening {
+    @MainActor
+    func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool {
+        do {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = ["-a", applicationURL.path, fileURL.path]
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
+}
+
+enum ExternalOpenAction: Equatable {
+    case openedInIData
+    case forwardedToAlternateApp(appName: String)
+    case presentedError
+}
+
+enum ExternalOpenPresentationDecision: Equatable {
+    case activateApp
+    case stayBackground
+}
+
+@MainActor
 final class AppModel: ObservableObject {
     enum VisiDataDependencyState: Equatable {
         case available(path: String)
@@ -107,6 +139,9 @@ final class AppModel: ObservableObject {
     private let environmentPathProvider: () -> String
     private let preferredLanguagesProvider: () -> [String]
     private let formatAssociationRestoreStore: FormatAssociationRestoreStore
+    private let externalFileOpener: any ExternalFileOpening
+    private let alternateApplicationResolver: @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler?
+    private let fileSizeProvider: @MainActor (URL) -> Int64?
 
     nonisolated static let vdExecutablePathKey = "vdExecutablePath"
     nonisolated static let pinnedRecentFilesKey = "pinnedRecentFiles"
@@ -118,6 +153,7 @@ final class AppModel: ObservableObject {
     nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     nonisolated static let defaultTutorialChapterID = "basic"
     nonisolated static let recentFilesLimit = 10
+    static let largeFileOpenThresholdBytes: Int64 = 500 * 1024 * 1024
     static let sharedVisiDataHelperPath = "/Users/Shared/iData/Configure VisiData.command"
     static let supportedFormats: [SupportedFormat] = [
         SupportedFormat(displayName: "CSV", chineseDisplayName: "CSV", fileExtension: "csv"),
@@ -156,6 +192,29 @@ final class AppModel: ObservableObject {
         SupportedFormat(displayName: "Compressed GZip", chineseDisplayName: "压缩 GZip", fileExtension: "gz"),
         SupportedFormat(displayName: "Compressed BGZip", chineseDisplayName: "压缩 BGZip", fileExtension: "bgz"),
     ]
+    static let formatPanelFormats: [SupportedFormat] = {
+        let conciseExamples = [
+            "csv",
+            "tsv",
+            "txt",
+            "tab",
+            "json",
+            "jsonl",
+            "xlsx",
+            "xls",
+            "parquet",
+            "feather",
+            "ma",
+            "vcf",
+            "h5ad",
+            "gz",
+            "bgz",
+        ]
+
+        return conciseExamples.compactMap { target in
+            supportedFormats.first { associationExtension(for: $0.fileExtension) == target }
+        }
+    }()
     static var supportedFormatHelpText: String {
         supportedFormats
             .map { "\($0.displayName) (.\($0.fileExtension))" }
@@ -367,7 +426,10 @@ final class AppModel: ObservableObject {
         recentFilesStore: RecentFilesStore? = nil,
         executableChecker: any ExecutableChecking = LocalExecutableChecker(),
         environmentPathProvider: @escaping () -> String = { ProcessInfo.processInfo.environment["PATH"] ?? "" },
-        preferredLanguagesProvider: @escaping () -> [String] = { Locale.preferredLanguages }
+        preferredLanguagesProvider: @escaping () -> [String] = { Locale.preferredLanguages },
+        externalFileOpener: any ExternalFileOpening = WorkspaceExternalFileOpener(),
+        alternateApplicationResolver: @escaping @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler? = AppModel.resolveAlternateApplication(for:lookupExtension:storedPreviousDefaults:),
+        fileSizeProvider: @escaping @MainActor (URL) -> Int64? = AppModel.fileSizeInBytes(for:)
     ) {
         self.defaults = defaults
         self.recentFilesStore = recentFilesStore ?? RecentFilesStore(defaults: defaults)
@@ -375,6 +437,9 @@ final class AppModel: ObservableObject {
         self.environmentPathProvider = environmentPathProvider
         self.preferredLanguagesProvider = preferredLanguagesProvider
         self.formatAssociationRestoreStore = FormatAssociationRestoreStore(defaults: defaults)
+        self.externalFileOpener = externalFileOpener
+        self.alternateApplicationResolver = alternateApplicationResolver
+        self.fileSizeProvider = fileSizeProvider
         let initialRecentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
         self.recentFiles = Self.orderedRecentFiles(
             initialRecentFiles,
@@ -755,14 +820,9 @@ final class AppModel: ObservableObject {
         }
         isTutorialActive = true
         activeTutorialChapterID = chapter.id
-        let completedCount = tutorialProgressByChapter()[chapter.id] ?? 0
-        if completedCount >= chapter.steps.count {
-            tutorialStepIndex = 0
-        } else {
-            tutorialStepIndex = min(completedCount, max(chapter.steps.count - 1, 0))
-        }
+        tutorialStepIndex = 0
         isTutorialCoachExpanded = true
-        markTutorialProgress(chapterID: chapter.id, completedStepCount: max(completedCount, 0))
+        markTutorialProgress(chapterID: chapter.id, completedStepCount: 0)
     }
 
     func advanceTutorialStep() {
@@ -841,6 +901,70 @@ final class AppModel: ObservableObject {
         }
 
         openExternalFile(url)
+    }
+
+    func handleExternalFileOpen(_ urls: [URL]) -> ExternalOpenPresentationDecision {
+        guard let url = Self.firstSupportedFile(in: urls) else {
+            guard !urls.isEmpty else {
+                return .stayBackground
+            }
+
+            statusMessage = nil
+            errorMessage = localized(
+                english: "Drop a regular file, not a folder. iData streams compressed .gz/.bgz files without extracting.",
+                chinese: "请拖入普通文件，不要拖文件夹。iData 会直接流式读取 .gz/.bgz 压缩文件，不会先解压。"
+            )
+            return .activateApp
+        }
+
+        switch routeExternalFile(url) {
+        case .openedInIData, .presentedError:
+            return .activateApp
+        case .forwardedToAlternateApp:
+            return .stayBackground
+        }
+    }
+
+    func routeExternalFile(_ url: URL) -> ExternalOpenAction {
+        guard Self.supportsTableFile(url) else {
+            statusMessage = nil
+            errorMessage = localized(
+                english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
+                chinese: "所选内容不是普通文件。iData 会直接打开大多数文件后缀，并对 .gz/.bgz 文件进行流式读取而不解压。"
+            )
+            return .presentedError
+        }
+
+        let lookupExtension = Self.lookupExtension(for: url)
+        if let fileSize = fileSizeProvider(url), fileSize <= Self.largeFileOpenThresholdBytes {
+            guard let alternateApp = alternateApplicationResolver(url, lookupExtension, previousDefaultAppByExtension) else {
+                statusMessage = nil
+                errorMessage = localized(
+                    english: "Could not find a non-iData app to open \(url.lastPathComponent).",
+                    chinese: "找不到可用于打开 \(url.lastPathComponent) 的非 iData 应用。"
+                )
+                return .presentedError
+            }
+
+            guard externalFileOpener.open(url, withApplicationAt: alternateApp.url) else {
+                statusMessage = nil
+                errorMessage = localized(
+                    english: "Could not open \(url.lastPathComponent) with \(alternateApp.displayName).",
+                    chinese: "无法用 \(alternateApp.displayName) 打开 \(url.lastPathComponent)。"
+                )
+                return .presentedError
+            }
+
+            statusMessage = nil
+            errorMessage = nil
+            return .forwardedToAlternateApp(appName: alternateApp.displayName)
+        }
+
+        openExternalFile(url)
+        if activeSession?.currentFileURL?.standardizedFileURL == url.standardizedFileURL {
+            return .openedInIData
+        }
+        return .presentedError
     }
 
     func openExternalFile(_ url: URL) {
@@ -1057,15 +1181,24 @@ final class AppModel: ObservableObject {
                 let storedPreviousDefaultApp = await MainActor.run { [lookupExtension] in
                     previousDefaultAppByExtension[lookupExtension]
                 }
-                let restoreTarget = preferredRestoreApplication(storedPreviousDefault: storedPreviousDefaultApp)
-                let restoreResult: FileTypeAssociationSetResult
-                if let restoreTarget {
-                    restoreResult = await FileTypeAssociation.setDefaultApp(
-                        at: restoreTarget.url,
+                let fallbackCandidates = FileTypeAssociation.alternativeApplicationCandidates(forExtension: lookupExtension)
+                let restoreCandidates = restoreApplicationCandidates(
+                    storedPreviousDefault: storedPreviousDefaultApp,
+                    fallbackCandidates: fallbackCandidates
+                )
+                var restoreTarget: DefaultApplicationHandler?
+                var restoreResult: FileTypeAssociationSetResult = .missingPreviousDefault
+                for candidate in restoreCandidates {
+                    let candidateResult = await FileTypeAssociation.setDefaultApp(
+                        at: candidate.url,
                         forExtension: lookupExtension
                     )
-                } else {
-                    restoreResult = .missingPreviousDefault
+                    if candidateResult == .success {
+                        restoreTarget = candidate
+                        restoreResult = .success
+                        break
+                    }
+                    restoreResult = candidateResult
                 }
                 let isNowDefault = await settledIDataDefaultState(
                     forExtension: lookupExtension,
@@ -1079,10 +1212,10 @@ final class AppModel: ObservableObject {
 
                     if !isNowDefault {
                         forgetPreviousDefaultApp(forLookupExtension: lookupExtension)
-                        if let storedPreviousDefaultApp {
+                        if let restoreTarget {
                             statusMessage = localized(
-                                english: "Restored the default app for .\(shownExtension) to \(storedPreviousDefaultApp.displayName).",
-                                chinese: "已恢复 .\(shownExtension) 默认应用为 \(storedPreviousDefaultApp.displayName)。"
+                                english: "Restored the default app for .\(shownExtension) to \(restoreTarget.displayName).",
+                                chinese: "已恢复 .\(shownExtension) 默认应用为 \(restoreTarget.displayName)。"
                             )
                             errorMessage = nil
                         } else {
@@ -1098,6 +1231,12 @@ final class AppModel: ObservableObject {
                             chinese: "系统已收到恢复请求，但 .\(shownExtension) 仍默认 iData。请再试一次并确认系统提示。"
                         )
                         errorMessage = nil
+                    } else if restoreResult == .missingPreviousDefault {
+                        errorMessage = localized(
+                            english: "Could not find a non-iData app to restore .\(shownExtension). Open this format once with another app in Finder, then try again.",
+                            chinese: "找不到可用于恢复 .\(shownExtension) 的非 iData 应用。请先在 Finder 里用其他应用打开一次该格式，再重试。"
+                        )
+                        statusMessage = nil
                     } else {
                         errorMessage = localized(
                             english: "Could not restore the default app for .\(shownExtension): \(restoreResult.userMessage)",
@@ -1162,6 +1301,19 @@ final class AppModel: ObservableObject {
                 isSettingFormatDefault = false
                 settingFormatExtension = nil
             }
+        }
+    }
+
+    func refreshFormatAssociationStatuses(forExtensions fileExtensions: [String]) {
+        let lookupExtensions = Set(
+            fileExtensions
+                .map(Self.associationExtension(for:))
+                .filter { !$0.isEmpty }
+        )
+
+        for lookupExtension in lookupExtensions {
+            let isDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
+            updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isDefault)
         }
     }
 
@@ -1282,17 +1434,24 @@ final class AppModel: ObservableObject {
         if ! command -v pipx >/dev/null 2>&1; then
           if command -v brew >/dev/null 2>&1; then
             echo "▸ Installing pipx via Homebrew..."
-            brew install pipx || true
-          elif command -v python3 >/dev/null 2>&1; then
+            if ! brew install pipx; then
+              echo "▸ Homebrew pipx install failed, trying python3 fallback..."
+            fi
+          fi
+
+          if ! command -v pipx >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
             echo "▸ Installing pipx via python3..."
             python3 -m pip install --user pipx
             python3 -m pipx ensurepath || true
-          else
-            echo "✗ Neither Homebrew nor python3 found. Please install one first."
+          fi
+
+          export PATH="$HOME/.local/bin:$(brew --prefix 2>/dev/null || echo /opt/homebrew)/bin:$PATH"
+
+          if ! command -v pipx >/dev/null 2>&1; then
+            echo "✗ Could not install pipx automatically. Install pipx manually, then retry."
             read '?Press Return to close...'
             exit 1
           fi
-          export PATH="$HOME/.local/bin:$(brew --prefix 2>/dev/null || echo /opt/homebrew)/bin:$PATH"
         fi
 
         echo "✓ pipx is available at: $(command -v pipx)"
@@ -1301,23 +1460,48 @@ final class AppModel: ObservableObject {
         # ── Step 2: Install or upgrade VisiData via pipx ──
         if pipx list 2>/dev/null | grep -q visidata; then
           echo "▸ Upgrading VisiData..."
-          pipx upgrade visidata || true
+          if ! pipx upgrade visidata; then
+            echo "✗ Failed to upgrade VisiData with pipx."
+            read '?Press Return to close this installer...'
+            exit 1
+          fi
         else
           echo "▸ Installing VisiData via pipx..."
-          pipx install visidata || true
+          if ! pipx install visidata; then
+            echo "✗ Failed to install VisiData with pipx."
+            read '?Press Return to close this installer...'
+            exit 1
+          fi
         fi
         echo ""
 
         # ── Step 3: Inject Excel & common format plugins ──
         echo "▸ Injecting Excel and compression plugins (openpyxl, pyxlsb, xlrd, zstandard)..."
-        pipx inject visidata openpyxl pyxlsb xlrd zstandard || true
+        if ! pipx inject visidata openpyxl pyxlsb xlrd zstandard; then
+          echo "✗ Failed to inject plugin dependencies into pipx visidata."
+          read '?Press Return to close this installer...'
+          exit 1
+        fi
         echo ""
 
         # ── Verification ──
+        if ! command -v vd >/dev/null 2>&1; then
+          echo "✗ Setup finished but vd is still not on PATH."
+          echo "  Run 'pipx ensurepath', reopen Terminal, then retry."
+          read '?Press Return to close this installer...'
+          exit 1
+        fi
+
+        if ! vd --version >/dev/null 2>&1; then
+          echo "✗ Found vd, but version check failed."
+          read '?Press Return to close this installer...'
+          exit 1
+        fi
+
         echo "================================"
         echo "Verification:"
-        echo "  vd path:    $(command -v vd || echo 'not found')"
-        echo "  vd version: $(vd --version 2>/dev/null || echo 'unknown')"
+        echo "  vd path:    $(command -v vd)"
+        echo "  vd version: $(vd --version 2>/dev/null)"
         echo ""
         echo "✓ Setup complete. Return to iData and reopen your file."
         echo "  If iData does not detect vd, use Auto Detect in Preferences."
@@ -1343,8 +1527,58 @@ final class AppModel: ObservableObject {
             .map { String($0).lowercased() } ?? ""
     }
 
+    static func fileSizeInBytes(for url: URL) -> Int64? {
+        let values = try? url.resourceValues(forKeys: [.fileSizeKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey])
+        if let size = values?.fileSize {
+            return Int64(size)
+        }
+        if let size = values?.totalFileAllocatedSize {
+            return Int64(size)
+        }
+        if let size = values?.fileAllocatedSize {
+            return Int64(size)
+        }
+        return nil
+    }
+
     static func canSetAssociationExtensionInput(_ rawInput: String) -> Bool {
         !associationExtension(for: rawInput).isEmpty
+    }
+
+    static func lookupExtension(for url: URL) -> String {
+        let fileName = url.lastPathComponent.lowercased()
+        guard !fileName.isEmpty else {
+            return associationExtension(for: url.pathExtension)
+        }
+
+        let formatsBySpecificity = supportedFormats.sorted { lhs, rhs in
+            lhs.fileExtension.count > rhs.fileExtension.count
+        }
+
+        for format in formatsBySpecificity {
+            let suffix = ".\(format.fileExtension.lowercased())"
+            if fileName.hasSuffix(suffix) {
+                return associationExtension(for: format.fileExtension)
+            }
+        }
+
+        return associationExtension(for: url.pathExtension)
+    }
+
+    @MainActor
+    static func resolveAlternateApplication(
+        for _: URL,
+        lookupExtension: String,
+        storedPreviousDefaults: [String: DefaultApplicationHandler]
+    ) -> DefaultApplicationHandler? {
+        guard !lookupExtension.isEmpty else {
+            return nil
+        }
+
+        return preferredRestoreApplication(
+            storedPreviousDefault: storedPreviousDefaults[lookupExtension],
+            fallbackCandidates: FileTypeAssociation.alternativeApplicationCandidates(forExtension: lookupExtension)
+        )
     }
 
     private func updateAssociationStatus(forLookupExtension lookupExtension: String, isDefault: Bool) {
@@ -1469,10 +1703,41 @@ struct DefaultApplicationHandler: Equatable, Sendable {
     let displayName: String
 }
 
+@MainActor
+func restoreApplicationCandidates(
+    storedPreviousDefault: DefaultApplicationHandler?,
+    fallbackCandidates: [DefaultApplicationHandler] = []
+) -> [DefaultApplicationHandler] {
+    var candidates: [DefaultApplicationHandler] = []
+    var seenBundleIdentifiers: Set<String> = []
+
+    if
+        let storedPreviousDefault,
+        !FileTypeAssociation.isIDataBundleIdentifier(storedPreviousDefault.bundleIdentifier)
+    {
+        candidates.append(storedPreviousDefault)
+        seenBundleIdentifiers.insert(storedPreviousDefault.bundleIdentifier)
+    }
+
+    for fallback in fallbackCandidates where !FileTypeAssociation.isIDataBundleIdentifier(fallback.bundleIdentifier) {
+        guard seenBundleIdentifiers.insert(fallback.bundleIdentifier).inserted else {
+            continue
+        }
+        candidates.append(fallback)
+    }
+
+    return candidates
+}
+
+@MainActor
 func preferredRestoreApplication(
-    storedPreviousDefault: DefaultApplicationHandler?
+    storedPreviousDefault: DefaultApplicationHandler?,
+    fallbackCandidates: [DefaultApplicationHandler] = []
 ) -> DefaultApplicationHandler? {
-    storedPreviousDefault
+    restoreApplicationCandidates(
+        storedPreviousDefault: storedPreviousDefault,
+        fallbackCandidates: fallbackCandidates
+    ).first
 }
 
 @MainActor
@@ -1627,6 +1892,40 @@ private enum FileTypeAssociation {
         }
 
         return applicationHandler(for: defaultAppURL)
+    }
+
+    static func alternativeApplicationCandidates(forExtension fileExtension: String) -> [DefaultApplicationHandler] {
+        guard let contentType = contentType(forExtension: fileExtension) else {
+            return []
+        }
+
+        var candidates: [DefaultApplicationHandler] = []
+        var seenBundleIdentifiers: Set<String> = []
+
+        for appURL in NSWorkspace.shared.urlsForApplications(toOpen: contentType) {
+            guard let handler = applicationHandler(for: appURL) else {
+                continue
+            }
+            guard !isIDataBundleIdentifier(handler.bundleIdentifier) else {
+                continue
+            }
+            guard seenBundleIdentifiers.insert(handler.bundleIdentifier).inserted else {
+                continue
+            }
+            candidates.append(handler)
+        }
+
+        if
+            candidates.isEmpty,
+            contentType.conforms(to: .plainText),
+            let textEditURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit"),
+            let textEdit = applicationHandler(for: textEditURL),
+            !isIDataBundleIdentifier(textEdit.bundleIdentifier)
+        {
+            candidates.append(textEdit)
+        }
+
+        return candidates
     }
 
     static func setIDataAsDefaultApp(forExtension fileExtension: String) async -> FileTypeAssociationSetResult {

@@ -110,6 +110,78 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func embeddedTerminalViewDoesNotObserveInputSourceChanges() throws {
+        let source = try embeddedTerminalViewSource()
+
+        #expect(!source.contains("Carbon.HIToolbox"))
+        #expect(!source.contains("kTISNotifySelectedKeyboardInputSourceChanged"))
+        #expect(!source.contains("handleInputSourceDidChange"))
+    }
+
+    @Test
+    func terminalHTMLAvoidsViewportAndIMEForcedResizeStorms() throws {
+        let html = try terminalHTML()
+
+        #expect(!html.contains("window.visualViewport.addEventListener"))
+        #expect(!html.contains("terminalRoot.addEventListener('compositionstart'"))
+        #expect(!html.contains("terminalRoot.addEventListener('compositionend'"))
+        #expect(!html.contains("resizeObserver.observe(terminalMount);"))
+    }
+
+    @Test
+    func terminalHTMLUsesBoundedLayoutPassBudget() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("let layoutPassBudgetRemaining = 0;"))
+        #expect(html.contains("let deferredMeasureBudgetRemaining = 0;"))
+        #expect(!html.contains("layoutRetryDeadline"))
+        #expect(!html.contains("layoutStablePassesRemaining"))
+        #expect(!html.contains("readyRetryHandle"))
+        #expect(!html.contains("readyProbeFrameBudget"))
+        #expect(!html.contains("notifyReadyWhenSized"))
+        #expect(!html.contains("layoutPassBudgetRemaining < 2"))
+        #expect(html.contains("deferredMeasureHandle = setTimeout(retryDeferredMeasurement, 250);"))
+        #expect(html.contains("deferredMeasureBudgetRemaining = Math.max(deferredMeasureBudgetRemaining, 8);"))
+        #expect(html.contains("window.iDataRefreshLayout = function() {\n      lastSentSize = null;"))
+    }
+
+    @Test
+    func terminalHTMLRecoversFromDelayedTerminalMetrics() async throws {
+        let harness = try TerminalHTMLHarness(initialCellWidth: 0, initialCellHeight: 0)
+        try await harness.load()
+        try await harness.clearMessages()
+
+        try await Task.sleep(for: .milliseconds(950))
+        try await harness.setCellMetrics(width: 8, height: 18)
+        try await Task.sleep(for: .milliseconds(450))
+
+        let messages = try await harness.messages()
+        let sawResize = messages.contains { message in
+            message.type == "resize" && message.cols != nil && message.rows != nil
+        }
+        let sawReady = messages.contains { $0.type == "ready" }
+        #expect(sawResize)
+        #expect(sawReady)
+    }
+
+    @Test
+    func terminalHTMLRefreshLayoutRepostsResizeForSameGeometry() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(300))
+        try await harness.clearMessages()
+
+        _ = try await harness.evaluate("window.iDataRefreshLayout();")
+        try await Task.sleep(for: .milliseconds(250))
+
+        let messages = try await harness.messages()
+        let resizeMessages = messages.filter { $0.type == "resize" }
+        #expect(resizeMessages.count == 1)
+        #expect(resizeMessages.first?.cols != nil)
+        #expect(resizeMessages.first?.rows != nil)
+    }
+
+    @Test
     func terminalHTMLResetsViewportStateWhenClearingTerminal() throws {
         let html = try terminalHTML()
 
@@ -174,4 +246,196 @@ private func terminalHTML(filePath: StaticString = #filePath) throws -> String {
         .deletingLastPathComponent()
     let htmlURL = repositoryRoot.appendingPathComponent("iDataApp/Resources/TerminalAssets/terminal.html")
     return try String(contentsOf: htmlURL, encoding: .utf8)
+}
+
+private func embeddedTerminalViewSource(filePath: StaticString = #filePath) throws -> String {
+    let fileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = fileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourceURL = repositoryRoot.appendingPathComponent("Sources/iData/EmbeddedTerminalView.swift")
+    return try String(contentsOf: sourceURL, encoding: .utf8)
+}
+
+private struct TerminalMessage: Decodable {
+    let type: String
+    let cols: Int?
+    let rows: Int?
+}
+
+@MainActor
+private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
+    private let webView: WKWebView
+    private let html: String
+    private var navigationContinuation: CheckedContinuation<Void, Error>?
+
+    init(
+        initialCellWidth: Int = 8,
+        initialCellHeight: Int = 18,
+        filePath: StaticString = #filePath
+    ) throws {
+        let baseHTML = try terminalHTML(filePath: filePath)
+        let stub = """
+        <script>
+          window.__terminalHarness = {
+            cellWidth: \(initialCellWidth),
+            cellHeight: \(initialCellHeight),
+            rectWidth: 960,
+            rectHeight: 640,
+            messages: [],
+            observers: []
+          };
+          window.webkit = {
+            messageHandlers: {
+              idata: {
+                postMessage(message) {
+                  window.__terminalHarness.messages.push(message);
+                }
+              }
+            }
+          };
+          window.ResizeObserver = class {
+            constructor(callback) {
+              this.callback = callback;
+              this.disconnected = false;
+              window.__terminalHarness.observers.push(this);
+            }
+            observe(element) {
+              this.element = element;
+            }
+            disconnect() {
+              this.disconnected = true;
+            }
+            __fire() {
+              if (!this.disconnected) {
+                this.callback([{ target: this.element }]);
+              }
+            }
+          };
+          const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+          HTMLElement.prototype.getBoundingClientRect = function() {
+            if (this.id === 'terminal' || this.id === 'terminal-mount' || this.classList.contains('xterm')) {
+              const width = window.__terminalHarness.rectWidth;
+              const height = window.__terminalHarness.rectHeight;
+              return { x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height, toJSON() { return this; } };
+            }
+            return originalGetBoundingClientRect.call(this);
+          };
+          window.Terminal = class {
+            constructor(options) {
+              this.options = {
+                ...options,
+                scrollbar: { showScrollbar: true, width: 14 }
+              };
+              this.cols = 0;
+              this.rows = 0;
+              this._disposables = [];
+            }
+            get dimensions() {
+              const width = window.__terminalHarness.cellWidth;
+              const height = window.__terminalHarness.cellHeight;
+              if (!width || !height) {
+                return null;
+              }
+              return { css: { cell: { width, height } } };
+            }
+            open(element) {
+              const xtermElement = document.createElement('div');
+              xtermElement.className = 'xterm';
+              xtermElement.style.padding = '0px';
+              element.appendChild(xtermElement);
+              this.element = xtermElement;
+            }
+            onData() {
+              return { dispose() {} };
+            }
+            onBinary() {
+              return { dispose() {} };
+            }
+            focus() {}
+            clearSelection() {}
+            scrollToTop() {}
+            dispose() {}
+            resize(cols, rows) {
+              this.cols = cols;
+              this.rows = rows;
+            }
+            write() {}
+          };
+          window.__setCellMetrics = function(width, height) {
+            window.__terminalHarness.cellWidth = width;
+            window.__terminalHarness.cellHeight = height;
+          };
+          window.__clearMessages = function() {
+            window.__terminalHarness.messages = [];
+          };
+          window.__messagesJSON = function() {
+            return JSON.stringify(window.__terminalHarness.messages);
+          };
+        </script>
+        """
+        self.html = baseHTML.replacingOccurrences(of: "<script src=\"xterm.js\"></script>", with: stub)
+
+        let configuration = WKWebViewConfiguration()
+        self.webView = WKWebView(frame: .init(x: 0, y: 0, width: 960, height: 640), configuration: configuration)
+        super.init()
+        self.webView.navigationDelegate = self
+    }
+
+    func load() async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            navigationContinuation = continuation
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        navigationContinuation?.resume(returning: ())
+        navigationContinuation = nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFail navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        navigationContinuation?.resume(throwing: error)
+        navigationContinuation = nil
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        navigationContinuation?.resume(throwing: error)
+        navigationContinuation = nil
+    }
+
+    func setCellMetrics(width: Int, height: Int) async throws {
+        _ = try await evaluate("window.__setCellMetrics(\(width), \(height));")
+    }
+
+    func clearMessages() async throws {
+        _ = try await evaluate("window.__clearMessages();")
+    }
+
+    func messages() async throws -> [TerminalMessage] {
+        let json = try await evaluate("window.__messagesJSON();")
+        let data = Data(json.utf8)
+        return try JSONDecoder().decode([TerminalMessage].self, from: data)
+    }
+
+    func evaluate(_ script: String) async throws -> String {
+        try await withCheckedThrowingContinuation { continuation in
+            webView.evaluateJavaScript(script) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: result as? String ?? "")
+            }
+        }
+    }
 }

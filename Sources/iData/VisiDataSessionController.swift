@@ -12,6 +12,99 @@ protocol TerminalDisplaySink: AnyObject {
     func focusTerminalDisplay()
 }
 
+enum PTYWriteOutcome: Equatable {
+    case completed
+    case descriptorUnavailable
+    case retryBudgetExceeded
+    case failed(errno: Int32)
+}
+
+struct PTYWriteDriver {
+    typealias WriteCall = (_ fileDescriptor: Int32, _ buffer: UnsafeRawPointer, _ count: Int) -> Int
+    typealias SleepCall = (_ microseconds: useconds_t) -> Void
+
+    let maxBackoffRetries: Int
+    let backoffMicros: useconds_t
+    let writeCall: WriteCall
+    let sleepCall: SleepCall
+
+    init(
+        maxBackoffRetries: Int = 200,
+        backoffMicros: useconds_t = 2_000,
+        writeCall: @escaping WriteCall = { fileDescriptor, buffer, count in
+            Darwin.write(fileDescriptor, buffer, count)
+        },
+        sleepCall: @escaping SleepCall = { microseconds in
+            Darwin.usleep(microseconds)
+        }
+    ) {
+        self.maxBackoffRetries = maxBackoffRetries
+        self.backoffMicros = backoffMicros
+        self.writeCall = writeCall
+        self.sleepCall = sleepCall
+    }
+
+    func writeAll(
+        data: Data,
+        fileDescriptorProvider: () -> Int32
+    ) -> PTYWriteOutcome {
+        guard !data.isEmpty else {
+            return .completed
+        }
+
+        var totalWritten = 0
+        var transientRetryCount = 0
+
+        return data.withUnsafeBytes { buffer in
+            guard let baseAddress = buffer.baseAddress else {
+                return .completed
+            }
+
+            while totalWritten < data.count {
+                let fileDescriptor = fileDescriptorProvider()
+                guard fileDescriptor >= 0 else {
+                    return .descriptorUnavailable
+                }
+
+                let writeResult = writeCall(
+                    fileDescriptor,
+                    baseAddress.advanced(by: totalWritten),
+                    data.count - totalWritten
+                )
+
+                if writeResult > 0 {
+                    totalWritten += writeResult
+                    transientRetryCount = 0
+                    continue
+                }
+
+                if writeResult == 0 {
+                    return .failed(errno: 0)
+                }
+
+                let writeErrno = errno
+
+                if writeErrno == EINTR {
+                    continue
+                }
+
+                if writeErrno == EAGAIN || writeErrno == EWOULDBLOCK {
+                    transientRetryCount += 1
+                    if transientRetryCount > maxBackoffRetries {
+                        return .retryBudgetExceeded
+                    }
+                    sleepCall(backoffMicros)
+                    continue
+                }
+
+                return .failed(errno: writeErrno)
+            }
+
+            return .completed
+        }
+    }
+}
+
 final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     @Published private(set) var currentFileURL: URL?
     @Published private(set) var isRunning = false
@@ -20,6 +113,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     private let preflight = VisiDataLaunchPrereflight()
     private let ioQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session")
+    private let writeQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session.write")
+    private let ptyWriteDriver = PTYWriteDriver()
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
     private var transcript = TerminalTranscript()
@@ -104,7 +199,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
-        writeToPTY(data)
+        enqueuePTYWrite(data)
     }
 
     @MainActor
@@ -113,7 +208,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
-        writeToPTY(data)
+        enqueuePTYWrite(data)
     }
 
     @MainActor
@@ -373,29 +468,13 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         displaySink?.focusTerminalDisplay()
     }
 
-    private func writeToPTY(_ data: Data) {
-        guard masterFileDescriptor >= 0 else {
-            return
-        }
-
-        data.withUnsafeBytes { buffer in
-            guard let baseAddress = buffer.baseAddress else {
+    private func enqueuePTYWrite(_ data: Data) {
+        writeQueue.async { [weak self] in
+            guard let self else {
                 return
             }
-
-            var totalWritten = 0
-            while totalWritten < data.count {
-                let bytesWritten = Darwin.write(
-                    masterFileDescriptor,
-                    baseAddress.advanced(by: totalWritten),
-                    data.count - totalWritten
-                )
-
-                if bytesWritten <= 0 {
-                    return
-                }
-
-                totalWritten += bytesWritten
+            _ = self.ptyWriteDriver.writeAll(data: data) { [weak self] in
+                self?.masterFileDescriptor ?? -1
             }
         }
     }

@@ -113,7 +113,10 @@ install_visidata() {
 
   if command -v brew >/dev/null 2>&1; then
     echo "Using Homebrew to install/upgrade VisiData..."
-    brew install visidata || brew upgrade visidata || true
+    if ! brew install visidata && ! brew upgrade visidata; then
+      echo "Failed to install or upgrade VisiData with Homebrew."
+      return 1
+    fi
   else
     if ! command -v pipx >/dev/null 2>&1; then
       if command -v python3 >/dev/null 2>&1; then
@@ -128,31 +131,57 @@ install_visidata() {
     fi
 
     echo "Using pipx to install/upgrade VisiData..."
-    pipx install visidata || pipx upgrade visidata || true
+    if ! pipx install visidata && ! pipx upgrade visidata; then
+      echo "Failed to install or upgrade VisiData with pipx."
+      return 1
+    fi
   fi
 
   if command -v pipx >/dev/null 2>&1; then
     echo "Injecting common workbook and compression packages into the visidata pipx environment..."
-    pipx inject visidata openpyxl pyxlsb xlrd zstandard || true
+    if ! pipx inject visidata openpyxl pyxlsb xlrd zstandard; then
+      echo "Failed to inject workbook/compression dependencies into pipx visidata."
+      return 1
+    fi
   fi
 
   echo ""
   echo "Verification:"
-  command -v vd || true
-  vd --version || true
+  if ! command -v vd >/dev/null 2>&1; then
+    echo "vd is still missing on PATH after setup."
+    return 1
+  fi
+  command -v vd
+  if ! vd --version; then
+    echo "vd is present but version check failed."
+    return 1
+  fi
+
+  return 0
 }
 
 refresh_detection
 print_status
 
 if [[ "$AUTO_INSTALL" -eq 1 ]]; then
-  install_visidata || true
+  if install_visidata; then
+    setup_status="completed successfully"
+  else
+    setup_status="failed"
+  fi
   refresh_detection
   echo ""
-  echo "Setup flow completed."
-  echo "If vd is still not detected in iData, click Auto Detect in Preferences."
+  echo "Setup flow $setup_status."
+  if [[ -n "$VD_BIN" ]]; then
+    echo "If iData still cannot detect vd, click Auto Detect in Preferences."
+  else
+    echo "vd is still missing. Resolve the error above, then run this helper again."
+  fi
   read '?Press Return to close this helper...'
-  exit 0
+  if [[ -n "$VD_BIN" ]]; then
+    exit 0
+  fi
+  exit 1
 fi
 
 echo ""
@@ -165,10 +194,19 @@ read '?Choose an action (I/G/Q): ' action
 
 case "${action:u}" in
   I)
-    install_visidata || true
+    if install_visidata; then
+      setup_status="completed successfully"
+    else
+      setup_status="failed"
+    fi
     refresh_detection
     echo ""
-    echo "If vd is still not detected in iData, click Auto Detect in Preferences."
+    echo "Setup flow $setup_status."
+    if [[ -n "$VD_BIN" ]]; then
+      echo "If iData still cannot detect vd, click Auto Detect in Preferences."
+    else
+      echo "vd is still missing. Resolve the error above, then run this helper again."
+    fi
     read '?Press Return to close this helper...'
     ;;
   G)

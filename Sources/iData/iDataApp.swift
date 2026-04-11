@@ -4,17 +4,29 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingOpenURLs: [URL] = []
-    private var openHandler: (([URL]) -> Void)?
+    private var openHandler: (([URL]) -> ExternalOpenPresentationDecision)?
     private var terminateHandler: (() -> Void)?
+    private let appActivator: @MainActor () -> Void
+
+    override init() {
+        self.appActivator = {
+            NSApplication.shared.activate(ignoringOtherApps: true)
+            NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
+        }
+        super.init()
+    }
+
+    init(appActivator: @escaping @MainActor () -> Void) {
+        self.appActivator = appActivator
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
     }
 
     func bind(
-        openHandler: @escaping ([URL]) -> Void,
+        openHandler: @escaping ([URL]) -> ExternalOpenPresentationDecision,
         terminateHandler: @escaping () -> Void
     ) {
         self.openHandler = openHandler
@@ -27,9 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let queuedURLs = pendingOpenURLs
         pendingOpenURLs.removeAll()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            NSApplication.shared.activate(ignoringOtherApps: true)
-            NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
-            openHandler(queuedURLs)
+            let presentationDecision = openHandler(queuedURLs)
+            if presentationDecision == .activateApp {
+                self.activateAppWindow()
+            }
         }
     }
 
@@ -57,13 +70,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        NSApplication.shared.activate(ignoringOtherApps: true)
-        NSApplication.shared.windows.first?.makeKeyAndOrderFront(nil)
         if let openHandler {
-            openHandler(fileURLs)
+            let presentationDecision = openHandler(fileURLs)
+            if presentationDecision == .activateApp {
+                activateAppWindow()
+            }
         } else {
             pendingOpenURLs.append(contentsOf: fileURLs)
         }
+    }
+
+    private func activateAppWindow() {
+        appActivator()
     }
 }
 
@@ -79,7 +97,7 @@ struct IDataApp: App {
                 .onAppear {
                     appDelegate.bind(
                         openHandler: { urls in
-                            model.openExternalFiles(urls)
+                            model.handleExternalFileOpen(urls)
                         },
                         terminateHandler: {
                             model.shutdown()

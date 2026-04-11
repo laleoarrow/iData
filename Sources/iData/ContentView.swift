@@ -1106,7 +1106,7 @@ private struct TutorialHubView: View {
                     Text(isChinese ? "教程清单" : "Tutorial Checklist")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text(isChinese ? "选择一个章节开始练习。完成的章节会自动打勾。" : "Choose a chapter to practice. Completed chapters are checked automatically.")
+                    Text(isChinese ? "选择一个章节开始练习。每次开始都会从第 1 步进入，完成的章节会自动打勾。" : "Choose a chapter to practice. Each launch starts from Step 1, and completed chapters remain checked.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1275,10 +1275,27 @@ private struct WelcomeDetailView: View {
             ?? model.checkFormatAssociation(forExtension: normalizedCustomAssociationExtension)
     }
 
+    private var customAssociationActionTitle: String {
+        if isCustomAssociationDefault {
+            return localizedText(isChinese, english: "Restore Previous Default", chinese: "恢复之前默认应用")
+        }
+        return localizedText(isChinese, english: "Set Default to iData", chinese: "设为 iData 默认打开")
+    }
+
+    private var customAssociationActionIcon: String {
+        isCustomAssociationDefault ? "arrow.uturn.backward.circle.fill" : "checkmark.circle.fill"
+    }
+
+    private var displayedFormatExtensions: [String] {
+        AppModel.formatPanelFormats.map(\.fileExtension)
+    }
+
     private var orderedSupportedFormats: [(format: AppModel.SupportedFormat, isDefault: Bool)] {
-        let snapshot = AppModel.supportedFormats.enumerated().map { index, format in
-            let isDefault = model.formatAssociationStatus[format.fileExtension]
-                ?? model.checkFormatAssociation(forExtension: format.fileExtension)
+        let snapshot = AppModel.formatPanelFormats.enumerated().map { index, format in
+            let lookupExtension = AppModel.associationExtension(for: format.fileExtension)
+            let isDefault = model.formatAssociationStatus[lookupExtension]
+                ?? model.formatAssociationStatus[format.fileExtension]
+                ?? false
             return (index: index, format: format, isDefault: isDefault)
         }
 
@@ -1290,6 +1307,10 @@ private struct WelcomeDetailView: View {
                 return lhs.index < rhs.index
             }
             .map { (format: $0.format, isDefault: $0.isDefault) }
+    }
+
+    private func refreshDisplayedFormatAssociationStatus() {
+        model.refreshFormatAssociationStatuses(forExtensions: displayedFormatExtensions)
     }
 
     private let repositoryURL = URL(string: "https://github.com/laleoarrow/iData")!
@@ -1616,16 +1637,16 @@ private struct WelcomeDetailView: View {
 
             Text(localizedText(
                 isChinese,
-                english: "These are common examples. iData now forwards most regular files directly to VisiData and only special-cases gzip-like compression.",
-                chinese: "下面列的是常见示例。iData 现在会把大多数常规文件直接转交给 VisiData，只对 gzip 一类压缩文件做少量特殊处理。"
+                english: "A concise set of common formats is shown below. iData still forwards most regular files directly to VisiData.",
+                chinese: "下面仅展示常见格式的精简集合。iData 仍会把大多数常规文件直接转交给 VisiData。"
             ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             Text(localizedText(
                 isChinese,
-                english: "Tip: click once to set iData as default; click again to restore the previous default app.",
-                chinese: "提示：点一次可把 iData 设为默认应用；再次点击会恢复到之前的默认应用。"
+                english: "Tap a chip to toggle default handling: set iData, then tap again to restore another app.",
+                chinese: "点击格式卡片可切换默认处理：先设为 iData，再点一次恢复到其他应用。"
             ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1666,7 +1687,7 @@ private struct WelcomeDetailView: View {
                     Button {
                         model.setFormatAsDefault(forExtension: customAssociationInput)
                     } label: {
-                        Label(localizedText(isChinese, english: "Set Default to iData", chinese: "设为 iData 默认打开"), systemImage: "checkmark.circle.fill")
+                        Label(customAssociationActionTitle, systemImage: customAssociationActionIcon)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canSubmitCustomAssociation)
@@ -1715,6 +1736,18 @@ private struct WelcomeDetailView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
         )
+        .onAppear {
+            refreshDisplayedFormatAssociationStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshDisplayedFormatAssociationStatus()
+        }
+        .onChange(of: normalizedCustomAssociationExtension) { _, newValue in
+            guard !newValue.isEmpty else {
+                return
+            }
+            model.refreshFormatAssociationStatuses(forExtensions: [newValue])
+        }
     }
 }
 
