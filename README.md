@@ -8,7 +8,7 @@
     <img src="https://img.shields.io/badge/BREW%20TEST--BOT-PASSING-FBB040?style=for-the-badge&logo=homebrew&logoColor=black" alt="Brew Test-Bot Passing" />
   </a>
   <a href="https://github.com/laleoarrow/iData/releases">
-    <img src="https://img.shields.io/badge/RELEASE-V0.1.10-1565c0?style=for-the-badge&logo=github&logoColor=white" alt="Release V0.1.10" />
+    <img src="https://img.shields.io/badge/RELEASE-V0.2.0-1565c0?style=for-the-badge&logo=github&logoColor=white" alt="Release V0.2.0" />
   </a>
   <a href="https://github.com/laleoarrow/iData">
     <img src="https://img.shields.io/badge/PLATFORM-macOS%2014%2B-111111?style=for-the-badge&logo=apple&logoColor=white" alt="Platform macOS 14+" />
@@ -105,12 +105,12 @@ Build the app bundle:
 Package a GitHub release asset:
 
 ```bash
-./scripts/package_release.sh 0.1.10
+./scripts/package_release.sh 0.2.0
 ```
 
 Install locally:
 
 - Copy `dist/iData.app` into `/Applications`
 - Quit any other running `iData` instance before testing the release build
-- Open `dist/iData-v0.1.10-macos-universal.dmg` if you want the drag-to-Applications installer view
-- Or run `dist/iData-v0.1.10-macos-universal.pkg` for the installer package flow
+- Open `dist/iData-v0.2.0-macos-universal.dmg` if you want the drag-to-Applications installer view
+- Or run `dist/iData-v0.2.0-macos-universal.pkg` for the installer package flow

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
-VERSION=${1:-0.1.11}
+VERSION=${1:-0.2.0}
 APP_DIR="$ROOT_DIR/dist/iData.app"
 PKG_NAME="iData-v${VERSION}-macos-universal.pkg"
 FINAL_PKG="$ROOT_DIR/dist/$PKG_NAME"
