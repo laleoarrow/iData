@@ -114,7 +114,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let preflight = VisiDataLaunchPrereflight()
     private let ioQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session")
     private let writeQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session.write")
-    private let ptyWriteDriver = PTYWriteDriver()
+    private let ptyWriteDriver: PTYWriteDriver
+    private let signalSender: (_ pid: pid_t, _ signal: Int32) -> Int32
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
     private var transcript = TerminalTranscript()
@@ -129,6 +130,18 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var readSource: DispatchSourceRead?
     private var processSource: DispatchSourceProcess?
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
+    private var outputGeneration: UInt64 = 0
+
+    init(
+        ptyWriteDriver: PTYWriteDriver = PTYWriteDriver(),
+        signalSender: @escaping (_ pid: pid_t, _ signal: Int32) -> Int32 = { pid, signal in
+            Darwin.kill(pid, signal)
+        }
+    ) {
+        self.ptyWriteDriver = ptyWriteDriver
+        self.signalSender = signalSender
+    }
+
     deinit {
         stopCurrentProcessIfNeeded(reapSynchronously: true)
     }
@@ -170,6 +183,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         )
         transcript.reset()
         requiresDisplayReset = true
+        outputGeneration &+= 1
 
         if isDisplayReady {
             displaySink?.clearTerminalDisplay()
@@ -180,7 +194,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             visidataExecutable: vdURL,
             fileURL: fileURL,
             cols: lastKnownSize.cols,
-            rows: lastKnownSize.rows
+            rows: lastKnownSize.rows,
+            generation: outputGeneration
         )
 
         isRunning = true
@@ -216,9 +231,15 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         let normalizedCols = UInt16(min(cols, Int(UInt16.max)))
         let normalizedRows = UInt16(min(rows, Int(UInt16.max)))
+        let requestedSize = (normalizedCols, normalizedRows)
+        let sizeChanged = requestedSize != lastKnownSize
         lastKnownSize = (normalizedCols, normalizedRows)
 
         guard masterFileDescriptor >= 0 else {
+            return
+        }
+
+        guard sizeChanged else {
             return
         }
 
@@ -232,7 +253,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         _ = ioctl(masterFileDescriptor, TIOCSWINSZ, &windowSize)
 
         if childPID > 0 {
-            kill(childPID, SIGWINCH)
+            _ = signalSender(childPID, SIGWINCH)
         }
     }
 
@@ -250,7 +271,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         visidataExecutable: URL,
         fileURL: URL,
         cols: UInt16,
-        rows: UInt16
+        rows: UInt16,
+        generation: UInt64
     ) throws {
         var master: Int32 = -1
         var slave: Int32 = -1
@@ -347,42 +369,42 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         close(slave)
         masterFileDescriptor = master
         childPID = pid
-        configureReadSource(for: master)
-        configureProcessSource(for: pid)
+        configureReadSource(for: master, generation: generation)
+        configureProcessSource(for: pid, generation: generation)
     }
 
-    private func configureReadSource(for fileDescriptor: Int32) {
+    private func configureReadSource(for fileDescriptor: Int32, generation: UInt64) {
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: ioQueue)
         source.setEventHandler { [weak self] in
-            self?.drainOutput()
+            self?.drainOutput(from: fileDescriptor, generation: generation)
         }
         source.resume()
         readSource = source
     }
 
-    private func configureProcessSource(for pid: pid_t) {
+    private func configureProcessSource(for pid: pid_t, generation: UInt64) {
         let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: ioQueue)
         source.setEventHandler { [weak self] in
-            self?.handleProcessExit()
+            self?.handleProcessExit(pid: pid, generation: generation)
         }
         source.resume()
         processSource = source
     }
 
-    private func drainOutput() {
-        guard masterFileDescriptor >= 0 else {
+    private func drainOutput(from fileDescriptor: Int32, generation: UInt64) {
+        guard fileDescriptor >= 0 else {
             return
         }
 
         var buffer = [UInt8](repeating: 0, count: 4096)
 
         while true {
-            let bytesRead = Darwin.read(masterFileDescriptor, &buffer, buffer.count)
+            let bytesRead = Darwin.read(fileDescriptor, &buffer, buffer.count)
 
             if bytesRead > 0 {
                 let data = Data(buffer.prefix(bytesRead))
                 Task { @MainActor [weak self] in
-                    self?.enqueueOutput(data)
+                    self?.enqueueOutput(data, generation: generation)
                 }
                 continue
             }
@@ -400,7 +422,11 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor
-    private func enqueueOutput(_ data: Data) {
+    private func enqueueOutput(_ data: Data, generation: UInt64) {
+        guard generation == outputGeneration else {
+            return
+        }
+
         transcript.append(data)
 
         if isDisplayReady {
@@ -414,7 +440,12 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     func appendOutputForTesting(_ data: Data) {
-        enqueueOutput(data)
+        enqueueOutput(data, generation: outputGeneration)
+    }
+
+    @MainActor
+    func appendOutputForTesting(_ data: Data, generation: UInt64) {
+        enqueueOutput(data, generation: generation)
     }
 
     @MainActor
@@ -442,14 +473,14 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
     }
 
-    private func handleProcessExit() {
-        guard childPID > 0 else {
+    private func handleProcessExit(pid: pid_t, generation: UInt64) {
+        var exitStatus: Int32 = 0
+        let exitedPID = waitpid(pid, &exitStatus, 0)
+        guard exitedPID == pid else {
             return
         }
 
-        var exitStatus: Int32 = 0
-        let exitedPID = waitpid(childPID, &exitStatus, 0)
-        guard exitedPID == childPID else {
+        guard generation == outputGeneration else {
             return
         }
 
@@ -507,6 +538,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     private func stopCurrentProcessIfNeeded(reapSynchronously: Bool) {
         let pid = childPID
+        outputGeneration &+= 1
 
         if pid > 0 {
             processSource?.cancel()
@@ -622,6 +654,11 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         environment["COLORTERM"] = "truecolor"
         environment["TERM_PROGRAM"] = "iData"
         return environment
+    }
+
+    @MainActor
+    var outputGenerationForTesting: UInt64 {
+        outputGeneration
     }
 }
 

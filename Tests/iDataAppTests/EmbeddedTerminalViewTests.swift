@@ -130,6 +130,14 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLDisablesBrowserScrollbackForVisiData() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("scrollback: 0,"))
+        #expect(html.contains("scrollbar: {\n          showScrollbar: false\n        },"))
+    }
+
+    @Test
     func terminalHTMLForcesResizeWhenFocusReenters() throws {
         let html = try terminalHTML()
 

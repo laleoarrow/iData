@@ -11,12 +11,21 @@ on:
 
 jobs:
   build:
-
     runs-on: macos-latest
+    permissions:
+      contents: read
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: swift build -v
-    - name: Run tests
-      run: swift test -v
+      - uses: actions/checkout@v5
+
+      - name: SwiftPM build
+        run: swift build -v
+
+      - name: SwiftPM tests
+        run: swift test -v
+
+      - name: Xcode Debug build
+        run: xcodebuild -project iData.xcodeproj -scheme iDataApp -configuration Debug -derivedDataPath .build/xcode-debug build
+
+      - name: Build installable app bundle
+        run: ./scripts/build_app.sh

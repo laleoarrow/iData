@@ -132,6 +132,11 @@ struct PreferencesView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                Text(isChinese ? "仅影响 Finder / 系统把文件交给 iData 的外部打开流程；不会改变你在 iData 内点“打开…”时的行为。" : "This only affects files handed to iData by Finder or other system open events. It does not change what happens when you click Open inside iData.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 VStack(alignment: .leading, spacing: 6) {
                     Text(isChinese ? "当前外部应用" : "Current external app")
                         .font(.subheadline.weight(.semibold))

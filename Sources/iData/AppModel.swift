@@ -1014,9 +1014,12 @@ final class AppModel: ObservableObject {
             fileSize <= Self.largeFileOpenThresholdBytes,
             !Self.compressionSuffixes.contains(lookupExtension)
         {
-            guard let alternateApp = preferredSmallFileApplication
-                ?? alternateApplicationResolver(url, lookupExtension, previousDefaultAppByExtension)
-            else {
+            let candidateApplications = preferredSmallFileApplicationCandidates(
+                for: url,
+                lookupExtension: lookupExtension
+            )
+
+            guard !candidateApplications.isEmpty else {
                 statusMessage = nil
                 errorMessage = localized(
                     english: "Could not find a non-iData app to open \(url.lastPathComponent).",
@@ -1025,18 +1028,27 @@ final class AppModel: ObservableObject {
                 return .presentedError
             }
 
-            guard externalFileOpener.open(url, withApplicationAt: alternateApp.url) else {
-                statusMessage = nil
-                errorMessage = localized(
-                    english: "Could not open \(url.lastPathComponent) with \(alternateApp.displayName).",
-                    chinese: "无法用 \(alternateApp.displayName) 打开 \(url.lastPathComponent)。"
-                )
-                return .presentedError
+            for alternateApp in candidateApplications {
+                guard FileManager.default.fileExists(atPath: alternateApp.url.path) else {
+                    if preferredSmallFileApplication == alternateApp {
+                        preferredSmallFileApplication = nil
+                    }
+                    continue
+                }
+
+                if externalFileOpener.open(url, withApplicationAt: alternateApp.url) {
+                    statusMessage = nil
+                    errorMessage = nil
+                    return .forwardedToAlternateApp(appName: alternateApp.displayName)
+                }
             }
 
             statusMessage = nil
-            errorMessage = nil
-            return .forwardedToAlternateApp(appName: alternateApp.displayName)
+            errorMessage = localized(
+                english: "Could not open \(url.lastPathComponent) with any configured non-iData app.",
+                chinese: "无法使用任何已配置的非 iData 应用打开 \(url.lastPathComponent)。"
+            )
+            return .presentedError
         }
 
         openExternalFile(url)
@@ -1058,11 +1070,9 @@ final class AppModel: ObservableObject {
 
         do {
             let explicitPath = normalizedVDExecutablePath()
-            let session = VisiDataSessionController()
+            let session = activeSession ?? VisiDataSessionController()
             try session.open(fileURL: url, explicitVDPath: explicitPath)
-            let previousSession = activeSession
             activeSession = session
-            previousSession?.terminate()
             lastOpenedFile = url
             performAnimatedMutation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
                 recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
@@ -1670,6 +1680,29 @@ final class AppModel: ObservableObject {
     private func rememberPreviousDefaultApp(_ handler: DefaultApplicationHandler, forLookupExtension lookupExtension: String) {
         previousDefaultAppByExtension[lookupExtension] = handler
         formatAssociationRestoreStore.save(handler, forLookupExtension: lookupExtension)
+    }
+
+    private func preferredSmallFileApplicationCandidates(for url: URL, lookupExtension: String) -> [DefaultApplicationHandler] {
+        var candidates: [DefaultApplicationHandler] = []
+        var seenBundleIdentifiers: Set<String> = []
+
+        if
+            let preferredSmallFileApplication,
+            !FileTypeAssociation.isIDataBundleIdentifier(preferredSmallFileApplication.bundleIdentifier),
+            seenBundleIdentifiers.insert(preferredSmallFileApplication.bundleIdentifier).inserted
+        {
+            candidates.append(preferredSmallFileApplication)
+        }
+
+        if
+            let fallback = alternateApplicationResolver(url, lookupExtension, previousDefaultAppByExtension),
+            !FileTypeAssociation.isIDataBundleIdentifier(fallback.bundleIdentifier),
+            seenBundleIdentifiers.insert(fallback.bundleIdentifier).inserted
+        {
+            candidates.append(fallback)
+        }
+
+        return candidates
     }
 
     private func forgetPreviousDefaultApp(forLookupExtension lookupExtension: String) {

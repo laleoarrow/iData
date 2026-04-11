@@ -36,13 +36,18 @@ struct AppModelTests {
     func smallSupportedFileForwardsToAlternateApplication() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-small-forward-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         defer {
             defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
         }
 
         let target = URL(fileURLWithPath: "/tmp/small.xlsx")
-        let excel = DefaultApplicationHandler(
-            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+        let excel = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "Microsoft Excel.app",
             bundleIdentifier: "com.microsoft.Excel",
             displayName: "Microsoft Excel"
         )
@@ -65,21 +70,27 @@ struct AppModelTests {
     }
 
     @Test
-    func preferredSmallFileApplicationOverridesResolverForSmallFiles() {
+    func preferredSmallFileApplicationOverridesResolverForSmallFiles() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-small-preferred-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         defer {
             defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
         }
 
         let target = URL(fileURLWithPath: "/tmp/small.csv")
-        let excel = DefaultApplicationHandler(
-            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+        let excel = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "Microsoft Excel.app",
             bundleIdentifier: "com.microsoft.Excel",
             displayName: "Microsoft Excel"
         )
-        let wps = DefaultApplicationHandler(
-            url: URL(fileURLWithPath: "/Applications/WPS Office.app"),
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
             bundleIdentifier: "cn.wps.Office",
             displayName: "WPS Office"
         )
@@ -97,6 +108,46 @@ struct AppModelTests {
 
         #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
         #expect(opener.openedApplicationURL == wps.url)
+    }
+
+    @Test
+    func stalePreferredSmallFileApplicationFallsBackToResolver() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-small-fallback-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let target = URL(fileURLWithPath: "/tmp/small.csv")
+        let staleWPS = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Missing WPS.app"),
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let excel = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "Microsoft Excel.app",
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+        let opener = RecordingExternalFileOpener(failingApplicationURLs: [staleWPS.url])
+
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in excel },
+            fileSizeProvider: { _ in 10 }
+        )
+        model.setPreferredSmallFileApplication(staleWPS)
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "Microsoft Excel"))
+        #expect(opener.openedApplicationURL == excel.url)
     }
 
     @Test
@@ -156,10 +207,18 @@ struct AppModelTests {
     }
 
     @Test
-    func thresholdBoundaryForwardsExactlyOneHundredMiB() {
+    func thresholdBoundaryForwardsExactlyOneHundredMiB() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-threshold-forward-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
         let target = URL(fileURLWithPath: "/tmp/boundary.tsv")
-        let numbers = DefaultApplicationHandler(
-            url: URL(fileURLWithPath: "/Applications/Numbers.app"),
+        let numbers = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "Numbers.app",
             bundleIdentifier: "com.apple.Numbers",
             displayName: "Numbers"
         )
@@ -287,11 +346,19 @@ struct AppModelTests {
     }
 
     @Test
-    func forwardedExternalOpenKeepsAppInBackground() {
+    func forwardedExternalOpenKeepsAppInBackground() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-external-open-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
         let target = URL(fileURLWithPath: "/tmp/background.csv")
         let opener = RecordingExternalFileOpener()
-        let textEdit = DefaultApplicationHandler(
-            url: URL(fileURLWithPath: "/Applications/TextEdit.app"),
+        let textEdit = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "TextEdit.app",
             bundleIdentifier: "com.apple.TextEdit",
             displayName: "TextEdit"
         )
@@ -1161,6 +1228,44 @@ struct AppModelTests {
     }
 
     @Test
+    func switchingFilesReusesSingleSessionController() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-reuse-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let first = tempRoot.appendingPathComponent("first.tsv")
+        let second = tempRoot.appendingPathComponent("second.tsv")
+        try Data("id\tvalue\n1\tA\n".utf8).write(to: first)
+        try Data("id\tvalue\n1\tB\n".utf8).write(to: second)
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        model.openExternalFile(first)
+        let sharedSession = try #require(model.activeSession)
+
+        model.openExternalFile(second)
+
+        #expect(model.activeSession === sharedSession)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == second.standardizedFileURL)
+    }
+
+    @Test
     func tutorialModeEndsCleanlyWhenSwitchingToLargeTable() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1408,10 +1513,18 @@ private final class RecordingExternalFileOpener: ExternalFileOpening {
     private(set) var openedFileURL: URL?
     private(set) var openedApplicationURL: URL?
     var shouldSucceed = true
+    private let failingApplicationURLs: Set<URL>
+
+    init(failingApplicationURLs: Set<URL> = []) {
+        self.failingApplicationURLs = failingApplicationURLs
+    }
 
     func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool {
         openedFileURL = fileURL
         openedApplicationURL = applicationURL
+        if failingApplicationURLs.contains(applicationURL) {
+            return false
+        }
         return shouldSucceed
     }
 }
@@ -1437,6 +1550,21 @@ private func makeLongRunningLauncher(at url: URL, sleepSeconds: Int) throws {
 
     try script.write(to: url, atomically: true, encoding: .utf8)
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+}
+
+private func makeFakeApplicationHandler(
+    in directory: URL,
+    appFolderName: String,
+    bundleIdentifier: String,
+    displayName: String
+) throws -> DefaultApplicationHandler {
+    let appURL = directory.appendingPathComponent(appFolderName, isDirectory: true)
+    try FileManager.default.createDirectory(at: appURL, withIntermediateDirectories: true)
+    return DefaultApplicationHandler(
+        url: appURL,
+        bundleIdentifier: bundleIdentifier,
+        displayName: displayName
+    )
 }
 
 private func writeLargeTSV(to url: URL, rows: Int, prefix: String) throws {
