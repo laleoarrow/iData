@@ -572,7 +572,7 @@ private final class ActualTerminalSnapshotHarness: NSObject, WKNavigationDelegat
     }
 
     private func snapshotWebView(to outputURL: URL) async throws {
-        let image: NSImage = try await withCheckedThrowingContinuation { continuation in
+        let pngData: Data = try await withCheckedThrowingContinuation { continuation in
             let configuration = WKSnapshotConfiguration()
             configuration.rect = webView.bounds
             webView.takeSnapshot(with: configuration) { image, error in
@@ -584,16 +584,16 @@ private final class ActualTerminalSnapshotHarness: NSObject, WKNavigationDelegat
                     continuation.resume(throwing: SnapshotError.missingImage)
                     return
                 }
-                continuation.resume(returning: image)
+                guard
+                    let tiff = image.tiffRepresentation,
+                    let bitmap = NSBitmapImageRep(data: tiff),
+                    let pngData = bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:])
+                else {
+                    continuation.resume(throwing: SnapshotError.missingImageData)
+                    return
+                }
+                continuation.resume(returning: pngData)
             }
-        }
-
-        guard
-            let tiff = image.tiffRepresentation,
-            let bitmap = NSBitmapImageRep(data: tiff),
-            let pngData = bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:])
-        else {
-            throw SnapshotError.missingImageData
         }
 
         try FileManager.default.createDirectory(

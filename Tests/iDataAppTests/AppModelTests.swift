@@ -65,6 +65,41 @@ struct AppModelTests {
     }
 
     @Test
+    func preferredSmallFileApplicationOverridesResolverForSmallFiles() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let target = URL(fileURLWithPath: "/tmp/small.csv")
+        let excel = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+        let wps = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/WPS Office.app"),
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let opener = RecordingExternalFileOpener()
+
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in excel },
+            fileSizeProvider: { _ in 10 }
+        )
+        model.setPreferredSmallFileApplication(wps)
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
+        #expect(opener.openedApplicationURL == wps.url)
+    }
+
+    @Test
     func fileLargerThanThresholdStaysInsideIData() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -203,6 +238,52 @@ struct AppModelTests {
         try handle.write(contentsOf: Data("\n".utf8))
 
         #expect(AppModel.fileSizeInBytes(for: target) == logicalSize)
+    }
+
+    @Test
+    func compressedSmallFileAlwaysStaysInsideIData() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-open-small-gzip-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let target = tempRoot.appendingPathComponent("small.tsv.gz")
+        try Data("ok".utf8).write(to: target)
+
+        let excel = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+        let opener = RecordingExternalFileOpener()
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in excel },
+            fileSizeProvider: { _ in 1024 }
+        )
+        model.vdExecutablePath = launcher.path
+        model.setPreferredSmallFileApplication(excel)
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .openedInIData)
+        #expect(opener.openedFileURL == nil)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
     }
 
     @Test
@@ -818,6 +899,27 @@ struct AppModelTests {
 
         #expect(restoredDescription.contains("csv"))
         #expect(restoredDescription.contains("com.apple.Numbers"))
+    }
+
+    @Test
+    func preferredSmallFileApplicationReloadsFromDefaults() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let wps = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/WPS Office.app"),
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+
+        let model = AppModel(defaults: defaults)
+        model.setPreferredSmallFileApplication(wps)
+
+        let reloadedModel = AppModel(defaults: defaults)
+        #expect(reloadedModel.preferredSmallFileApplication == wps)
     }
 
     @Test

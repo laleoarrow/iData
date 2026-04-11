@@ -118,6 +118,11 @@ final class AppModel: ObservableObject {
             defaults.set(appLanguagePreference.rawValue, forKey: Self.appLanguagePreferenceKey)
         }
     }
+    @Published var preferredSmallFileApplication: DefaultApplicationHandler? {
+        didSet {
+            preferredSmallFileApplicationStore.store(preferredSmallFileApplication)
+        }
+    }
     @Published var reduceAnimations: Bool {
         didSet {
             defaults.set(reduceAnimations, forKey: Self.reduceAnimationsKey)
@@ -139,6 +144,7 @@ final class AppModel: ObservableObject {
     private let environmentPathProvider: () -> String
     private let preferredLanguagesProvider: () -> [String]
     private let formatAssociationRestoreStore: FormatAssociationRestoreStore
+    private let preferredSmallFileApplicationStore: PreferredSmallFileApplicationStore
     private let externalFileOpener: any ExternalFileOpening
     private let alternateApplicationResolver: @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler?
     private let fileSizeProvider: @MainActor (URL) -> Int64?
@@ -149,6 +155,7 @@ final class AppModel: ObservableObject {
     nonisolated static let isSidebarCollapsedKey = "isSidebarCollapsed"
     nonisolated static let appLanguagePreferenceKey = "appLanguagePreference"
     nonisolated static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
+    nonisolated static let preferredSmallFileApplicationKey = "preferredSmallFileApplication"
     nonisolated static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
     nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     nonisolated static let defaultTutorialChapterID = "basic"
@@ -437,6 +444,7 @@ final class AppModel: ObservableObject {
         self.environmentPathProvider = environmentPathProvider
         self.preferredLanguagesProvider = preferredLanguagesProvider
         self.formatAssociationRestoreStore = FormatAssociationRestoreStore(defaults: defaults)
+        self.preferredSmallFileApplicationStore = PreferredSmallFileApplicationStore(defaults: defaults)
         self.externalFileOpener = externalFileOpener
         self.alternateApplicationResolver = alternateApplicationResolver
         self.fileSizeProvider = fileSizeProvider
@@ -451,6 +459,7 @@ final class AppModel: ObservableObject {
         self.appLanguagePreference = AppLanguagePreference(
             rawValue: defaults.string(forKey: Self.appLanguagePreferenceKey) ?? ""
         ) ?? .system
+        self.preferredSmallFileApplication = preferredSmallFileApplicationStore.load()
         self.previousDefaultAppByExtension = formatAssociationRestoreStore.loadAll()
     }
 
@@ -765,6 +774,70 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func setPreferredSmallFileApplication(_ handler: DefaultApplicationHandler?) {
+        if let handler, FileTypeAssociation.isIDataBundleIdentifier(handler.bundleIdentifier) {
+            errorMessage = localized(
+                english: "Please choose a non-iData app for small-file handoff.",
+                chinese: "请为小文件转交选择一个非 iData 应用。"
+            )
+            return
+        }
+
+        preferredSmallFileApplication = handler
+        errorMessage = nil
+        statusMessage = handler.map {
+            localized(
+                english: "Small files at or below 100 MiB will be handed off to \($0.displayName). Compressed .gz/.bgz files always stay in iData.",
+                chinese: "小于等于 100 MiB 的文件将转交给 \($0.displayName)。压缩 .gz/.bgz 文件始终留在 iData 中打开。"
+            )
+        }
+    }
+
+    func clearPreferredSmallFileApplication() {
+        preferredSmallFileApplication = nil
+        errorMessage = nil
+        statusMessage = localized(
+            english: "Small files at or below 100 MiB will fall back to the previous default app when possible. Compressed .gz/.bgz files always stay in iData.",
+            chinese: "小于等于 100 MiB 的文件会尽量回退到此前的默认应用。压缩 .gz/.bgz 文件始终留在 iData 中打开。"
+        )
+    }
+
+    func choosePreferredSmallFileApplication() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+
+        guard panel.runModal() == .OK, let appURL = panel.url else {
+            return
+        }
+
+        guard let handler = FileTypeAssociation.applicationHandler(for: appURL) else {
+            errorMessage = localized(
+                english: "Could not read the selected application.",
+                chinese: "无法读取所选应用。"
+            )
+            return
+        }
+
+        setPreferredSmallFileApplication(handler)
+    }
+
+    var preferredSmallFileApplicationDisplayName: String {
+        preferredSmallFileApplication?.displayName ?? localized(
+            english: "Use previous default app when available",
+            chinese: "优先回退到此前的默认应用"
+        )
+    }
+
+    var smallFileRoutingSummary: String {
+        localized(
+            english: "Finder-opened files at or below 100 MiB can be handed off to one global app that you choose here. Compressed .gz/.bgz files always stay in iData.",
+            chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，可以统一转交给你在这里指定的一个应用。压缩 .gz/.bgz 文件始终留在 iData。"
+        )
+    }
+
     func presentTutorialHub() {
         isTutorialHubPresented = true
     }
@@ -936,8 +1009,14 @@ final class AppModel: ObservableObject {
         }
 
         let lookupExtension = Self.lookupExtension(for: url)
-        if let fileSize = fileSizeProvider(url), fileSize <= Self.largeFileOpenThresholdBytes {
-            guard let alternateApp = alternateApplicationResolver(url, lookupExtension, previousDefaultAppByExtension) else {
+        if
+            let fileSize = fileSizeProvider(url),
+            fileSize <= Self.largeFileOpenThresholdBytes,
+            !Self.compressionSuffixes.contains(lookupExtension)
+        {
+            guard let alternateApp = preferredSmallFileApplication
+                ?? alternateApplicationResolver(url, lookupExtension, previousDefaultAppByExtension)
+            else {
                 statusMessage = nil
                 errorMessage = localized(
                     english: "Could not find a non-iData app to open \(url.lastPathComponent).",
@@ -1789,6 +1868,33 @@ private struct PersistedDefaultApplicationHandler: Codable {
 }
 
 @MainActor
+private struct PreferredSmallFileApplicationStore {
+    let defaults: UserDefaults
+
+    func load() -> DefaultApplicationHandler? {
+        guard
+            let data = defaults.data(forKey: AppModel.preferredSmallFileApplicationKey),
+            let handler = try? JSONDecoder().decode(PersistedDefaultApplicationHandler.self, from: data)
+        else {
+            return nil
+        }
+
+        return handler.handler
+    }
+
+    func store(_ handler: DefaultApplicationHandler?) {
+        guard let handler else {
+            defaults.removeObject(forKey: AppModel.preferredSmallFileApplicationKey)
+            return
+        }
+
+        if let data = try? JSONEncoder().encode(PersistedDefaultApplicationHandler(handler)) {
+            defaults.set(data, forKey: AppModel.preferredSmallFileApplicationKey)
+        }
+    }
+}
+
+@MainActor
 private struct FormatAssociationRestoreStore {
     let defaults: UserDefaults
 
@@ -1989,7 +2095,7 @@ private enum FileTypeAssociation {
         }
     }
 
-    private static func applicationHandler(for appURL: URL) -> DefaultApplicationHandler? {
+    static func applicationHandler(for appURL: URL) -> DefaultApplicationHandler? {
         guard
             let bundle = Bundle(url: appURL),
             let bundleIdentifier = bundle.bundleIdentifier

@@ -19,6 +19,7 @@ struct PreferencesView: View {
                 preferencesHero
                 animationsCard
                 appLanguageCard
+                smallFileRoutingCard
                 runtimeCard
                 updatesCard
             }
@@ -119,6 +120,42 @@ struct PreferencesView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var smallFileRoutingCard: some View {
+        PreferencesCard(title: isChinese ? "小文件转交" : "Small-File Handoff", icon: "arrowshape.turn.up.right.circle") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(model.smallFileRoutingSummary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(isChinese ? "当前外部应用" : "Current external app")
+                        .font(.subheadline.weight(.semibold))
+                    Text(model.preferredSmallFileApplicationDisplayName)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                }
+
+                HStack(spacing: 10) {
+                    Button(isChinese ? "选择应用…" : "Choose App…") {
+                        model.choosePreferredSmallFileApplication()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .quietInteractiveSurface(enabled: motionEnabled)
+
+                    Button(isChinese ? "清除" : "Clear") {
+                        model.clearPreferredSmallFileApplication()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(model.preferredSmallFileApplication == nil)
+                    .quietInteractiveSurface(enabled: motionEnabled)
+
+                    Spacer(minLength: 0)
+                }
             }
         }
     }
