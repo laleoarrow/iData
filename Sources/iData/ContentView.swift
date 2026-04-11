@@ -283,14 +283,16 @@ private struct SidebarHeaderCard: View {
                 }
             }
             .buttonStyle(.plain)
-            .onHover { hovering in
-                if motionEnabled {
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        isHoveringCollapsedIcon = hovering
-                    }
-                } else {
-                    isHoveringCollapsedIcon = hovering
-                }
+            .quietInteractiveSurface(
+                enabled: motionEnabled,
+                hoverScale: 1.018,
+                hoverYOffset: -1,
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+                glowStyle: .rounded(12)
+            )
+            .background {
+                SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHoveringCollapsedIcon)
             }
 
             Spacer(minLength: 0)
@@ -329,7 +331,7 @@ private struct SidebarFooter: View {
                 VStack(spacing: 18) {
                     SettingsLink {
                         SidebarFooterIcon(symbol: "gearshape.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
@@ -338,7 +340,7 @@ private struct SidebarFooter: View {
                         model.isHelpPresented = true
                     } label: {
                         SidebarFooterIcon(symbol: "questionmark.circle")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
@@ -347,7 +349,7 @@ private struct SidebarFooter: View {
                         model.presentTutorialHub()
                     } label: {
                         SidebarFooterIcon(symbol: "graduationcap.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
@@ -357,7 +359,7 @@ private struct SidebarFooter: View {
                 HStack(spacing: 18) {
                     SettingsLink {
                         SidebarFooterIcon(symbol: "gearshape.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
@@ -366,7 +368,7 @@ private struct SidebarFooter: View {
                         model.isHelpPresented = true
                     } label: {
                         SidebarFooterIcon(symbol: "questionmark.circle")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
@@ -375,7 +377,7 @@ private struct SidebarFooter: View {
                         model.presentTutorialHub()
                     } label: {
                         SidebarFooterIcon(symbol: "graduationcap.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1)
+                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
@@ -460,11 +462,17 @@ private struct RecentFileRow: View {
     let togglePinAction: () -> Void
     let removeAction: () -> Void
 
+    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var isHovering = false
 
+    private var motionEnabled: Bool {
+        idataAnimationsEnabled && !accessibilityReduceMotion
+    }
+
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: openAction) {
+        Button(action: openAction) {
+            HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(fileURL.lastPathComponent)
                         .font(.headline)
@@ -477,65 +485,78 @@ private struct RecentFileRow: View {
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
 
-            Spacer(minLength: 0)
-
-            Button(action: togglePinAction) {
-                Image(systemName: isPinned ? "pin.fill" : "pin")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(isPinned ? Color.accentColor : .secondary)
-                    .frame(width: 24, height: 24)
-                    .background(
-                        Circle()
-                            .fill(isPinned ? Color.accentColor.opacity(0.14) : Color.white.opacity(0.06))
-                    )
-                    .overlay(
-                        Circle()
-                            .strokeBorder(isPinned ? Color.accentColor.opacity(0.28) : Color.white.opacity(0.08))
-                    )
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .opacity(isHovering ? 1 : 0)
-            .allowsHitTesting(isHovering)
-            .help(isPinned
-                ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
-                : localizedText(isChinese, english: "Pin to top", chinese: "置顶到顶部"))
-
-            Button(action: removeAction) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24, height: 24)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(isHovering ? 0.10 : 0.0))
-                    )
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity(isHovering ? 0.12 : 0.0))
-                    )
-            }
-            .buttonStyle(.plain)
-            .opacity(isHovering ? 1 : 0)
-            .allowsHitTesting(isHovering)
-            .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .padding(.trailing, 70)
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
-        .padding(14)
+        .buttonStyle(.plain)
         .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            SidebarHoverGlow(
+                isVisible: isHovering,
+                style: .rounded(20)
+            )
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(borderColor)
         )
+        .overlay(alignment: .trailing) {
+            HStack(spacing: 8) {
+                Button(action: togglePinAction) {
+                    Image(systemName: isPinned ? "pin.fill" : "pin")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(isPinned ? Color.accentColor : .secondary)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(isPinned ? Color.accentColor.opacity(0.14) : Color.white.opacity(0.06))
+                        )
+                        .overlay(
+                            Circle()
+                                .strokeBorder(isPinned ? Color.accentColor.opacity(0.28) : Color.white.opacity(0.08))
+                        )
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovering ? 1 : 0)
+                .allowsHitTesting(isHovering)
+                .help(isPinned
+                    ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
+                    : localizedText(isChinese, english: "Pin to top", chinese: "置顶到顶部"))
+
+                Button(action: removeAction) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(isHovering ? 0.10 : 0.0))
+                        )
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.white.opacity(isHovering ? 0.12 : 0.0))
+                        )
+                }
+                .buttonStyle(.plain)
+                .opacity(isHovering ? 1 : 0)
+                .allowsHitTesting(isHovering)
+                .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
+            }
+            .padding(.trailing, 14)
+        }
         .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 16 : 10, y: 6)
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onHover { hovering in
-            withAnimation(.easeOut(duration: 0.14)) {
-                isHovering = hovering
-            }
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
         }
+        .scaleEffect(motionEnabled && isHovering ? 1.012 : 1)
+        .offset(y: motionEnabled && isHovering ? -1 : 0)
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 
     private var backgroundStyle: some ShapeStyle {
@@ -614,19 +635,26 @@ private struct CollapsedRecentFileRow: View {
             Circle()
                 .strokeBorder(borderColor)
         )
+        .overlay {
+            SidebarHoverGlow(
+                isVisible: isHovering,
+                style: .circle
+            )
+        }
         .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 14 : 8, y: 4)
         .frame(maxWidth: .infinity)
         .contentShape(Circle())
-        .onHover { hovering in
-            if motionEnabled {
-                withAnimation(.easeOut(duration: 0.18)) {
-                    isHovering = hovering
-                }
-            } else {
-                isHovering = hovering
-            }
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
         }
-        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
+        .scaleEffect(motionEnabled && isHovering ? 1.02 : 1)
+        .offset(y: motionEnabled && isHovering ? -1 : 0)
+        .shadow(
+            color: .black.opacity(motionEnabled && isHovering ? 0.06 : 0),
+            radius: motionEnabled && isHovering ? 10 : 0,
+            y: motionEnabled && isHovering ? 4 : 0
+        )
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 
     private var primaryHelpText: String {
@@ -724,7 +752,7 @@ private struct SidebarCollapseToggleButton: View {
         .help(isCollapsed
             ? localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏")
             : localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
-        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1, shadowOpacity: 0.08, shadowRadius: 10)
+        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1, shadowOpacity: 0.08, shadowRadius: 10, glowStyle: .rounded(10))
     }
 }
 
@@ -777,6 +805,212 @@ private struct SidebarAmbientGlow: View {
         }
         .allowsHitTesting(false)
         .animation(motionEnabled ? .easeInOut(duration: 0.58) : nil, value: isCollapsed)
+    }
+}
+
+enum SidebarHoverGlowStyle: Equatable {
+    case none
+    case rounded(CGFloat)
+    case circle
+}
+
+private struct SidebarHoverGlow: View {
+    let isVisible: Bool
+    let style: SidebarHoverGlowStyle
+
+    private let haloYellow = Color(red: 1.0, green: 0.86, blue: 0.26)
+    private let haloBlue = Color(red: 0.23, green: 0.58, blue: 1.0)
+
+    var body: some View {
+        Group {
+            switch style {
+            case .none:
+                EmptyView()
+            case let .rounded(cornerRadius):
+                glow(for: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            case .circle:
+                glow(for: Circle())
+            }
+        }
+        .opacity(isVisible ? 1 : 0)
+        .animation(.easeOut(duration: 0.18), value: isVisible)
+        .allowsHitTesting(false)
+    }
+
+    private func glow<S: Shape>(for shape: S) -> some View {
+        ZStack {
+            shape
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            haloYellow.opacity(0.34),
+                            haloBlue.opacity(0.30),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .scaleEffect(1.08)
+                .blur(radius: 16)
+
+            shape
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            haloYellow.opacity(0.24),
+                            .clear,
+                        ],
+                        center: .topLeading,
+                        startRadius: 4,
+                        endRadius: 42
+                    )
+                )
+                .scaleEffect(1.16)
+                .blur(radius: 12)
+                .offset(x: -8, y: -8)
+
+            shape
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            haloBlue.opacity(0.22),
+                            .clear,
+                        ],
+                        center: .bottomTrailing,
+                        startRadius: 4,
+                        endRadius: 46
+                    )
+                )
+                .scaleEffect(1.18)
+                .blur(radius: 14)
+                .offset(x: 10, y: 8)
+        }
+        .blendMode(.plusLighter)
+    }
+}
+
+private struct SidebarHoverTrackingRegion: NSViewRepresentable {
+    let isEnabled: Bool
+    @Binding var isHovering: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isHovering: $isHovering)
+    }
+
+    func makeNSView(context: Context) -> HoverTrackingView {
+        let view = HoverTrackingView()
+        view.hoverDidChange = context.coordinator.updateHoverState
+        view.isTrackingEnabled = isEnabled
+        return view
+    }
+
+    func updateNSView(_ nsView: HoverTrackingView, context: Context) {
+        nsView.hoverDidChange = context.coordinator.updateHoverState
+        nsView.isTrackingEnabled = isEnabled
+        nsView.syncHoverState()
+    }
+
+    final class Coordinator {
+        @Binding private var isHovering: Bool
+
+        init(isHovering: Binding<Bool>) {
+            _isHovering = isHovering
+        }
+
+        func updateHoverState(_ hovering: Bool) {
+            guard isHovering != hovering else {
+                return
+            }
+            isHovering = hovering
+        }
+    }
+}
+
+private final class HoverTrackingView: NSView {
+    var hoverDidChange: ((Bool) -> Void)?
+    var isTrackingEnabled = true {
+        didSet {
+            guard oldValue != isTrackingEnabled else {
+                return
+            }
+            refreshTrackingArea()
+            syncHoverState()
+        }
+    }
+
+    private var trackingAreaRef: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        refreshTrackingArea()
+    }
+
+    override func layout() {
+        super.layout()
+        syncHoverState()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        syncHoverState()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        hoverDidChange?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        hoverDidChange?(false)
+    }
+
+    func syncHoverState() {
+        guard isTrackingEnabled, let window else {
+            hoverDidChange?(false)
+            return
+        }
+
+        let location = convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        hoverDidChange?(bounds.insetBy(dx: -0.5, dy: -0.5).contains(location))
+    }
+
+    private func refreshTrackingArea() {
+        if let trackingAreaRef {
+            removeTrackingArea(trackingAreaRef)
+            self.trackingAreaRef = nil
+        }
+
+        guard isTrackingEnabled else {
+            return
+        }
+
+        let trackingAreaRef = NSTrackingArea(
+            rect: .zero,
+            options: [
+                .mouseEnteredAndExited,
+                .inVisibleRect,
+                .activeInActiveApp,
+                .enabledDuringMouseDrag,
+            ],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingAreaRef)
+        self.trackingAreaRef = trackingAreaRef
     }
 }
 
@@ -2506,11 +2740,18 @@ private struct QuietInteractiveSurfaceModifier: ViewModifier {
     let hoverYOffset: CGFloat
     let shadowOpacity: Double
     let shadowRadius: CGFloat
+    let glowStyle: SidebarHoverGlowStyle
 
     @State private var isHovering = false
 
     func body(content: Content) -> some View {
         content
+            .overlay {
+                SidebarHoverGlow(
+                    isVisible: enabled && isHovering,
+                    style: glowStyle
+                )
+            }
             .scaleEffect(enabled && isHovering ? hoverScale : 1)
             .offset(y: enabled && isHovering ? hoverYOffset : 0)
             .shadow(
@@ -2519,12 +2760,8 @@ private struct QuietInteractiveSurfaceModifier: ViewModifier {
                 y: enabled && isHovering ? max(2, shadowRadius * 0.35) : 0
             )
             .animation(enabled ? .easeOut(duration: 0.24) : nil, value: isHovering)
-            .onHover { hovering in
-                if enabled {
-                    isHovering = hovering
-                } else {
-                    isHovering = false
-                }
+            .background {
+                SidebarHoverTrackingRegion(isEnabled: enabled, isHovering: $isHovering)
             }
     }
 }
@@ -2535,7 +2772,8 @@ extension View {
         hoverScale: CGFloat = 1.01,
         hoverYOffset: CGFloat = -1.5,
         shadowOpacity: Double = 0.14,
-        shadowRadius: CGFloat = 16
+        shadowRadius: CGFloat = 16,
+        glowStyle: SidebarHoverGlowStyle = .none
     ) -> some View {
         modifier(
             QuietInteractiveSurfaceModifier(
@@ -2543,7 +2781,8 @@ extension View {
                 hoverScale: hoverScale,
                 hoverYOffset: hoverYOffset,
                 shadowOpacity: shadowOpacity,
-                shadowRadius: shadowRadius
+                shadowRadius: shadowRadius,
+                glowStyle: glowStyle
             )
         )
     }

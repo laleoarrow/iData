@@ -59,12 +59,14 @@ struct EmbeddedTerminalViewTests {
         session.appendOutputForTesting(Data("hello".utf8))
         session.markDisplayReady()
 
-        #expect(sink.clearCallCount == 1)
+        #expect(sink.clearCallCount == 0)
+        #expect(sink.resetCallCount == 0)
         #expect(sink.writeCallCount == 1)
 
         try await Task.sleep(for: .milliseconds(650))
 
-        #expect(sink.clearCallCount == 1)
+        #expect(sink.clearCallCount == 0)
+        #expect(sink.resetCallCount == 0)
         #expect(sink.writeCallCount == 1)
     }
 
@@ -110,14 +112,65 @@ struct EmbeddedTerminalViewTests {
         session.appendOutputForTesting(Data("hello".utf8))
         session.markDisplayReady()
 
-        #expect(sink.clearCallCount == 1)
+        #expect(sink.clearCallCount == 0)
+        #expect(sink.resetCallCount == 0)
         #expect(sink.writeCallCount == 1)
+        #expect(sink.focusCallCount == 1)
 
         session.markDisplayReady()
         session.markDisplayReady()
 
-        #expect(sink.clearCallCount == 1)
+        #expect(sink.clearCallCount == 0)
+        #expect(sink.resetCallCount == 0)
         #expect(sink.writeCallCount == 1)
+        #expect(sink.focusCallCount == 1)
+    }
+
+    @Test
+    func rebindingExistingSessionReplaysTranscriptIntoReplacementDisplay() {
+        let session = VisiDataSessionController()
+        let firstSink = TerminalDisplaySinkSpy()
+        let secondSink = TerminalDisplaySinkSpy()
+
+        session.bind(displaySink: firstSink)
+        session.appendOutputForTesting(Data("hello".utf8))
+        session.markDisplayReady()
+
+        #expect(firstSink.clearCallCount == 0)
+        #expect(firstSink.writeCallCount == 1)
+
+        session.bind(displaySink: nil)
+        session.bind(displaySink: secondSink)
+        session.markDisplayReady()
+
+        #expect(secondSink.clearCallCount == 1)
+        #expect(secondSink.resetCallCount == 0)
+        #expect(secondSink.writeCallCount == 1)
+        #expect(secondSink.focusCallCount == 1)
+    }
+
+    @Test
+    func resetTerminalDisplayRequiresFreshReadyAndResizeBeforeSessionBecomesReadyAgain() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = WKWebView(frame: .zero)
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady()
+        coordinator.handleTerminalResize(cols: 120, rows: 32)
+
+        #expect(displayReadyFlag(for: session))
+
+        coordinator.resetTerminalDisplay()
+
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalResize(cols: 120, rows: 32)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalReady()
+        #expect(displayReadyFlag(for: session))
     }
 
     @Test
@@ -184,7 +237,8 @@ struct EmbeddedTerminalViewTests {
         #expect(!html.contains("layoutPassBudgetRemaining < 2"))
         #expect(html.contains("deferredMeasureHandle = setTimeout(retryDeferredMeasurement, 250);"))
         #expect(html.contains("deferredMeasureBudgetRemaining = Math.max(deferredMeasureBudgetRemaining, 8);"))
-        #expect(html.contains("window.iDataRefreshLayout = function() {\n      lastSentSize = null;"))
+        #expect(html.contains("window.iDataRefreshLayout = function() {"))
+        #expect(html.contains("lastSentSize = null;"))
     }
 
     @Test
@@ -204,6 +258,25 @@ struct EmbeddedTerminalViewTests {
         let sawReady = messages.contains { $0.type == "ready" }
         #expect(sawResize)
         #expect(sawReady)
+    }
+
+    @Test
+    func terminalHTMLRepostsResizeWhenCellMetricsSettleAfterInitialMeasurement() async throws {
+        let harness = try TerminalHTMLHarness(initialCellWidth: 8, initialCellHeight: 20)
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(300))
+
+        let initialMessages = try await harness.messages()
+        let initialResize = try #require(initialMessages.last { $0.type == "resize" })
+        #expect(initialResize.rows == 32)
+
+        try await harness.clearMessages()
+        try await harness.setCellMetrics(width: 8, height: 18)
+        try await Task.sleep(for: .milliseconds(1200))
+
+        let settledMessages = try await harness.messages()
+        let settledResize = settledMessages.last { $0.type == "resize" }
+        #expect(settledResize?.rows == 35)
     }
 
     @Test
@@ -256,6 +329,8 @@ struct EmbeddedTerminalViewTests {
 
         #expect(html.contains("term.clearSelection();"))
         #expect(html.contains("term.scrollToTop();"))
+        #expect(html.contains("window.iDataSoftClearTerminal = function()"))
+        #expect(html.contains("term?.clear();"))
     }
 
     @Test
@@ -264,7 +339,7 @@ struct EmbeddedTerminalViewTests {
 
         #expect(html.contains("function createTerminal("))
         #expect(html.contains("term.dispose();"))
-        #expect(html.contains("createTerminal();"))
+        #expect(html.contains("createTerminal(true);"))
     }
 
     @Test
@@ -294,11 +369,16 @@ struct EmbeddedTerminalViewTests {
 @MainActor
 private final class TerminalDisplaySinkSpy: TerminalDisplaySink {
     private(set) var clearCallCount = 0
+    private(set) var resetCallCount = 0
     private(set) var writeCallCount = 0
     private(set) var focusCallCount = 0
 
     func clearTerminalDisplay() {
         clearCallCount += 1
+    }
+
+    func resetTerminalDisplay() {
+        resetCallCount += 1
     }
 
     func writeToTerminalDisplay(_ data: Data) {

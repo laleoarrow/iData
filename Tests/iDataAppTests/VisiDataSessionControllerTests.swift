@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct VisiDataSessionControllerTests {
     @Test
-    func terminateAlsoStopsDescendantProcesses() throws {
+    func terminateAlsoStopsDescendantProcesses() async throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-session-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
@@ -24,12 +24,12 @@ struct VisiDataSessionControllerTests {
         let session = VisiDataSessionController()
         try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
 
-        let childPID = try waitForChildPID(in: childPIDFile, timeout: 8.0)
+        let childPID = try await waitForChildPID(in: childPIDFile, timeout: 8.0)
         #expect(processExists(childPID))
 
         session.terminate()
 
-        let childExited = waitForProcessExit(childPID, timeout: 5.0)
+        let childExited = await waitForProcessExit(childPID, timeout: 5.0)
         #expect(childExited)
         if !childExited {
             _ = kill(childPID, SIGKILL)
@@ -122,20 +122,94 @@ struct VisiDataSessionControllerTests {
         #expect(signalSpy.signalCount == 1)
     }
 
+    @Test
+    func openUsesMeasuredDisplaySizeWhenFirstResizeArrivesBeforeFallback() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-launch-size-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        let observer = LaunchObserver()
+        let launcher = tempRoot.appendingPathComponent("fake-vd-size.zsh")
+        try makeSleepLauncher(at: launcher, sleepSeconds: 5)
+
+        let sink = TerminalDisplaySinkBuffer()
+        let session = VisiDataSessionController(launchObserver: observer.record(cols:rows:))
+        session.bind(displaySink: sink)
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        #expect(observer.isEmpty())
+        session.resize(cols: 195, rows: 41)
+        defer {
+            session.terminate()
+        }
+
+        let launchedSize = try await waitForLaunchRecord(observer, timeout: 1.0)
+        #expect(launchedSize == (195, 41))
+    }
+
+    @Test
+    func openUsesDefaultSizeImmediatelyWhenNoDisplayIsBound() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-launch-fallback-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        let observer = LaunchObserver()
+        let launcher = tempRoot.appendingPathComponent("fake-vd-size-fallback.zsh")
+        try makeSleepLauncher(at: launcher, sleepSeconds: 5)
+
+        let session = VisiDataSessionController(launchObserver: observer.record(cols:rows:))
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        defer {
+            session.terminate()
+        }
+
+        let launchedSize = try await waitForLaunchRecord(observer, timeout: 1.0)
+        #expect(launchedSize == (120, 32))
+    }
+
+    @Test
+    func invalidatingDisplayReadinessBuffersOutputUntilFreshReplay() {
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkBuffer()
+
+        session.bind(displaySink: sink)
+        session.appendOutputForTesting(Data("FIRST\n".utf8))
+        session.markDisplayReady()
+        #expect(sink.writes == ["FIRST\n"])
+
+        session.invalidateDisplayReadinessForTerminalReset()
+        session.appendOutputForTesting(Data("SECOND\n".utf8))
+
+        #expect(sink.writes == ["FIRST\n"])
+
+        session.markDisplayReady()
+
+        #expect(sink.writes == ["FIRST\n", "SECOND\n"])
+    }
+
     private func makeFakeVDLauncher(at url: URL, childPIDFile: URL) throws {
         let escapedPIDPath = childPIDFile.path
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
 
         let script = """
-        #!/usr/bin/env python3
-        import pathlib
-        import subprocess
-        import time
-
-        child = subprocess.Popen(["/bin/sleep", "120"])
-        pathlib.Path("\(escapedPIDPath)").write_text(str(child.pid))
-        time.sleep(120)
+        #!/bin/zsh
+        trap 'exit 0' TERM INT HUP
+        /bin/sleep 120 &
+        child_pid=$!
+        print -r -- "$child_pid" > "\(escapedPIDPath)"
+        wait "$child_pid"
         """
 
         try script.write(to: url, atomically: true, encoding: .utf8)
@@ -153,43 +227,6 @@ struct VisiDataSessionControllerTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
-    private func waitForChildPID(in fileURL: URL, timeout: TimeInterval) throws -> pid_t {
-        let deadline = Date().addingTimeInterval(timeout)
-
-        while Date() < deadline {
-            if
-                let content = try? String(contentsOf: fileURL, encoding: .utf8)
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-                let pid = pid_t(content)
-            {
-                return pid
-            }
-            usleep(50_000)
-        }
-
-        throw TestError.missingChildPIDFile(fileURL.path)
-    }
-
-    private func processExists(_ pid: pid_t) -> Bool {
-        if kill(pid, 0) == 0 {
-            return true
-        }
-
-        return errno == EPERM
-    }
-
-    private func waitForProcessExit(_ pid: pid_t, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-
-        while Date() < deadline {
-            if !processExists(pid) {
-                return true
-            }
-            usleep(50_000)
-        }
-
-        return !processExists(pid)
-    }
 }
 
 private enum TestError: Error {
@@ -201,6 +238,10 @@ private final class TerminalDisplaySinkBuffer: TerminalDisplaySink {
     private(set) var writes: [String] = []
 
     func clearTerminalDisplay() {
+        writes.removeAll()
+    }
+
+    func resetTerminalDisplay() {
         writes.removeAll()
     }
 
@@ -227,4 +268,80 @@ private final class SignalSenderSpy {
         signals.append((pid: pid, signal: signal))
         return 0
     }
+}
+
+private final class LaunchObserver {
+    private let lock = NSLock()
+    private var records: [(Int, Int)] = []
+
+    func record(cols: UInt16, rows: UInt16) {
+        lock.lock()
+        defer { lock.unlock() }
+        records.append((Int(cols), Int(rows)))
+    }
+
+    func firstRecord() -> (Int, Int)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return records.first
+    }
+
+    func isEmpty() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return records.isEmpty
+    }
+}
+
+private func waitForChildPID(in fileURL: URL, timeout: TimeInterval) async throws -> pid_t {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+        if
+            let content = try? String(contentsOf: fileURL, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            let pid = pid_t(content)
+        {
+            return pid
+        }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+
+    throw TestError.missingChildPIDFile(fileURL.path)
+}
+
+@MainActor
+private func waitForLaunchRecord(_ observer: LaunchObserver, timeout: TimeInterval) async throws -> (Int, Int) {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+        if let record = observer.firstRecord() {
+            return record
+        }
+
+        try await Task.sleep(for: .milliseconds(50))
+    }
+
+    throw TestError.missingChildPIDFile("launch observer")
+}
+
+private func processExists(_ pid: pid_t) -> Bool {
+    if kill(pid, 0) == 0 {
+        return true
+    }
+
+    return errno == EPERM
+}
+
+private func waitForProcessExit(_ pid: pid_t, timeout: TimeInterval) async -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+        if !processExists(pid) {
+            return true
+        }
+        try? await Task.sleep(for: .milliseconds(50))
+    }
+
+    return !processExists(pid)
 }

@@ -76,9 +76,15 @@
     let deferredResizeObserver = null;
     let deferredMeasureHandle = null;
     let deferredMeasureBudgetRemaining = 0;
+    let metricSettleHandle = null;
+    let metricSettleBudgetRemaining = 0;
 
     function post(message) {
       window.webkit?.messageHandlers?.idata?.postMessage(message);
+    }
+
+    function debug(message) {
+      post({ type: 'debug', message });
     }
 
     function makeTerminalOptions() {
@@ -124,6 +130,46 @@
       while (terminalDisposables.length > 0) {
         terminalDisposables.pop()?.dispose?.();
       }
+    }
+
+    function stopMetricSettlingChecks() {
+      if (metricSettleHandle !== null) {
+        clearTimeout(metricSettleHandle);
+        metricSettleHandle = null;
+      }
+      metricSettleBudgetRemaining = 0;
+    }
+
+    function scheduleMetricSettlingChecks() {
+      metricSettleBudgetRemaining = Math.max(metricSettleBudgetRemaining, 8);
+
+      if (metricSettleHandle !== null) {
+        return;
+      }
+
+      const settle = () => {
+        metricSettleHandle = null;
+
+        if (metricSettleBudgetRemaining > 0) {
+          metricSettleBudgetRemaining -= 1;
+        }
+
+        if (!term) {
+          stopMetricSettlingChecks();
+          return;
+        }
+
+        refreshTerminalLayout(false);
+
+        if (metricSettleBudgetRemaining > 0) {
+          metricSettleHandle = setTimeout(settle, 250);
+          return;
+        }
+
+        stopMetricSettlingChecks();
+      };
+
+      metricSettleHandle = setTimeout(settle, 250);
     }
 
     function stopDeferredLayoutRecovery() {
@@ -200,6 +246,7 @@
 
     function createTerminal(resetReadyState = false) {
       stopDeferredLayoutRecovery();
+      stopMetricSettlingChecks();
       disposeTerminalDisposables();
 
       if (term) {
@@ -223,6 +270,8 @@
 
       lastSentSize = null;
       forceResizePassesPending = Math.max(forceResizePassesPending, 1);
+
+      debug(`createTerminal resetReady=${resetReadyState} forceResizePassesPending=${forceResizePassesPending}`);
 
       if (resetReadyState) {
         didPostTerminalReady = false;
@@ -315,6 +364,10 @@
 
       lastSentSize = sizeKey;
 
+      debug(
+        `measure force=${force} cell=${cellWidth}x${cellHeight} rect=${parentRect.width}x${parentRect.height} usable=${usableWidth}x${usableHeight} term=${term.cols}x${term.rows} next=${cols}x${rows} changed=${sizeChanged} termNeedsResize=${terminalNeedsResize}`
+      );
+
       if (terminalNeedsResize) {
         term.resize(cols, rows);
       }
@@ -364,6 +417,7 @@
         }
         if (didMeasure) {
           stopDeferredLayoutRecovery();
+          scheduleMetricSettlingChecks();
         }
         if (didMeasure && term.cols > 0 && term.rows > 0) {
           postTerminalReady();
@@ -393,15 +447,24 @@
     }
 
     window.iDataWriteBase64 = writeBase64;
+    window.iDataSoftClearTerminal = function() {
+      debug('softClearTerminal');
+      term?.clearSelection();
+      term?.scrollToTop();
+      term?.clear();
+    };
     window.iDataClearTerminal = function() {
-      createTerminal();
+      debug('clearTerminalDisplay');
+      createTerminal(true);
       scheduleTerminalLayoutPasses({ forceResize: true });
     };
     window.iDataRefreshLayout = function() {
+      debug('refreshLayout');
       lastSentSize = null;
       scheduleTerminalLayoutPasses({ forceResize: true });
     };
     window.iDataFocusTerminal = function() {
+      debug('focusTerminal');
       term?.focus();
       scheduleTerminalLayoutPasses({ forceResize: true });
     };
@@ -427,6 +490,10 @@
     window.addEventListener('focus', () => {
       scheduleTerminalLayoutPasses({ forceResize: true });
     });
+
+    terminalRoot.addEventListener('wheel', () => {
+      debug(`wheel term=${term?.cols ?? 0}x${term?.rows ?? 0} last=${lastSentSize ?? 'nil'}`);
+    }, { passive: true });
 
     requestAnimationFrame(() => {
       scheduleTerminalLayoutPasses({ forceResize: true });

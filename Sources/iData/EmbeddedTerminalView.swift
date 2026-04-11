@@ -1,5 +1,32 @@
 import SwiftUI
 import WebKit
+import OSLog
+
+private func terminalDebugTrace(_ message: String) {
+    let timestamp = ISO8601DateFormatter().string(from: Date())
+    let line = "\(timestamp) \(message)\n"
+    guard let data = line.data(using: .utf8) else {
+        return
+    }
+
+    let fileURL = URL(fileURLWithPath: "/tmp/idata-terminal-trace.log")
+    if !FileManager.default.fileExists(atPath: fileURL.path) {
+        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+    }
+
+    guard let handle = try? FileHandle(forWritingTo: fileURL) else {
+        return
+    }
+
+    defer { try? handle.close() }
+
+    do {
+        try handle.seekToEnd()
+        try handle.write(contentsOf: data)
+    } catch {
+        return
+    }
+}
 
 struct EmbeddedTerminalView: NSViewRepresentable {
     @ObservedObject var session: VisiDataSessionController
@@ -35,6 +62,10 @@ struct EmbeddedTerminalView: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, TerminalDisplaySink {
+        private let logger = Logger(
+            subsystem: Bundle.main.bundleIdentifier ?? "io.github.leoarrow.idata",
+            category: "TerminalLayout"
+        )
         private weak var webView: WKWebView?
         private weak var session: VisiDataSessionController?
         private var didFinishInitialNavigation = false
@@ -48,6 +79,8 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         func bind(session: VisiDataSessionController, webView: WKWebView) {
             let sessionDidChange = self.session !== session
+            logger.info("coordinator bind session=\(String(describing: ObjectIdentifier(session)), privacy: .public) sessionDidChange=\(sessionDidChange, privacy: .public)")
+            terminalDebugTrace("coordinator.bind session=\(ObjectIdentifier(session)) sessionDidChange=\(sessionDidChange)")
             if self.session !== session {
                 self.session?.bind(displaySink: nil)
                 self.session = session
@@ -63,6 +96,10 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         }
 
         func unbindCurrentSession() {
+            if let session {
+                logger.info("coordinator unbind session=\(String(describing: ObjectIdentifier(session)), privacy: .public)")
+                terminalDebugTrace("coordinator.unbind session=\(ObjectIdentifier(session))")
+            }
             session?.bind(displaySink: nil)
         }
 
@@ -95,11 +132,13 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             didFinishInitialNavigation = true
+            terminalDebugTrace("webView.didFinish")
             markSessionDisplayReadyIfPossible()
         }
 
         func handleTerminalReady() {
             didReceiveTerminalReady = true
+            terminalDebugTrace("terminal.ready")
             markSessionDisplayReadyIfPossible()
         }
 
@@ -109,11 +148,21 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             }
 
             didReceiveTerminalResize = true
+            terminalDebugTrace("terminal.resize cols=\(cols) rows=\(rows)")
             session?.resize(cols: cols, rows: rows)
             markSessionDisplayReadyIfPossible()
         }
 
         func clearTerminalDisplay() {
+            terminalDebugTrace("terminal.clear.soft")
+            evaluate(functionCall: "window.iDataSoftClearTerminal();")
+        }
+
+        func resetTerminalDisplay() {
+            didReceiveTerminalReady = false
+            didReceiveTerminalResize = false
+            session?.invalidateDisplayReadinessForTerminalReset()
+            terminalDebugTrace("terminal.clear.reset")
             evaluate(functionCall: "window.iDataClearTerminal();")
         }
 
@@ -123,6 +172,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         }
 
         func focusTerminalDisplay() {
+            terminalDebugTrace("terminal.focus")
             evaluate(functionCall: "window.iDataFocusTerminal();")
         }
 
@@ -152,6 +202,11 @@ struct EmbeddedTerminalView: NSViewRepresentable {
                     let rows = body["rows"] as? Int
                 {
                     handleTerminalResize(cols: cols, rows: rows)
+                }
+            case "debug":
+                if let message = body["message"] as? String {
+                    logger.info("\(message, privacy: .public)")
+                    terminalDebugTrace("js.debug \(message)")
                 }
             default:
                 break

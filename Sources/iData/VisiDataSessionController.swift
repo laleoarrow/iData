@@ -1,13 +1,41 @@
 import Darwin
 import Dispatch
 import Foundation
+import OSLog
 #if canImport(iDataCore)
 import iDataCore
 #endif
 
+private func terminalDebugTrace(_ message: String) {
+    let timestamp = ISO8601DateFormatter().string(from: Date())
+    let line = "\(timestamp) \(message)\n"
+    guard let data = line.data(using: .utf8) else {
+        return
+    }
+
+    let fileURL = URL(fileURLWithPath: "/tmp/idata-terminal-trace.log")
+    if !FileManager.default.fileExists(atPath: fileURL.path) {
+        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+    }
+
+    guard let handle = try? FileHandle(forWritingTo: fileURL) else {
+        return
+    }
+
+    defer { try? handle.close() }
+
+    do {
+        try handle.seekToEnd()
+        try handle.write(contentsOf: data)
+    } catch {
+        return
+    }
+}
+
 @MainActor
 protocol TerminalDisplaySink: AnyObject {
     func clearTerminalDisplay()
+    func resetTerminalDisplay()
     func writeToTerminalDisplay(_ data: Data)
     func focusTerminalDisplay()
 }
@@ -106,6 +134,10 @@ struct PTYWriteDriver {
 }
 
 final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "io.github.leoarrow.idata",
+        category: "TerminalLayout"
+    )
     @Published private(set) var currentFileURL: URL?
     @Published private(set) var isRunning = false
     @Published private(set) var statusMessage: String?
@@ -116,10 +148,15 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let writeQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session.write")
     private let ptyWriteDriver: PTYWriteDriver
     private let signalSender: (_ pid: pid_t, _ signal: Int32) -> Int32
+    private let launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)?
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
+    private var hasPresentedDisplay = false
     private var transcript = TerminalTranscript()
     private var requiresDisplayReset = true
+    private var pendingOpenRequest: PendingOpenRequest?
+    private var pendingLaunchTask: Task<Void, Never>?
+    private var hasMeasuredDisplaySize = false
     private let ptyLock = NSLock()
     private var _masterFileDescriptor: Int32 = -1
     private var masterFileDescriptor: Int32 {
@@ -132,14 +169,22 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
     private var outputGeneration: UInt64 = 0
 
+    private struct PendingOpenRequest {
+        let fileURL: URL
+        let vdURL: URL
+        let generation: UInt64
+    }
+
     init(
         ptyWriteDriver: PTYWriteDriver = PTYWriteDriver(),
         signalSender: @escaping (_ pid: pid_t, _ signal: Int32) -> Int32 = { pid, signal in
             Darwin.kill(pid, signal)
-        }
+        },
+        launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)? = nil
     ) {
         self.ptyWriteDriver = ptyWriteDriver
         self.signalSender = signalSender
+        self.launchObserver = launchObserver
     }
 
     deinit {
@@ -150,20 +195,44 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     func bind(displaySink: TerminalDisplaySink?) {
         self.displaySink = displaySink
         if displaySink == nil {
+            logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) bind(nil) -> display not ready")
+            terminalDebugTrace("session.bind nil session=\(ObjectIdentifier(self))")
             isDisplayReady = false
+        } else {
+            terminalDebugTrace("session.bind sink session=\(ObjectIdentifier(self))")
         }
     }
 
     @MainActor
     func markDisplayReady() {
         guard !isDisplayReady else {
-            displaySink?.focusTerminalDisplay()
+            logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) markDisplayReady while already ready")
+            terminalDebugTrace("session.markDisplayReady alreadyReady session=\(ObjectIdentifier(self))")
             return
         }
 
+        logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) markDisplayReady replay transcript chunks=\(self.transcript.chunks.count, privacy: .public)")
+        terminalDebugTrace("session.markDisplayReady session=\(ObjectIdentifier(self)) chunks=\(self.transcript.chunks.count)")
         isDisplayReady = true
-        replayTranscript()
+        if hasPresentedDisplay {
+            replayTranscript()
+        } else {
+            presentInitialTranscript()
+        }
+        hasPresentedDisplay = true
         displaySink?.focusTerminalDisplay()
+    }
+
+    @MainActor
+    func invalidateDisplayReadinessForTerminalReset() {
+        guard isDisplayReady else {
+            return
+        }
+
+        logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) invalidateDisplayReadinessForTerminalReset")
+        terminalDebugTrace("session.invalidateDisplayReadinessForTerminalReset session=\(ObjectIdentifier(self))")
+        isDisplayReady = false
+        requiresDisplayReset = true
     }
 
     @MainActor
@@ -174,9 +243,12 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         let vdURL = try preflight.resolveExecutable(explicitVDPath: explicitVDPath)
         stopCurrentProcessIfNeeded(reapSynchronously: true)
+        pendingLaunchTask?.cancel()
+        pendingLaunchTask = nil
 
         currentFileURL = fileURL
         errorMessage = nil
+        isRunning = true
         statusMessage = AppModel.localized(
             english: "Opening \(fileURL.lastPathComponent)…",
             chinese: "正在打开 \(fileURL.lastPathComponent)…"
@@ -184,25 +256,38 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         transcript.reset()
         requiresDisplayReset = true
         outputGeneration &+= 1
+        logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) open file=\(fileURL.lastPathComponent, privacy: .public) generation=\(self.outputGeneration, privacy: .public) displayReady=\(self.isDisplayReady, privacy: .public)")
+        terminalDebugTrace("session.open session=\(ObjectIdentifier(self)) file=\(fileURL.lastPathComponent) generation=\(self.outputGeneration) displayReady=\(self.isDisplayReady)")
+        pendingOpenRequest = PendingOpenRequest(fileURL: fileURL, vdURL: vdURL, generation: outputGeneration)
 
-        if isDisplayReady {
-            displaySink?.clearTerminalDisplay()
-            requiresDisplayReset = false
+        let shouldAwaitDisplayMeasurement = displaySink != nil && !hasMeasuredDisplaySize
+
+        do {
+            if !shouldAwaitDisplayMeasurement {
+                try launchPendingOpenIfPossible()
+            } else {
+                pendingLaunchTask = Task.detached(priority: .userInitiated) { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    do {
+                        try await Task.sleep(for: .milliseconds(250))
+                        try Task.checkCancellation()
+                        await MainActor.run {
+                            terminalDebugTrace("session.open fallbackFire session=\(ObjectIdentifier(self))")
+                            try? self.launchPendingOpenIfPossible()
+                        }
+                    } catch {
+                        return
+                    }
+                }
+                terminalDebugTrace("session.open fallbackSchedule session=\(ObjectIdentifier(self))")
+            }
+        } catch {
+            pendingOpenRequest = nil
+            isRunning = false
+            throw error
         }
-
-        try startProcess(
-            visidataExecutable: vdURL,
-            fileURL: fileURL,
-            cols: lastKnownSize.cols,
-            rows: lastKnownSize.rows,
-            generation: outputGeneration
-        )
-
-        isRunning = true
-        statusMessage = AppModel.localized(
-            english: "Running VisiData for \(fileURL.lastPathComponent).",
-            chinese: "正在为 \(fileURL.lastPathComponent) 运行 VisiData。"
-        )
     }
 
     @MainActor
@@ -229,11 +314,19 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
+        hasMeasuredDisplaySize = true
         let normalizedCols = UInt16(min(cols, Int(UInt16.max)))
         let normalizedRows = UInt16(min(rows, Int(UInt16.max)))
         let requestedSize = (normalizedCols, normalizedRows)
         let sizeChanged = requestedSize != lastKnownSize
         lastKnownSize = (normalizedCols, normalizedRows)
+        terminalDebugTrace("session.resize session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows) sizeChanged=\(sizeChanged)")
+
+        if pendingOpenRequest != nil, childPID == 0 {
+            pendingLaunchTask?.cancel()
+            pendingLaunchTask = nil
+            try? launchPendingOpenIfPossible()
+        }
 
         guard masterFileDescriptor >= 0 else {
             return
@@ -259,6 +352,9 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     func terminate() {
+        pendingLaunchTask?.cancel()
+        pendingLaunchTask = nil
+        pendingOpenRequest = nil
         stopCurrentProcessIfNeeded(reapSynchronously: true)
         isRunning = false
         statusMessage = AppModel.localized(
@@ -371,6 +467,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         childPID = pid
         configureReadSource(for: master, generation: generation)
         configureProcessSource(for: pid, generation: generation)
+        reapImmediatelyExitedProcessIfNeeded(pid: pid, generation: generation)
+        scheduleExitVerification(pid: pid, generation: generation)
     }
 
     private func configureReadSource(for fileDescriptor: Int32, generation: UInt64) {
@@ -431,6 +529,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         if isDisplayReady {
             if requiresDisplayReset {
+                logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) enqueueOutput triggers deferred clear for generation=\(generation, privacy: .public)")
+                terminalDebugTrace("session.enqueueOutput deferredClear session=\(ObjectIdentifier(self)) generation=\(generation)")
                 displaySink?.clearTerminalDisplay()
                 requiresDisplayReset = false
             }
@@ -454,12 +554,59 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
+        logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) replayTranscript clears terminal and replays \(self.transcript.chunks.count, privacy: .public) chunks")
+        terminalDebugTrace("session.replayTranscript session=\(ObjectIdentifier(self)) chunks=\(self.transcript.chunks.count)")
         displaySink?.clearTerminalDisplay()
         requiresDisplayReset = false
 
         for chunk in transcript.chunks {
             displaySink?.writeToTerminalDisplay(chunk)
         }
+    }
+
+    @MainActor
+    private func presentInitialTranscript() {
+        guard isDisplayReady else {
+            return
+        }
+
+        requiresDisplayReset = false
+
+        for chunk in transcript.chunks {
+            displaySink?.writeToTerminalDisplay(chunk)
+        }
+    }
+
+    @MainActor
+    private func launchPendingOpenIfPossible() throws {
+        guard let pendingOpenRequest else {
+            return
+        }
+        pendingLaunchTask?.cancel()
+        pendingLaunchTask = nil
+
+        if isDisplayReady {
+            logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) open() clears terminal immediately because display is already ready")
+            terminalDebugTrace("session.open immediateClear generation=\(pendingOpenRequest.generation)")
+            displaySink?.resetTerminalDisplay()
+        }
+
+        launchObserver?(lastKnownSize.cols, lastKnownSize.rows)
+
+        try startProcess(
+            visidataExecutable: pendingOpenRequest.vdURL,
+            fileURL: pendingOpenRequest.fileURL,
+            cols: lastKnownSize.cols,
+            rows: lastKnownSize.rows,
+            generation: pendingOpenRequest.generation
+        )
+
+        self.pendingOpenRequest = nil
+        isRunning = true
+        statusMessage = AppModel.localized(
+            english: "Running VisiData for \(pendingOpenRequest.fileURL.lastPathComponent).",
+            chinese: "正在为 \(pendingOpenRequest.fileURL.lastPathComponent) 运行 VisiData。"
+        )
     }
 
     private func enqueuePTYWrite(_ data: Data) {
@@ -480,11 +627,58 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
+        finalizeProcessExit(pid: pid, generation: generation, exitStatus: exitStatus)
+    }
+
+    private func reapImmediatelyExitedProcessIfNeeded(pid: pid_t, generation: UInt64) {
+        var exitStatus: Int32 = 0
+        let exitedPID = waitpid(pid, &exitStatus, WNOHANG)
+        guard exitedPID == pid else {
+            return
+        }
+
+        finalizeProcessExit(pid: pid, generation: generation, exitStatus: exitStatus)
+    }
+
+    private func scheduleExitVerification(pid: pid_t, generation: UInt64, remainingChecks: Int = 40) {
+        guard remainingChecks > 0 else {
+            return
+        }
+
+        ioQueue.asyncAfter(deadline: .now() + .milliseconds(50)) { [weak self] in
+            self?.verifyProcessExit(pid: pid, generation: generation, remainingChecks: remainingChecks)
+        }
+    }
+
+    private func verifyProcessExit(pid: pid_t, generation: UInt64, remainingChecks: Int) {
+        guard generation == outputGeneration, childPID == pid else {
+            return
+        }
+
+        var exitStatus: Int32 = 0
+        let exitedPID = waitpid(pid, &exitStatus, WNOHANG)
+
+        if exitedPID == pid {
+            terminalDebugTrace("session.verifyProcessExit reapedImmediately session=\(ObjectIdentifier(self)) pid=\(pid)")
+            finalizeProcessExit(pid: pid, generation: generation, exitStatus: exitStatus)
+            return
+        }
+
+        guard exitedPID == 0 else {
+            return
+        }
+
+        scheduleExitVerification(pid: pid, generation: generation, remainingChecks: remainingChecks - 1)
+    }
+
+    private func finalizeProcessExit(pid: pid_t, generation: UInt64, exitStatus: Int32) {
         guard generation == outputGeneration else {
             return
         }
 
-        childPID = 0
+        if childPID == pid {
+            childPID = 0
+        }
         cleanupDescriptorsAndSources()
 
         Task { @MainActor [weak self] in
@@ -639,6 +833,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     private func cleanupDescriptorsAndSources() {
+        processSource?.cancel()
+        processSource = nil
         readSource?.cancel()
         readSource = nil
 

@@ -28,6 +28,34 @@ struct ContentViewLayoutTests {
             Text(isChinese ? "在原生 macOS 壳中打开超大表格文件，同时保留 VisiData 完整的行为、快捷键和运行速度。" : "Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
         """)))
     }
+
+    @Test
+    func expandedRecentFileRowUsesFullCardPrimaryHitTarget() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(normalizeWhitespace("""
+        Button(action: openAction) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(fileURL.lastPathComponent)
+        """)))
+
+        #expect(source.contains(".padding(.trailing, 70)"))
+        #expect(source.contains(normalizeWhitespace("""
+        .overlay(alignment: .trailing) {
+            HStack(spacing: 8) {
+        """)))
+    }
+
+    @Test
+    func sidebarHoverGlowUsesAppKitTrackingBridgeWithYellowBlueGradient() throws {
+        let source = try contentViewSource()
+
+        #expect(source.contains("private struct SidebarHoverTrackingRegion: NSViewRepresentable"))
+        #expect(source.contains("private struct SidebarHoverGlow"))
+        #expect(source.contains("Color(red: 1.0, green: 0.86, blue: 0.26)"))
+        #expect(source.contains("Color(red: 0.23, green: 0.58, blue: 1.0)"))
+    }
 }
 
 private func contentViewSource(filePath: StaticString = #filePath) throws -> String {
