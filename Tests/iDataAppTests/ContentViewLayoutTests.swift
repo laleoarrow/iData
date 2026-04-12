@@ -96,6 +96,38 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func statusPanelHoverHighlightsStayInsideMatchingShapes() throws {
+        let source = try contentViewSource()
+        let normalizedCard = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct StatusAndInputCard: View {",
+            end: "private struct InputMethodQuickSwitchOrbButton: View {"
+        ))
+        let normalizedOrb = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct InputMethodQuickSwitchOrbButton: View {",
+            end: "private struct SessionInfoHintRow: View {"
+        ))
+
+        #expect(normalizedCard.contains(normalizeWhitespace("""
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .inset(by: 1)
+            .fill(
+        """)))
+        #expect(!normalizedCard.contains(".quietInteractiveSurface("))
+        #expect(normalizedOrb.contains(normalizeWhitespace("""
+        Circle()
+            .inset(by: 1)
+            .fill(
+        """)))
+        #expect(normalizedOrb.contains(normalizeWhitespace("""
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        }
+        """)))
+    }
+
+    @Test
     func sidebarTracksExactlyOneHoveredRecentFileAtATime() throws {
         let source = normalizeWhitespace(try contentViewSource())
 
@@ -117,6 +149,11 @@ struct ContentViewLayoutTests {
             if !newValue {
                 hoveredRecentFilePath = nil
             }
+        }
+        """)))
+        #expect(source.contains(normalizeWhitespace("""
+        .onChange(of: model.recentFiles.map { $0.standardizedFileURL.path }) { _, _ in
+            hoveredRecentFilePath = nil
         }
         """)))
     }
@@ -155,4 +192,14 @@ private func normalizeWhitespace(_ value: String) -> String {
     value
         .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func extractSection(from source: String, start: String, end: String) throws -> String {
+    guard let startRange = source.range(of: start) else {
+        throw NSError(domain: "ContentViewLayoutTests", code: 1)
+    }
+    guard let endRange = source.range(of: end, range: startRange.upperBound..<source.endIndex) else {
+        throw NSError(domain: "ContentViewLayoutTests", code: 2)
+    }
+    return String(source[startRange.lowerBound..<endRange.lowerBound])
 }

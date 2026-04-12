@@ -133,7 +133,7 @@ private struct SidebarView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: model.isSidebarCollapsed ? 12 : 10) {
-                            ForEach(model.recentFiles, id: \.path) { fileURL in
+                            ForEach(model.recentFiles, id: \.standardizedFileURL.path) { fileURL in
                                 Group {
                                     if model.isSidebarCollapsed {
                                         CollapsedRecentFileRow(
@@ -178,6 +178,9 @@ private struct SidebarView: View {
                         if !newValue {
                             hoveredRecentFilePath = nil
                         }
+                    }
+                    .onChange(of: model.recentFiles.map { $0.standardizedFileURL.path }) { _, _ in
+                        hoveredRecentFilePath = nil
                     }
                 }
 
@@ -2266,8 +2269,7 @@ private struct StatusAndInputCard: View {
     let isLikelyEnglish: Bool
     let onSwitchToEnglish: () -> Void
 
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var isHovering = false
 
     private var statusBadgeTitle: String {
         if isLikelyEnglish {
@@ -2341,19 +2343,39 @@ private struct StatusAndInputCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.006,
-            hoverYOffset: -0.5,
-            shadowOpacity: 0.05,
-            shadowRadius: 8
-        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .inset(by: 1)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.12),
+                            Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.10),
+                            Color.white.opacity(0.06),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .opacity(isHovering ? 1 : 0)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .inset(by: 1)
+                .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0), lineWidth: 0.9)
+        }
+        .animation(.easeOut(duration: 0.18), value: isHovering)
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        }
     }
 }
 
 private struct InputMethodQuickSwitchOrbButton: View {
     let isChinese: Bool
     let onTap: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
         Button {
@@ -2394,10 +2416,34 @@ private struct InputMethodQuickSwitchOrbButton: View {
                             lineWidth: 1
                         )
                 )
+                .overlay {
+                    Circle()
+                        .inset(by: 1)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.18),
+                                    Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.16),
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .opacity(isHovering ? 1 : 0)
+                }
+                .overlay {
+                    Circle()
+                        .inset(by: 1)
+                        .strokeBorder(Color.white.opacity(isHovering ? 0.22 : 0), lineWidth: 1)
+                }
                 .shadow(color: .black.opacity(0.28), radius: 12, y: 3)
         }
         .buttonStyle(.plain)
         .help(isChinese ? "切换到英文输入法" : "Switch to English input")
+        .animation(.easeOut(duration: 0.18), value: isHovering)
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        }
     }
 }
 
