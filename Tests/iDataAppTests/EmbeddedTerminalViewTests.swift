@@ -343,6 +343,14 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLUsesStableBoxDrawingMetricsForVisiDataBorders() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("customGlyphs: false,"))
+        #expect(html.contains("lineHeight: 1,"))
+    }
+
+    @Test
     func terminalHTMLAvoidsHotPathForcedRefreshCalls() throws {
         let html = try terminalHTML()
 

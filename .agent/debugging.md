@@ -4,9 +4,13 @@
 
 ```bash
 cd /Users/leoarrow/Project/mypackage/agents/iData
+swift build
 swift test
 /bin/zsh -lc 'xcodebuild -project iData.xcodeproj -scheme iDataApp -configuration Debug -derivedDataPath .build/xcode-debug build'
+./scripts/build_app.sh
 ```
+
+This matches the local equivalent of `.github/workflows/swift.yml`.
 
 ## Installable build
 
@@ -76,6 +80,25 @@ open -a /Users/leoarrow/Project/mypackage/agents/iData/dist/iData.app /tmp/sampl
 ps -Ao pid,ppid,etime,command | egrep 'iData|vd|gzip -dc'
 ```
 *Note: Closing the UI window will automatically terminate both `vd` and any descendant processes (like `gzip -dc`) via its process group.*
+
+## Pressure pass after any feature or bug fix
+
+Run a manual stress pass against the built app before claiming the change is stable:
+
+1. Quit every running `iData` instance, then launch the fresh `dist/iData.app` or `/Applications/iData.app`.
+2. Rapidly switch between multiple files or sessions and confirm the visible table/terminal always matches the selected file.
+3. Drag supported files into the window repeatedly and verify the drop target, active session, and focus state stay correct.
+4. Resize the window aggressively, including narrow/wide and short/tall transitions, and watch for clipped content, tearing, stale frames, or wrong visible regions.
+5. Hover and click interactive sidebar/detail controls repeatedly to catch border, glow, alignment, or hit-target regressions.
+6. If the change touched terminal rendering, keep an eye on delayed layout issues: blank regions, half-painted terminal cells, or content drawn outside the expected bounds.
+
+Record any visual defects such as:
+
+- content not filling the available region
+- stale content from a previous file/session
+- hover or focus effects painting the wrong shape
+- drag/drop activating the wrong target
+- visible tearing, flicker, or incomplete repaint during fast changes
 
 ## Terminal frontend
 

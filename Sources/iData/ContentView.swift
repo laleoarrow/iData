@@ -495,12 +495,6 @@ private struct RecentFileRow: View {
         }
         .buttonStyle(.plain)
         .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            SidebarHoverGlow(
-                isVisible: isHovering,
-                style: .rounded(20)
-            )
-        }
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(borderColor)
@@ -518,7 +512,8 @@ private struct RecentFileRow: View {
                         )
                         .overlay(
                             Circle()
-                                .strokeBorder(isPinned ? Color.accentColor.opacity(0.28) : Color.white.opacity(0.08))
+                                .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
+                                .opacity(isHovering ? 0.96 : (isPinned ? 0.48 : 0.18))
                         )
                 }
                 .buttonStyle(.plain)
@@ -539,7 +534,8 @@ private struct RecentFileRow: View {
                         )
                         .overlay(
                             Circle()
-                                .strokeBorder(Color.white.opacity(isHovering ? 0.12 : 0.0))
+                                .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
+                                .opacity(isHovering ? 0.92 : 0.0)
                         )
                 }
                 .buttonStyle(.plain)
@@ -590,6 +586,17 @@ private struct RecentFileRow: View {
         }
 
         return Color.white.opacity(0.06)
+    }
+
+    private var actionBorderGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(red: 1.0, green: 0.86, blue: 0.26),
+                Color(red: 0.23, green: 0.58, blue: 1.0),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 

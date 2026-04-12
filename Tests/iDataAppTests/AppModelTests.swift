@@ -762,6 +762,53 @@ struct AppModelTests {
     }
 
     @Test
+    func preferredSmallFileOpenApplicationPrefersWPSThenExcelBeforeStoredDefault() {
+        let stored = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Numbers.app"),
+            bundleIdentifier: "com.apple.Numbers",
+            displayName: "Numbers"
+        )
+        let excel = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+        let wps = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/WPS Office.app"),
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+
+        let chosen = preferredSmallFileOpenApplication(
+            storedPreviousDefault: stored,
+            fallbackCandidates: [stored, excel, wps]
+        )
+
+        #expect(chosen == wps)
+    }
+
+    @Test
+    func preferredSmallFileOpenApplicationFallsBackToExcelWhenWPSMissing() {
+        let stored = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Numbers.app"),
+            bundleIdentifier: "com.apple.Numbers",
+            displayName: "Numbers"
+        )
+        let excel = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+
+        let chosen = preferredSmallFileOpenApplication(
+            storedPreviousDefault: stored,
+            fallbackCandidates: [stored, excel]
+        )
+
+        #expect(chosen == excel)
+    }
+
+    @Test
     func settledIDataDefaultStateWaitsForDelayedRestorePropagation() async {
         final class Probe: @unchecked Sendable {
             private var readings: [Bool]

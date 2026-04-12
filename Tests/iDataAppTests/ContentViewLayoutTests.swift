@@ -56,6 +56,28 @@ struct ContentViewLayoutTests {
         #expect(source.contains("Color(red: 1.0, green: 0.86, blue: 0.26)"))
         #expect(source.contains("Color(red: 0.23, green: 0.58, blue: 1.0)"))
     }
+
+    @Test
+    func recentFileRowUsesTrailingButtonBorderGlowInsteadOfFullCardGlow() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(!source.contains(normalizeWhitespace("""
+        private struct RecentFileRow: View {
+        """)) || !source.contains(normalizeWhitespace("""
+        .overlay {
+            SidebarHoverGlow(
+                isVisible: isHovering,
+                style: .rounded(20)
+            )
+        }
+        """)))
+
+        #expect(source.contains("private var actionBorderGradient: LinearGradient"))
+        #expect(source.contains(normalizeWhitespace("""
+        Circle()
+            .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
+        """)))
+    }
 }
 
 private func contentViewSource(filePath: StaticString = #filePath) throws -> String {

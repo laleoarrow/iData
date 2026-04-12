@@ -826,15 +826,15 @@ final class AppModel: ObservableObject {
 
     var preferredSmallFileApplicationDisplayName: String {
         preferredSmallFileApplication?.displayName ?? localized(
-            english: "Use previous default app when available",
-            chinese: "优先回退到此前的默认应用"
+            english: "Prefer WPS Office, then Microsoft Excel",
+            chinese: "默认优先 WPS Office，其次 Microsoft Excel"
         )
     }
 
     var smallFileRoutingSummary: String {
         localized(
-            english: "Finder-opened files at or below 100 MiB can be handed off to one global app that you choose here. Compressed .gz/.bgz files always stay in iData.",
-            chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，可以统一转交给你在这里指定的一个应用。压缩 .gz/.bgz 文件始终留在 iData。"
+            english: "Finder-opened files at or below 100 MiB prefer WPS Office, then Microsoft Excel, unless you choose a different global app here. Compressed .gz/.bgz files always stay in iData.",
+            chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，默认优先交给 WPS Office，其次 Microsoft Excel；你也可以在这里改成别的统一应用。压缩 .gz/.bgz 文件始终留在 iData。"
         )
     }
 
@@ -1664,7 +1664,7 @@ final class AppModel: ObservableObject {
             return nil
         }
 
-        return preferredRestoreApplication(
+        return preferredSmallFileOpenApplication(
             storedPreviousDefault: storedPreviousDefaults[lookupExtension],
             fallbackCandidates: FileTypeAssociation.alternativeApplicationCandidates(forExtension: lookupExtension)
         )
@@ -1850,6 +1850,71 @@ func preferredRestoreApplication(
         storedPreviousDefault: storedPreviousDefault,
         fallbackCandidates: fallbackCandidates
     ).first
+}
+
+@MainActor
+func preferredSmallFileOpenApplication(
+    storedPreviousDefault: DefaultApplicationHandler?,
+    fallbackCandidates: [DefaultApplicationHandler] = []
+) -> DefaultApplicationHandler? {
+    preferredSmallFileOpenCandidates(
+        storedPreviousDefault: storedPreviousDefault,
+        fallbackCandidates: fallbackCandidates
+    ).first
+}
+
+@MainActor
+func preferredSmallFileOpenCandidates(
+    storedPreviousDefault: DefaultApplicationHandler?,
+    fallbackCandidates: [DefaultApplicationHandler] = []
+) -> [DefaultApplicationHandler] {
+    var candidates: [DefaultApplicationHandler] = []
+    var seenBundleIdentifiers: Set<String> = []
+
+    let orderedFallbacks = fallbackCandidates.sorted { lhs, rhs in
+        let lhsRank = smallFileOpenPriorityRank(for: lhs)
+        let rhsRank = smallFileOpenPriorityRank(for: rhs)
+        if lhsRank != rhsRank {
+            return lhsRank < rhsRank
+        }
+        return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+    }
+
+    for fallback in orderedFallbacks where !FileTypeAssociation.isIDataBundleIdentifier(fallback.bundleIdentifier) {
+        guard seenBundleIdentifiers.insert(fallback.bundleIdentifier).inserted else {
+            continue
+        }
+        candidates.append(fallback)
+    }
+
+    if
+        let storedPreviousDefault,
+        !FileTypeAssociation.isIDataBundleIdentifier(storedPreviousDefault.bundleIdentifier),
+        seenBundleIdentifiers.insert(storedPreviousDefault.bundleIdentifier).inserted
+    {
+        candidates.append(storedPreviousDefault)
+    }
+
+    return candidates
+}
+
+private func smallFileOpenPriorityRank(for handler: DefaultApplicationHandler) -> Int {
+    let displayName = handler.displayName.lowercased()
+
+    switch handler.bundleIdentifier {
+    case "cn.wps.Office":
+        return 0
+    case "com.microsoft.Excel":
+        return 1
+    default:
+        if displayName.contains("wps") {
+            return 0
+        }
+        if displayName.contains("excel") {
+            return 1
+        }
+        return 2
+    }
 }
 
 @MainActor

@@ -2,32 +2,6 @@ import SwiftUI
 import WebKit
 import OSLog
 
-private func terminalDebugTrace(_ message: String) {
-    let timestamp = ISO8601DateFormatter().string(from: Date())
-    let line = "\(timestamp) \(message)\n"
-    guard let data = line.data(using: .utf8) else {
-        return
-    }
-
-    let fileURL = URL(fileURLWithPath: "/tmp/idata-terminal-trace.log")
-    if !FileManager.default.fileExists(atPath: fileURL.path) {
-        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
-    }
-
-    guard let handle = try? FileHandle(forWritingTo: fileURL) else {
-        return
-    }
-
-    defer { try? handle.close() }
-
-    do {
-        try handle.seekToEnd()
-        try handle.write(contentsOf: data)
-    } catch {
-        return
-    }
-}
-
 struct EmbeddedTerminalView: NSViewRepresentable {
     @ObservedObject var session: VisiDataSessionController
 

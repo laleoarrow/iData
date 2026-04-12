@@ -6,30 +6,96 @@ import OSLog
 import iDataCore
 #endif
 
-private func terminalDebugTrace(_ message: String) {
-    let timestamp = ISO8601DateFormatter().string(from: Date())
-    let line = "\(timestamp) \(message)\n"
-    guard let data = line.data(using: .utf8) else {
-        return
+enum TerminalDebugLogger {
+    private final class Storage: @unchecked Sendable {
+        let stateLock = NSLock()
+        let writeQueue = DispatchQueue(label: "io.github.leoarrow.idata.terminal-debug-log")
+        var enabledOverride: Bool?
+        var logFileURLOverride: URL?
     }
 
-    let fileURL = URL(fileURLWithPath: "/tmp/idata-terminal-trace.log")
-    if !FileManager.default.fileExists(atPath: fileURL.path) {
-        FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+    private static let storage = Storage()
+
+    static func log(_ message: String) {
+        guard isEnabled else {
+            return
+        }
+
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let line = "\(timestamp) \(message)\n"
+        guard let data = line.data(using: .utf8) else {
+            return
+        }
+
+        let logFileURL = resolvedLogFileURL()
+        storage.writeQueue.async {
+            append(data: data, to: logFileURL)
+        }
     }
 
-    guard let handle = try? FileHandle(forWritingTo: fileURL) else {
-        return
+    private static var isEnabled: Bool {
+        storage.stateLock.withLock {
+            if let enabledOverride = storage.enabledOverride {
+                return enabledOverride
+            }
+
+            let environment = ProcessInfo.processInfo.environment
+            let value = environment["IDATA_TERMINAL_TRACE"]?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return value == "1" || value == "true" || value == "yes"
+        }
     }
 
-    defer { try? handle.close() }
-
-    do {
-        try handle.seekToEnd()
-        try handle.write(contentsOf: data)
-    } catch {
-        return
+    private static func resolvedLogFileURL() -> URL {
+        storage.stateLock.withLock {
+            storage.logFileURLOverride ?? URL(fileURLWithPath: "/tmp/idata-terminal-trace.log")
+        }
     }
+
+    private static func append(data: Data, to fileURL: URL) {
+        let fileManager = FileManager.default
+        let directoryURL = fileURL.deletingLastPathComponent()
+
+        do {
+            try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+            if !fileManager.fileExists(atPath: fileURL.path) {
+                fileManager.createFile(atPath: fileURL.path, contents: nil)
+            }
+
+            let handle = try FileHandle(forWritingTo: fileURL)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+        } catch {
+            return
+        }
+    }
+
+    static func setEnabledOverrideForTesting(_ value: Bool?) {
+        storage.stateLock.withLock {
+            storage.enabledOverride = value
+        }
+    }
+
+    static func setLogFileURLForTesting(_ value: URL?) {
+        storage.stateLock.withLock {
+            storage.logFileURLOverride = value
+        }
+    }
+
+    static func flushForTesting() {
+        storage.writeQueue.sync {}
+    }
+
+    static func resetForTesting() {
+        storage.stateLock.withLock {
+            storage.enabledOverride = nil
+            storage.logFileURLOverride = nil
+        }
+    }
+}
+
+func terminalDebugTrace(_ message: String) {
+    TerminalDebugLogger.log(message)
 }
 
 @MainActor
