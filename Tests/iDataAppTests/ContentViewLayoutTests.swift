@@ -75,6 +75,27 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func sidebarFooterIconsUseSingleLayerStableHoverSurface() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains("private struct SidebarFooterActionIcon: View"))
+        #expect(source.contains(normalizeWhitespace("""
+        SettingsLink {
+            SidebarFooterActionIcon(symbol: "gearshape.fill")
+        }
+        """)))
+        #expect(!source.contains(normalizeWhitespace("""
+        SidebarFooterIcon(symbol: "gearshape.fill")
+            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+        """)))
+        #expect(source.contains(normalizeWhitespace("""
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        }
+        """)))
+    }
+
+    @Test
     func sidebarTracksExactlyOneHoveredRecentFileAtATime() throws {
         let source = normalizeWhitespace(try contentViewSource())
 

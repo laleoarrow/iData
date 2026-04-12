@@ -356,8 +356,7 @@ private struct SidebarFooter: View {
             if model.isSidebarCollapsed {
                 VStack(spacing: 18) {
                     SettingsLink {
-                        SidebarFooterIcon(symbol: "gearshape.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+                        SidebarFooterActionIcon(symbol: "gearshape.fill")
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
@@ -365,8 +364,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.isHelpPresented = true
                     } label: {
-                        SidebarFooterIcon(symbol: "questionmark.circle")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+                        SidebarFooterActionIcon(symbol: "questionmark.circle")
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
@@ -374,8 +372,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.presentTutorialHub()
                     } label: {
-                        SidebarFooterIcon(symbol: "graduationcap.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+                        SidebarFooterActionIcon(symbol: "graduationcap.fill")
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
@@ -384,8 +381,7 @@ private struct SidebarFooter: View {
             } else {
                 HStack(spacing: 18) {
                     SettingsLink {
-                        SidebarFooterIcon(symbol: "gearshape.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+                        SidebarFooterActionIcon(symbol: "gearshape.fill")
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
@@ -393,8 +389,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.isHelpPresented = true
                     } label: {
-                        SidebarFooterIcon(symbol: "questionmark.circle")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+                        SidebarFooterActionIcon(symbol: "questionmark.circle")
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
@@ -402,8 +397,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.presentTutorialHub()
                     } label: {
-                        SidebarFooterIcon(symbol: "graduationcap.fill")
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
+                        SidebarFooterActionIcon(symbol: "graduationcap.fill")
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
@@ -820,6 +814,57 @@ private struct SidebarFooterIcon: View {
             .font(.system(size: 18, weight: .semibold))
             .frame(width: 24, height: 24)
             .contentShape(Rectangle())
+    }
+}
+
+private struct SidebarFooterActionIcon: View {
+    let symbol: String
+
+    @State private var isHovering = false
+
+    var body: some View {
+        SidebarFooterIcon(symbol: symbol)
+            .frame(width: 34, height: 34)
+            .background(
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: isHovering
+                                ? [
+                                    Color.white.opacity(0.14),
+                                    Color.accentColor.opacity(0.12),
+                                ]
+                                : [
+                                    Color.white.opacity(0.05),
+                                    Color.white.opacity(0.02),
+                                ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                Circle()
+                    .strokeBorder(
+                        isHovering ? Color.white.opacity(0.18) : Color.white.opacity(0.08)
+                    )
+            )
+            .overlay {
+                SidebarHoverGlow(
+                    isVisible: isHovering,
+                    style: .circle
+                )
+            }
+            .shadow(
+                color: .black.opacity(isHovering ? 0.08 : 0),
+                radius: isHovering ? 8 : 0,
+                y: isHovering ? 3 : 0
+            )
+            .contentShape(Circle())
+            .animation(.easeOut(duration: 0.18), value: isHovering)
+            .background {
+                SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+            }
     }
 }
 
