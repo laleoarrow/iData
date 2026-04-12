@@ -91,7 +91,6 @@ private struct SidebarView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var hoveredRecentFilePath: String?
-    @State private var isHoveringRecentFileList = false
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
@@ -171,11 +170,8 @@ private struct SidebarView: View {
                     }
                     .scrollIndicators(.hidden)
                     .animation(listAnimation, value: model.recentFiles)
-                    .background {
-                        SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHoveringRecentFileList)
-                    }
-                    .onChange(of: isHoveringRecentFileList) { _, newValue in
-                        if !newValue {
+                    .onHover { hovering in
+                        if !hovering {
                             hoveredRecentFilePath = nil
                         }
                     }
@@ -309,8 +305,8 @@ private struct SidebarHeaderCard: View {
                 }
             }
             .buttonStyle(.plain)
-            .background {
-                SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHoveringCollapsedIcon)
+            .onHover { hovering in
+                isHoveringCollapsedIcon = hovering
             }
 
             Spacer(minLength: 0)
@@ -333,7 +329,7 @@ private struct CollapsedSidebarHeaderIconButton<Content: View>: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            Circle()
                 .fill(
                     LinearGradient(
                         colors: isHovering
@@ -351,7 +347,7 @@ private struct CollapsedSidebarHeaderIconButton<Content: View>: View {
                     )
                 )
 
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            Circle()
                 .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
 
             content
@@ -361,12 +357,11 @@ private struct CollapsedSidebarHeaderIconButton<Content: View>: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.secondary)
                     .frame(width: 48, height: 48)
-                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.white.opacity(0.08), in: Circle())
             }
         }
         .frame(width: 60, height: 60)
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: .black.opacity(isHovering ? 0.06 : 0), radius: isHovering ? 8 : 0, y: isHovering ? 3 : 0)
+        .contentShape(Circle())
         .animation(.easeOut(duration: 0.18), value: isHovering)
     }
 }
@@ -581,17 +576,10 @@ private struct RecentFileRow: View {
             }
             .padding(.trailing, 14)
         }
-        .shadow(
-            color: .black.opacity(motionEnabled && isHovering ? 0.10 : 0),
-            radius: motionEnabled && isHovering ? 12 : 0,
-            y: motionEnabled && isHovering ? 5 : 0
-        )
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        .onHover { hovering in
+            isHovering = hovering
         }
-        .scaleEffect(motionEnabled && isHovering ? 1.012 : 1)
-        .offset(y: motionEnabled && isHovering ? -1 : 0)
         .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 
@@ -667,11 +655,10 @@ private struct RecentFileActionButton: View {
         .opacity(isVisible ? 1 : 0)
         .allowsHitTesting(isVisible)
         .contentShape(Circle())
-        .scaleEffect(isVisible && isHovering ? 1.04 : 1)
         .animation(.easeOut(duration: 0.16), value: isVisible)
         .animation(.easeOut(duration: 0.16), value: isHovering)
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: isVisible, isHovering: $isHovering)
+        .onHover { hovering in
+            isHovering = isVisible && hovering
         }
     }
 }
@@ -726,16 +713,9 @@ private struct CollapsedRecentFileRow: View {
         }
         .frame(maxWidth: .infinity)
         .contentShape(Circle())
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        .onHover { hovering in
+            isHovering = hovering
         }
-        .scaleEffect(motionEnabled && isHovering ? 1.02 : 1)
-        .offset(y: motionEnabled && isHovering ? -1 : 0)
-        .shadow(
-            color: .black.opacity(motionEnabled && isHovering ? 0.06 : 0),
-            radius: motionEnabled && isHovering ? 10 : 0,
-            y: motionEnabled && isHovering ? 4 : 0
-        )
         .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 
@@ -807,6 +787,7 @@ private struct SidebarCollapseToggleButton: View {
     let isChinese: Bool
     let motionEnabled: Bool
     let action: () -> Void
+    @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
@@ -816,10 +797,16 @@ private struct SidebarCollapseToggleButton: View {
                 .frame(width: 30, height: 30)
                 .background(
                     LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.10),
-                            Color.accentColor.opacity(0.10),
-                        ],
+                        colors: isHovering
+                            ? [
+                                Color.white.opacity(0.16),
+                                Color.accentColor.opacity(0.14),
+                                Color.white.opacity(0.05),
+                            ]
+                            : [
+                                Color.white.opacity(0.10),
+                                Color.accentColor.opacity(0.10),
+                            ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -827,14 +814,23 @@ private struct SidebarCollapseToggleButton: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10))
+                        .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.10))
                 )
+                .overlay {
+                    SidebarHoverGlow(
+                        isVisible: isHovering,
+                        style: .rounded(10)
+                    )
+                }
         }
         .buttonStyle(.plain)
         .help(isCollapsed
             ? localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏")
             : localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
-        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1, shadowOpacity: 0.08, shadowRadius: 10, glowStyle: .rounded(10))
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 }
 
@@ -902,14 +898,14 @@ private struct SidebarFooterActionIcon: View {
                     .strokeBorder(Color.white.opacity(isHovering ? 0.20 : 0), lineWidth: 1)
             }
             .shadow(
-                color: .black.opacity(isHovering ? 0.08 : 0),
-                radius: isHovering ? 8 : 0,
-                y: isHovering ? 3 : 0
+                color: .black.opacity(isHovering ? 0.04 : 0),
+                radius: isHovering ? 6 : 0,
+                y: isHovering ? 2 : 0
             )
             .contentShape(Circle())
             .animation(.easeOut(duration: 0.18), value: isHovering)
-            .background {
-                SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+            .onHover { hovering in
+                isHovering = hovering
             }
     }
 }
@@ -984,27 +980,27 @@ private struct SidebarHoverGlow: View {
         .allowsHitTesting(false)
     }
 
-    private func glow<S: Shape>(for shape: S) -> some View {
+    private func glow<S: InsettableShape>(for shape: S) -> some View {
         ZStack {
             shape
                 .fill(
                     LinearGradient(
                         colors: [
-                            haloYellow.opacity(0.34),
-                            haloBlue.opacity(0.30),
+                            haloYellow.opacity(0.12),
+                            haloBlue.opacity(0.10),
+                            Color.white.opacity(0.04),
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .scaleEffect(1.08)
-                .blur(radius: 16)
 
-            shape
+            shape.inset(by: 1)
                 .fill(
                     RadialGradient(
                         colors: [
-                            haloYellow.opacity(0.24),
+                            Color.white.opacity(0.08),
+                            haloYellow.opacity(0.10),
                             .clear,
                         ],
                         center: .topLeading,
@@ -1012,27 +1008,22 @@ private struct SidebarHoverGlow: View {
                         endRadius: 42
                     )
                 )
-                .scaleEffect(1.16)
-                .blur(radius: 12)
-                .offset(x: -8, y: -8)
 
-            shape
-                .fill(
-                    RadialGradient(
+            shape.inset(by: 1)
+                .strokeBorder(
+                    LinearGradient(
                         colors: [
-                            haloBlue.opacity(0.22),
-                            .clear,
+                            Color.white.opacity(0.18),
+                            haloBlue.opacity(0.14),
+                            Color.white.opacity(0.06),
                         ],
-                        center: .bottomTrailing,
-                        startRadius: 4,
-                        endRadius: 46
-                    )
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
                 )
-                .scaleEffect(1.18)
-                .blur(radius: 14)
-                .offset(x: 10, y: 8)
         }
-        .blendMode(.plusLighter)
+        .clipShape(shape)
     }
 }
 
@@ -2408,8 +2399,8 @@ private struct StatusAndInputCard: View {
                 .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0), lineWidth: 0.9)
         }
         .animation(.easeOut(duration: 0.18), value: isHovering)
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        .onHover { hovering in
+            isHovering = hovering
         }
     }
 }
@@ -2484,8 +2475,8 @@ private struct InputMethodQuickSwitchOrbButton: View {
         .buttonStyle(.plain)
         .help(isChinese ? "切换到英文输入法" : "Switch to English input")
         .animation(.easeOut(duration: 0.18), value: isHovering)
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
+        .onHover { hovering in
+            isHovering = hovering
         }
     }
 }
@@ -2950,8 +2941,8 @@ private struct QuietInteractiveSurfaceModifier: ViewModifier {
                 y: enabled && isHovering ? max(2, shadowRadius * 0.35) : 0
             )
             .animation(enabled ? .easeOut(duration: 0.24) : nil, value: isHovering)
-            .background {
-                SidebarHoverTrackingRegion(isEnabled: enabled, isHovering: $isHovering)
+            .onHover { hovering in
+                isHovering = enabled && hovering
             }
     }
 }

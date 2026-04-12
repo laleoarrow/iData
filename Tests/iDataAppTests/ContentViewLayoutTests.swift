@@ -64,13 +64,21 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func sidebarHoverGlowUsesAppKitTrackingBridgeWithYellowBlueGradient() throws {
+    func sidebarHoverGlowStaysInsideButtonBounds() throws {
         let source = try contentViewSource()
+        let glowSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarHoverGlow: View {",
+            end: "private struct SidebarHoverTrackingRegion: NSViewRepresentable {"
+        ))
 
-        #expect(source.contains("private struct SidebarHoverTrackingRegion: NSViewRepresentable"))
         #expect(source.contains("private struct SidebarHoverGlow"))
-        #expect(source.contains("Color(red: 1.0, green: 0.86, blue: 0.26)"))
-        #expect(source.contains("Color(red: 0.23, green: 0.58, blue: 1.0)"))
+        #expect(glowSection.contains("Color(red: 1.0, green: 0.86, blue: 0.26)"))
+        #expect(glowSection.contains("Color(red: 0.23, green: 0.58, blue: 1.0)"))
+        #expect(!glowSection.contains(".scaleEffect(1.08)"))
+        #expect(!glowSection.contains(".scaleEffect(1.16)"))
+        #expect(!glowSection.contains(".scaleEffect(1.18)"))
+        #expect(glowSection.contains(".clipShape(shape)"))
     }
 
     @Test
@@ -92,51 +100,53 @@ struct ContentViewLayoutTests {
 
     @Test
     func sidebarFooterIconsUseSingleLayerStableHoverSurface() throws {
-        let source = normalizeWhitespace(try contentViewSource())
+        let source = try contentViewSource()
+        let normalized = normalizeWhitespace(source)
+        let footerSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarFooterActionIcon: View {",
+            end: "private struct SidebarAmbientGlow: View {"
+        ))
 
-        #expect(source.contains("private struct SidebarFooterActionIcon: View"))
-        #expect(source.contains(normalizeWhitespace("""
+        #expect(normalized.contains("private struct SidebarFooterActionIcon: View"))
+        #expect(normalized.contains(normalizeWhitespace("""
         SettingsLink {
             SidebarFooterActionIcon(symbol: "gearshape.fill")
         }
         """)))
-        #expect(!source.contains(normalizeWhitespace("""
+        #expect(!normalized.contains(normalizeWhitespace("""
         SidebarFooterIcon(symbol: "gearshape.fill")
             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
         """)))
-        #expect(source.contains(normalizeWhitespace("""
+        #expect(footerSection.contains(normalizeWhitespace("""
         Circle()
             .inset(by: 1)
             .fill(
         """)))
-        #expect(source.contains(normalizeWhitespace("""
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
-        }
-        """)))
+        #expect(footerSection.contains(".onHover { hovering in"))
+        #expect(!footerSection.contains("SidebarHoverTrackingRegion"))
     }
 
     @Test
     func collapsedSidebarHeaderHoverStaysInsideSidebarBounds() throws {
-        let source = normalizeWhitespace(try contentViewSource())
+        let source = try contentViewSource()
+        let normalized = normalizeWhitespace(source)
+        let collapsedHeaderSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct CollapsedSidebarHeaderIconButton<Content: View>: View {",
+            end: "private struct SidebarFooter: View {"
+        ))
 
-        #expect(source.contains(normalizeWhitespace("""
+        #expect(normalized.contains(normalizeWhitespace("""
         SidebarView(model: model)
             .frame(width: sidebarWidth)
             .frame(maxHeight: .infinity)
         """)))
-        #expect(source.contains(".clipped()"))
-        #expect(source.contains("private struct CollapsedSidebarHeaderIconButton<Content: View>: View"))
-        #expect(!source.contains(normalizeWhitespace("""
-        .quietInteractiveSurface(
-            enabled: motionEnabled,
-            hoverScale: 1.018,
-            hoverYOffset: -1,
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            glowStyle: .rounded(12)
-        )
-        """)))
+        #expect(normalized.contains(".clipped()"))
+        #expect(normalized.contains("private struct CollapsedSidebarHeaderIconButton<Content: View>: View"))
+        #expect(collapsedHeaderSection.contains("Circle()"))
+        #expect(!collapsedHeaderSection.contains("RoundedRectangle(cornerRadius: 14"))
+        #expect(!collapsedHeaderSection.contains("SidebarHoverTrackingRegion"))
     }
 
     @Test
@@ -159,16 +169,15 @@ struct ContentViewLayoutTests {
             .fill(
         """)))
         #expect(!normalizedCard.contains(".quietInteractiveSurface("))
+        #expect(!normalizedCard.contains("SidebarHoverTrackingRegion"))
+        #expect(normalizedCard.contains(".onHover { hovering in"))
         #expect(normalizedOrb.contains(normalizeWhitespace("""
         Circle()
             .inset(by: 1)
             .fill(
         """)))
-        #expect(normalizedOrb.contains(normalizeWhitespace("""
-        .background {
-            SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
-        }
-        """)))
+        #expect(!normalizedOrb.contains("SidebarHoverTrackingRegion"))
+        #expect(normalizedOrb.contains(".onHover { hovering in"))
     }
 
     @Test
@@ -176,7 +185,6 @@ struct ContentViewLayoutTests {
         let source = normalizeWhitespace(try contentViewSource())
 
         #expect(source.contains("@State private var hoveredRecentFilePath: String?"))
-        #expect(source.contains("@State private var isHoveringRecentFileList = false"))
         #expect(source.contains(normalizeWhitespace("""
         private func recentFileHoverBinding(for fileURL: URL) -> Binding<Bool> {
             let hoverKey = fileURL.standardizedFileURL.path
@@ -189,8 +197,8 @@ struct ContentViewLayoutTests {
         }
         """)))
         #expect(source.contains(normalizeWhitespace("""
-        .onChange(of: isHoveringRecentFileList) { _, newValue in
-            if !newValue {
+        .onHover { hovering in
+            if !hovering {
                 hoveredRecentFilePath = nil
             }
         }
@@ -204,21 +212,45 @@ struct ContentViewLayoutTests {
 
     @Test
     func selectedRecentFileRowDoesNotUsePersistentGlowShadow() throws {
-        let source = normalizeWhitespace(try contentViewSource())
+        let source = try contentViewSource()
+        let expandedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct RecentFileRow: View {",
+            end: "private struct RecentFileActionButton: View {"
+        ))
+        let collapsedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct CollapsedRecentFileRow: View {",
+            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+        ))
 
-        #expect(source.contains(normalizeWhitespace("""
-        .shadow(
-            color: .black.opacity(motionEnabled && isHovering ? 0.10 : 0),
-            radius: motionEnabled && isHovering ? 12 : 0,
-            y: motionEnabled && isHovering ? 5 : 0
-        )
-        """)))
-        #expect(!source.contains(normalizeWhitespace("""
-        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 16 : 10, y: 6)
-        """)))
-        #expect(!source.contains(normalizeWhitespace("""
-        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 14 : 8, y: 4)
-        """)))
+        #expect(!expandedRow.contains(".shadow("))
+        #expect(!collapsedRow.contains(".shadow("))
+    }
+
+    @Test
+    func recentFileRowsUseStableHoverWithoutTrackingBridge() throws {
+        let source = try contentViewSource()
+        let expandedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct RecentFileRow: View {",
+            end: "private struct RecentFileActionButton: View {"
+        ))
+        let collapsedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct CollapsedRecentFileRow: View {",
+            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+        ))
+
+        #expect(expandedRow.contains(".onHover { hovering in"))
+        #expect(!expandedRow.contains("SidebarHoverTrackingRegion"))
+        #expect(!expandedRow.contains(".scaleEffect(motionEnabled && isHovering ? 1.012 : 1)"))
+        #expect(!expandedRow.contains(".offset(y: motionEnabled && isHovering ? -1 : 0)"))
+
+        #expect(collapsedRow.contains(".onHover { hovering in"))
+        #expect(!collapsedRow.contains("SidebarHoverTrackingRegion"))
+        #expect(!collapsedRow.contains(".scaleEffect(motionEnabled && isHovering ? 1.02 : 1)"))
+        #expect(!collapsedRow.contains(".offset(y: motionEnabled && isHovering ? -1 : 0)"))
     }
 }
 
