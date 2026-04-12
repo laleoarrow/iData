@@ -58,12 +58,10 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func recentFileRowUsesTrailingButtonBorderGlowInsteadOfFullCardGlow() throws {
+    func recentFileRowUsesFullCardGlowInsteadOfTrailingButtonGlow() throws {
         let source = normalizeWhitespace(try contentViewSource())
 
-        #expect(!source.contains(normalizeWhitespace("""
-        private struct RecentFileRow: View {
-        """)) || !source.contains(normalizeWhitespace("""
+        #expect(source.contains(normalizeWhitespace("""
         .overlay {
             SidebarHoverGlow(
                 isVisible: isHovering,
@@ -72,11 +70,8 @@ struct ContentViewLayoutTests {
         }
         """)))
 
-        #expect(source.contains("private var actionBorderGradient: LinearGradient"))
-        #expect(source.contains(normalizeWhitespace("""
-        Circle()
-            .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
-        """)))
+        #expect(!source.contains("private var actionBorderGradient: LinearGradient"))
+        #expect(source.contains("private struct RecentFileActionButton: View"))
     }
 
     @Test

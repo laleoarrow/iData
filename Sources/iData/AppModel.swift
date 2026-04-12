@@ -732,7 +732,7 @@ final class AppModel: ObservableObject {
     }
 
     func appVersionDisplay(revealingBuild _: Bool) -> String {
-        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.1"
         return "v\(shortVersion)"
     }
 

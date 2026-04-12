@@ -525,48 +525,32 @@ private struct RecentFileRow: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(borderColor)
         )
+        .overlay {
+            SidebarHoverGlow(
+                isVisible: isHovering,
+                style: .rounded(20)
+            )
+        }
         .overlay(alignment: .trailing) {
             HStack(spacing: 8) {
-                Button(action: togglePinAction) {
-                    Image(systemName: isPinned ? "pin.fill" : "pin")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(isPinned ? Color.accentColor : .secondary)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(isPinned ? Color.accentColor.opacity(0.14) : Color.white.opacity(0.06))
-                        )
-                        .overlay(
-                            Circle()
-                                .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
-                                .opacity(isHovering ? 0.96 : (isPinned ? 0.48 : 0.18))
-                        )
-                }
-                .buttonStyle(.plain)
-                .opacity(isHovering ? 1 : 0)
-                .allowsHitTesting(isHovering)
+                RecentFileActionButton(
+                    symbol: isPinned ? "pin.fill" : "pin",
+                    foregroundStyle: isPinned ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary),
+                    backgroundFill: isPinned ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.08),
+                    isVisible: isHovering,
+                    action: togglePinAction
+                )
                 .help(isPinned
                     ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
                     : localizedText(isChinese, english: "Pin to top", chinese: "置顶到顶部"))
 
-                Button(action: removeAction) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(Color.white.opacity(isHovering ? 0.10 : 0.0))
-                        )
-                        .overlay(
-                            Circle()
-                                .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
-                                .opacity(isHovering ? 0.92 : 0.0)
-                        )
-                }
-                .buttonStyle(.plain)
-                .opacity(isHovering ? 1 : 0)
-                .allowsHitTesting(isHovering)
+                RecentFileActionButton(
+                    symbol: "xmark",
+                    foregroundStyle: AnyShapeStyle(.secondary),
+                    backgroundFill: Color.white.opacity(0.08),
+                    isVisible: isHovering,
+                    action: removeAction
+                )
                 .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
             }
             .padding(.trailing, 14)
@@ -600,7 +584,17 @@ private struct RecentFileRow: View {
         }
 
         if isHovering {
-            return AnyShapeStyle(.regularMaterial)
+            return AnyShapeStyle(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.12),
+                        Color.accentColor.opacity(0.10),
+                        Color.white.opacity(0.05),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
         }
 
         return AnyShapeStyle(.thinMaterial)
@@ -617,16 +611,42 @@ private struct RecentFileRow: View {
 
         return Color.white.opacity(0.06)
     }
+}
 
-    private var actionBorderGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 1.0, green: 0.86, blue: 0.26),
-                Color(red: 0.23, green: 0.58, blue: 1.0),
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+private struct RecentFileActionButton: View {
+    let symbol: String
+    let foregroundStyle: AnyShapeStyle
+    let backgroundFill: Color
+    let isVisible: Bool
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(foregroundStyle)
+                .frame(width: 24, height: 24)
+                .background(
+                    Circle()
+                        .fill(backgroundFill.opacity(isVisible ? (isHovering ? 1 : 0.88) : 0))
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(Color.white.opacity(isVisible ? (isHovering ? 0.26 : 0.14) : 0), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .opacity(isVisible ? 1 : 0)
+        .allowsHitTesting(isVisible)
+        .contentShape(Circle())
+        .scaleEffect(isVisible && isHovering ? 1.04 : 1)
+        .animation(.easeOut(duration: 0.16), value: isVisible)
+        .animation(.easeOut(duration: 0.16), value: isHovering)
+        .background {
+            SidebarHoverTrackingRegion(isEnabled: isVisible, isHovering: $isHovering)
+        }
     }
 }
 
