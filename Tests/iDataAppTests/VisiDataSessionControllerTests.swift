@@ -179,6 +179,26 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
+    func firstMeasuredResizeAfterFallbackLaunchRebuildsTerminalDisplay() {
+        let sink = TerminalDisplaySinkBuffer()
+        let signalSpy = SignalSenderSpy()
+        let session = VisiDataSessionController(signalSender: signalSpy.send)
+        session.bind(displaySink: sink)
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: open("/dev/null", O_RDONLY))
+
+        #expect(sink.resetCount == 0)
+
+        session.resize(cols: 180, rows: 40)
+
+        #expect(sink.resetCount == 1)
+        #expect(signalSpy.signalCount == 1)
+
+        session.resize(cols: 180, rows: 40)
+
+        #expect(sink.resetCount == 1)
+    }
+
+    @Test
     func invalidatingDisplayReadinessBuffersOutputUntilFreshReplay() {
         let session = VisiDataSessionController()
         let sink = TerminalDisplaySinkBuffer()
@@ -236,12 +256,16 @@ private enum TestError: Error {
 @MainActor
 private final class TerminalDisplaySinkBuffer: TerminalDisplaySink {
     private(set) var writes: [String] = []
+    private(set) var clearCount = 0
+    private(set) var resetCount = 0
 
     func clearTerminalDisplay() {
+        clearCount += 1
         writes.removeAll()
     }
 
     func resetTerminalDisplay() {
+        resetCount += 1
         writes.removeAll()
     }
 
@@ -253,6 +277,8 @@ private final class TerminalDisplaySinkBuffer: TerminalDisplaySink {
 
     func reset() {
         writes.removeAll()
+        clearCount = 0
+        resetCount = 0
     }
 }
 

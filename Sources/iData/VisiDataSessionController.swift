@@ -215,6 +215,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let ptyWriteDriver: PTYWriteDriver
     private let signalSender: (_ pid: pid_t, _ signal: Int32) -> Int32
     private let launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)?
+    private let displayMeasurementFallbackDelay: Duration
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
     private var hasPresentedDisplay = false
@@ -223,6 +224,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var pendingOpenRequest: PendingOpenRequest?
     private var pendingLaunchTask: Task<Void, Never>?
     private var hasMeasuredDisplaySize = false
+    private var launchedBeforeMeasuredDisplaySize = false
     private let ptyLock = NSLock()
     private var _masterFileDescriptor: Int32 = -1
     private var masterFileDescriptor: Int32 {
@@ -246,11 +248,13 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         signalSender: @escaping (_ pid: pid_t, _ signal: Int32) -> Int32 = { pid, signal in
             Darwin.kill(pid, signal)
         },
-        launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)? = nil
+        launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)? = nil,
+        displayMeasurementFallbackDelay: Duration = .milliseconds(900)
     ) {
         self.ptyWriteDriver = ptyWriteDriver
         self.signalSender = signalSender
         self.launchObserver = launchObserver
+        self.displayMeasurementFallbackDelay = displayMeasurementFallbackDelay
     }
 
     deinit {
@@ -337,7 +341,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                         return
                     }
                     do {
-                        try await Task.sleep(for: .milliseconds(250))
+                        try await Task.sleep(for: self.displayMeasurementFallbackDelay)
                         try Task.checkCancellation()
                         await MainActor.run {
                             terminalDebugTrace("session.open fallbackFire session=\(ObjectIdentifier(self))")
@@ -400,6 +404,12 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         guard sizeChanged else {
             return
+        }
+
+        if childPID > 0, launchedBeforeMeasuredDisplaySize {
+            launchedBeforeMeasuredDisplaySize = false
+            terminalDebugTrace("session.resize rebuildDisplayAfterFallbackLaunch session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows)")
+            displaySink?.resetTerminalDisplay()
         }
 
         var windowSize = winsize(
@@ -657,6 +667,9 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             displaySink?.resetTerminalDisplay()
         }
 
+        launchedBeforeMeasuredDisplaySize = displaySink != nil && !hasMeasuredDisplaySize
+        terminalDebugTrace("session.open launch session=\(ObjectIdentifier(self)) generation=\(pendingOpenRequest.generation) launchedBeforeMeasuredDisplaySize=\(launchedBeforeMeasuredDisplaySize)")
+
         launchObserver?(lastKnownSize.cols, lastKnownSize.rows)
 
         try startProcess(
@@ -799,6 +812,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private func stopCurrentProcessIfNeeded(reapSynchronously: Bool) {
         let pid = childPID
         outputGeneration &+= 1
+        launchedBeforeMeasuredDisplaySize = false
 
         if pid > 0 {
             processSource?.cancel()
@@ -921,6 +935,13 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     @MainActor
     var outputGenerationForTesting: UInt64 {
         outputGeneration
+    }
+
+    @MainActor
+    func simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: Int32) {
+        masterFileDescriptor = fileDescriptor
+        childPID = 999_999
+        launchedBeforeMeasuredDisplaySize = true
     }
 }
 
