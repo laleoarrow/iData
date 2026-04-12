@@ -30,6 +30,22 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func sidebarAppIconUsesNativeArtworkWithoutExtraRoundedBackdrop() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(normalizeWhitespace("""
+        private var appIcon: some View {
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 48, height: 48)
+        """)))
+        #expect(!source.contains(normalizeWhitespace("""
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        """)))
+    }
+
+    @Test
     func expandedRecentFileRowUsesFullCardPrimaryHitTarget() throws {
         let source = normalizeWhitespace(try contentViewSource())
 
@@ -89,9 +105,37 @@ struct ContentViewLayoutTests {
             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
         """)))
         #expect(source.contains(normalizeWhitespace("""
+        Circle()
+            .inset(by: 1)
+            .fill(
+        """)))
+        #expect(source.contains(normalizeWhitespace("""
         .background {
             SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
         }
+        """)))
+    }
+
+    @Test
+    func collapsedSidebarHeaderHoverStaysInsideSidebarBounds() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(normalizeWhitespace("""
+        SidebarView(model: model)
+            .frame(width: sidebarWidth)
+            .frame(maxHeight: .infinity)
+        """)))
+        #expect(source.contains(".clipped()"))
+        #expect(source.contains("private struct CollapsedSidebarHeaderIconButton<Content: View>: View"))
+        #expect(!source.contains(normalizeWhitespace("""
+        .quietInteractiveSurface(
+            enabled: motionEnabled,
+            hoverScale: 1.018,
+            hoverYOffset: -1,
+            shadowOpacity: 0.06,
+            shadowRadius: 8,
+            glowStyle: .rounded(12)
+        )
         """)))
     }
 

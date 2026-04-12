@@ -190,6 +190,7 @@ private struct SidebarView: View {
             }
             .padding(16)
         }
+        .clipped()
     }
 
     private func recentFileHoverBinding(for fileURL: URL) -> Binding<Bool> {
@@ -242,8 +243,8 @@ private struct SidebarHeaderCard: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
-        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.008, hoverYOffset: -1, shadowOpacity: 0.08, shadowRadius: 12)
     }
 
     private var expandedBody: some View {
@@ -300,26 +301,14 @@ private struct SidebarHeaderCard: View {
                     model.setSidebarCollapsed(false)
                 }
             } label: {
-                ZStack {
+                CollapsedSidebarHeaderIconButton(
+                    isHovering: isHoveringCollapsedIcon,
+                    showsClearGlyph: commandMonitor.isCommandPressed && !model.recentFiles.isEmpty
+                ) {
                     appIcon
-
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 42, height: 42)
-                        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .opacity(isHoveringCollapsedIcon && commandMonitor.isCommandPressed && !model.recentFiles.isEmpty ? 1 : 0)
                 }
             }
             .buttonStyle(.plain)
-            .quietInteractiveSurface(
-                enabled: motionEnabled,
-                hoverScale: 1.018,
-                hoverYOffset: -1,
-                shadowOpacity: 0.06,
-                shadowRadius: 8,
-                glowStyle: .rounded(12)
-            )
             .background {
                 SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHoveringCollapsedIcon)
             }
@@ -332,13 +321,53 @@ private struct SidebarHeaderCard: View {
         Image(nsImage: NSApplication.shared.applicationIconImage)
             .resizable()
             .aspectRatio(contentMode: .fit)
-            .frame(width: 42, height: 42)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.10))
-            )
+            .frame(width: 48, height: 48)
+            .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
+    }
+}
+
+private struct CollapsedSidebarHeaderIconButton<Content: View>: View {
+    let isHovering: Bool
+    let showsClearGlyph: Bool
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: isHovering
+                            ? [
+                                Color.white.opacity(0.14),
+                                Color.accentColor.opacity(0.12),
+                                Color.white.opacity(0.05),
+                            ]
+                            : [
+                                Color.white.opacity(0.04),
+                                Color.white.opacity(0.02),
+                            ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
+
+            content
+
+            if showsClearGlyph {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 48, height: 48)
+                    .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+        .frame(width: 60, height: 60)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(isHovering ? 0.06 : 0), radius: isHovering ? 8 : 0, y: isHovering ? 3 : 0)
+        .animation(.easeOut(duration: 0.18), value: isHovering)
     }
 }
 
@@ -853,10 +882,24 @@ private struct SidebarFooterActionIcon: View {
                     )
             )
             .overlay {
-                SidebarHoverGlow(
-                    isVisible: isHovering,
-                    style: .circle
-                )
+                Circle()
+                    .inset(by: 1)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.16),
+                                Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.14),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .opacity(isHovering ? 1 : 0)
+            }
+            .overlay {
+                Circle()
+                    .inset(by: 1)
+                    .strokeBorder(Color.white.opacity(isHovering ? 0.20 : 0), lineWidth: 1)
             }
             .shadow(
                 color: .black.opacity(isHovering ? 0.08 : 0),
