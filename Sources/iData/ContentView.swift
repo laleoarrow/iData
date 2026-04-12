@@ -90,6 +90,8 @@ struct ContentView: View {
 private struct SidebarView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var hoveredRecentFilePath: String?
+    @State private var isHoveringRecentFileList = false
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
@@ -137,6 +139,7 @@ private struct SidebarView: View {
                                         CollapsedRecentFileRow(
                                             fileURL: fileURL,
                                             isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                            isHovering: recentFileHoverBinding(for: fileURL),
                                             isChinese: model.effectiveLanguage == .chinese,
                                             openAction: { model.openExternalFile(fileURL) },
                                             removeAction: { model.removeRecentFile(fileURL) }
@@ -146,6 +149,7 @@ private struct SidebarView: View {
                                             fileURL: fileURL,
                                             isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
                                             isPinned: model.isPinnedRecentFile(fileURL),
+                                            isHovering: recentFileHoverBinding(for: fileURL),
                                             isChinese: model.effectiveLanguage == .chinese,
                                             openAction: { model.openExternalFile(fileURL) },
                                             togglePinAction: { model.togglePinnedRecentFile(fileURL) },
@@ -167,6 +171,14 @@ private struct SidebarView: View {
                     }
                     .scrollIndicators(.hidden)
                     .animation(listAnimation, value: model.recentFiles)
+                    .background {
+                        SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHoveringRecentFileList)
+                    }
+                    .onChange(of: isHoveringRecentFileList) { _, newValue in
+                        if !newValue {
+                            hoveredRecentFilePath = nil
+                        }
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -175,6 +187,20 @@ private struct SidebarView: View {
             }
             .padding(16)
         }
+    }
+
+    private func recentFileHoverBinding(for fileURL: URL) -> Binding<Bool> {
+        let hoverKey = fileURL.standardizedFileURL.path
+        return Binding(
+            get: { hoveredRecentFilePath == hoverKey },
+            set: { isHovering in
+                if isHovering {
+                    hoveredRecentFilePath = hoverKey
+                } else if hoveredRecentFilePath == hoverKey {
+                    hoveredRecentFilePath = nil
+                }
+            }
+        )
     }
 }
 
@@ -457,6 +483,7 @@ private struct RecentFileRow: View {
     let fileURL: URL
     let isActive: Bool
     let isPinned: Bool
+    @Binding var isHovering: Bool
     let isChinese: Bool
     let openAction: () -> Void
     let togglePinAction: () -> Void
@@ -464,7 +491,6 @@ private struct RecentFileRow: View {
 
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @State private var isHovering = false
 
     private var motionEnabled: Bool {
         idataAnimationsEnabled && !accessibilityReduceMotion
@@ -545,7 +571,11 @@ private struct RecentFileRow: View {
             }
             .padding(.trailing, 14)
         }
-        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 16 : 10, y: 6)
+        .shadow(
+            color: .black.opacity(motionEnabled && isHovering ? 0.10 : 0),
+            radius: motionEnabled && isHovering ? 12 : 0,
+            y: motionEnabled && isHovering ? 5 : 0
+        )
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .background {
             SidebarHoverTrackingRegion(isEnabled: true, isHovering: $isHovering)
@@ -603,6 +633,7 @@ private struct RecentFileRow: View {
 private struct CollapsedRecentFileRow: View {
     let fileURL: URL
     let isActive: Bool
+    @Binding var isHovering: Bool
     let isChinese: Bool
     let openAction: () -> Void
     let removeAction: () -> Void
@@ -610,7 +641,6 @@ private struct CollapsedRecentFileRow: View {
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @StateObject private var commandMonitor = CommandKeyMonitor()
-    @State private var isHovering = false
 
     private var motionEnabled: Bool {
         idataAnimationsEnabled && !accessibilityReduceMotion
@@ -648,7 +678,6 @@ private struct CollapsedRecentFileRow: View {
                 style: .circle
             )
         }
-        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 14 : 8, y: 4)
         .frame(maxWidth: .infinity)
         .contentShape(Circle())
         .background {

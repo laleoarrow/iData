@@ -78,6 +78,51 @@ struct ContentViewLayoutTests {
             .strokeBorder(actionBorderGradient, lineWidth: isHovering ? 1.2 : 0.9)
         """)))
     }
+
+    @Test
+    func sidebarTracksExactlyOneHoveredRecentFileAtATime() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains("@State private var hoveredRecentFilePath: String?"))
+        #expect(source.contains("@State private var isHoveringRecentFileList = false"))
+        #expect(source.contains(normalizeWhitespace("""
+        private func recentFileHoverBinding(for fileURL: URL) -> Binding<Bool> {
+            let hoverKey = fileURL.standardizedFileURL.path
+        """)))
+        #expect(source.contains(normalizeWhitespace("""
+        if isHovering {
+            hoveredRecentFilePath = hoverKey
+        } else if hoveredRecentFilePath == hoverKey {
+            hoveredRecentFilePath = nil
+        }
+        """)))
+        #expect(source.contains(normalizeWhitespace("""
+        .onChange(of: isHoveringRecentFileList) { _, newValue in
+            if !newValue {
+                hoveredRecentFilePath = nil
+            }
+        }
+        """)))
+    }
+
+    @Test
+    func selectedRecentFileRowDoesNotUsePersistentGlowShadow() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(normalizeWhitespace("""
+        .shadow(
+            color: .black.opacity(motionEnabled && isHovering ? 0.10 : 0),
+            radius: motionEnabled && isHovering ? 12 : 0,
+            y: motionEnabled && isHovering ? 5 : 0
+        )
+        """)))
+        #expect(!source.contains(normalizeWhitespace("""
+        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 16 : 10, y: 6)
+        """)))
+        #expect(!source.contains(normalizeWhitespace("""
+        .shadow(color: .black.opacity(isActive ? 0.16 : 0.08), radius: isActive ? 14 : 8, y: 4)
+        """)))
+    }
 }
 
 private func contentViewSource(filePath: StaticString = #filePath) throws -> String {
