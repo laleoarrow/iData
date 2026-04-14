@@ -667,7 +667,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             displaySink?.resetTerminalDisplay()
         }
 
-        launchedBeforeMeasuredDisplaySize = displaySink != nil && !hasMeasuredDisplaySize
+        // Rebuild the terminal on the first measured resize whenever the PTY
+        // launched before we had a real container measurement, even if the
+        // display sink was attached later during the welcome -> session switch.
+        launchedBeforeMeasuredDisplaySize = !hasMeasuredDisplaySize
         terminalDebugTrace("session.open launch session=\(ObjectIdentifier(self)) generation=\(pendingOpenRequest.generation) launchedBeforeMeasuredDisplaySize=\(launchedBeforeMeasuredDisplaySize)")
 
         launchObserver?(lastKnownSize.cols, lastKnownSize.rows)

@@ -12,6 +12,26 @@ swift test
 
 This matches the local equivalent of `.github/workflows/swift.yml`.
 
+## Required handoff after any code change
+
+Before claiming a fix or feature is ready, complete this checklist against the final diff, not an earlier draft:
+
+1. Run the full local equivalent of `.github/workflows/swift.yml`:
+
+```bash
+cd /Users/leoarrow/Project/mypackage/agents/iData
+swift build -v
+swift test -v
+xcodebuild -project iData.xcodeproj -scheme iDataApp -configuration Debug -derivedDataPath .build/xcode-debug build
+./scripts/build_app.sh
+```
+
+2. If the change touches packaging, release assets, update metadata, `docs/appcast.xml`, or Homebrew sync behavior, inspect the impacted workflow file under `.github/workflows/` and verify the new assumptions still match the automation. For release automation changes, this includes `.github/workflows/sync-homebrew-cask.yml`.
+3. Replace `/Applications/iData.app` with the fresh `dist/iData.app`, launch the installed app, and leave it ready for human review unless the user explicitly says not to.
+4. Run the pressure pass below against the fresh app build.
+5. Remove temporary logs, debug prints, dead code, throwaway assets, and any other experiment-only artifacts before handoff.
+6. Check `git status --short` before handing work off. The only remaining diff may be the intended tracked changes for review. If the task is fully finished, the worktree should otherwise be clean.
+
 ## Installable build
 
 ```bash

@@ -199,6 +199,37 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
+    func firstMeasuredResizeRebuildsDisplayAfterSessionBindsPostLaunch() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-post-bind-resize-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-post-bind.zsh")
+        try makeSleepLauncher(at: launcher, sleepSeconds: 120)
+
+        let sink = TerminalDisplaySinkBuffer()
+        let session = VisiDataSessionController()
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        defer {
+            session.terminate()
+        }
+
+        session.bind(displaySink: sink)
+
+        #expect(sink.resetCount == 0)
+
+        session.resize(cols: 180, rows: 40)
+
+        #expect(sink.resetCount == 1)
+    }
+
+    @Test
     func invalidatingDisplayReadinessBuffersOutputUntilFreshReplay() {
         let session = VisiDataSessionController()
         let sink = TerminalDisplaySinkBuffer()

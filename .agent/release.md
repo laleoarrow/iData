@@ -28,6 +28,14 @@ Outputs:
 
 Homebrew tap is synced by GitHub Actions after a GitHub Release is published.
 
+## Workflow parity for release-related changes
+
+If you modify release packaging, asset names, `docs/appcast.xml`, notarization inputs, or Homebrew tap sync behavior, do not stop at local packaging scripts alone:
+
+1. Re-read the relevant workflow under `.github/workflows/` and confirm the changed filenames, digests, tags, and branch assumptions still match the automation.
+2. For Homebrew sync changes, explicitly verify `.github/workflows/sync-homebrew-cask.yml` still resolves the same asset name and digest shape that `package_release.sh` publishes.
+3. Before tagging or publishing, confirm `git status --short` is clean except for the intended release edits.
+
 Optional signing and notarization inputs:
 
 - `IDATA_DEVELOPER_ID_APP`
