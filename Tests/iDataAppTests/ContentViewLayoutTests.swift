@@ -30,6 +30,39 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func quickStartPanelMatchesTutorialCardStructure() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(normalizeWhitespace("""
+        private var quickTipsCard: some View {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+        """)))
+
+        #expect(source.contains(normalizeWhitespace("""
+        VStack(spacing: 9) {
+            ForEach(quickTips) { tip in
+                quickTipPreviewRow(tip)
+            }
+        }
+        """)))
+
+        #expect(source.contains(normalizeWhitespace("""
+        private func quickTipPreviewRow(_ tip: QuickTip) -> some View {
+            HStack(alignment: .top, spacing: 10) {
+        """)))
+
+        #expect(source.contains(normalizeWhitespace("""
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.20),
+                    Color.white.opacity(0.05),
+                ],
+        """)))
+    }
+
+    @Test
     func sidebarAppIconUsesNativeArtworkWithoutExtraRoundedBackdrop() throws {
         let source = normalizeWhitespace(try contentViewSource())
 

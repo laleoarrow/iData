@@ -1963,43 +1963,69 @@ private struct WelcomeDetailView: View {
 
     private var quickTipsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(localizedText(isChinese, english: "VisiData Quick Start", chinese: "VisiData 快速上手"))
-                .font(.headline)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(localizedText(isChinese, english: "VisiData Quick Start", chinese: "VisiData 快速上手"))
+                        .font(.headline)
 
-            Text(localizedText(
-                isChinese,
-                english: "These are common starter shortcuts. All normal VisiData commands still work inside the embedded session.",
-                chinese: "这里列出的是常见入门快捷键。内嵌会话里其余标准 VisiData 命令仍然都可以正常使用。"
-            ))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            ForEach(quickTips) { tip in
-                HStack(alignment: .top, spacing: 14) {
-                    Text(tip.keys)
-                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.08), in: Capsule())
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tip.title)
-                            .font(.headline)
-                        Text(tip.detail)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    Text(localizedText(
+                        isChinese,
+                        english: "These are common starter shortcuts. All normal VisiData commands still work inside the embedded session.",
+                        chinese: "这里列出的是常见入门快捷键。内嵌会话里其余标准 VisiData 命令仍然都可以正常使用。"
+                    ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 0)
+            }
+
+            VStack(spacing: 9) {
+                ForEach(quickTips) { tip in
+                    quickTipPreviewRow(tip)
+                }
             }
         }
         .padding(22)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.20),
+                    Color.white.opacity(0.05),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
+                .strokeBorder(Color.white.opacity(0.10))
         )
+    }
+
+    @ViewBuilder
+    private func quickTipPreviewRow(_ tip: QuickTip) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(tip.keys)
+                .font(.system(.caption, design: .monospaced, weight: .semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.08), in: Capsule())
+                .frame(minWidth: 110, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(tip.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(tip.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private var formatsCard: some View {
