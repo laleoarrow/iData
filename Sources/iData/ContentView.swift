@@ -1599,15 +1599,18 @@ private struct WelcomeDetailView: View {
     @ObservedObject var updater: AppUpdaterController
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var customAssociationInput = ""
+    @State private var tutorialPreviewChapterIndex: Int = 0
+    @State private var tutorialCarouselTimer: Timer?
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
-    private var basicPreviewSteps: [AppModel.TutorialStep] {
-        model.tutorialChapters
-            .first(where: { $0.id == AppModel.defaultTutorialChapterID })?
-            .steps ?? []
+    private var currentPreviewChapter: AppModel.TutorialChapter? {
+        let chapters = model.tutorialChapters
+        guard !chapters.isEmpty else { return nil }
+        let index = tutorialPreviewChapterIndex % chapters.count
+        return chapters[index]
     }
 
     private var isChinese: Bool {
@@ -1862,7 +1865,10 @@ private struct WelcomeDetailView: View {
     }
 
     private var tutorialEntryCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let chapters = model.tutorialChapters
+        let chapter = currentPreviewChapter
+
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(isChinese ? "交互式教程" : "Interactive Tutorial")
@@ -1885,12 +1891,54 @@ private struct WelcomeDetailView: View {
                 .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1)
             }
 
-            VStack(spacing: 9) {
-                ForEach(Array(basicPreviewSteps.prefix(4)), id: \.id) { step in
-                    tutorialPreviewRow(step)
+            if let chapter {
+                // Chapter sub-header
+                HStack(spacing: 8) {
+                    Image(systemName: chapter.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                    Text(chapter.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
                 }
+                .id(chapter.id + "-header")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+
+                VStack(spacing: 9) {
+                    ForEach(Array(chapter.steps.prefix(4)), id: \.id) { step in
+                        tutorialPreviewRow(step)
+                    }
+                }
+                .id(chapter.id + "-steps")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
             }
-            .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.86, blendDuration: 0.12) : nil, value: model.isTutorialActive)
+
+            // Page indicator dots
+            if chapters.count > 1 {
+                HStack(spacing: 6) {
+                    Spacer()
+                    ForEach(Array(chapters.enumerated()), id: \.element.id) { index, _ in
+                        Circle()
+                            .fill(Color.white.opacity(index == (tutorialPreviewChapterIndex % chapters.count) ? 0.8 : 0.25))
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(index == (tutorialPreviewChapterIndex % chapters.count) ? 1.15 : 1)
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.35)) {
+                                    tutorialPreviewChapterIndex = index
+                                }
+                                restartCarouselTimer()
+                            }
+                    }
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
         }
         .padding(22)
         .background(
@@ -1908,6 +1956,24 @@ private struct WelcomeDetailView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
+        .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
+        .onAppear { startCarouselTimer() }
+        .onDisappear { tutorialCarouselTimer?.invalidate() }
+    }
+
+    private func startCarouselTimer() {
+        tutorialCarouselTimer?.invalidate()
+        tutorialCarouselTimer = Timer.scheduledTimer(withTimeInterval: 6.0, repeats: true) { _ in
+            Task { @MainActor in
+                let chapters = model.tutorialChapters
+                guard chapters.count > 1 else { return }
+                tutorialPreviewChapterIndex = (tutorialPreviewChapterIndex + 1) % chapters.count
+            }
+        }
+    }
+
+    private func restartCarouselTimer() {
+        startCarouselTimer()
     }
 
     @ViewBuilder
