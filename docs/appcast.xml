@@ -3,32 +3,30 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.1</title>
-            <pubDate>Sun, 12 Apr 2026 13:18:02 +0800</pubDate>
+            <title>0.2.2</title>
+            <pubDate>Wed, 15 Apr 2026 17:11:15 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>21</sparkle:version>
-            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+            <sparkle:version>22</sparkle:version>
+            <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# iData v0.2.1
+            <description sparkle:format="markdown"><![CDATA[## v0.2.2
 
-This release tightens sidebar hover rendering so recent-file cards, footer actions, and status controls keep their highlight surfaces inside their intended bounds during fast hover changes and resize churn.
+### Bug fixes
 
-## Highlights
+- **Fixed blank main table after first file click or fast file switch.**
+  VisiData was launched with a default terminal size (120×32) before the
+  embedded xterm view reported its real dimensions. When the measured size
+  arrived, ncurses sent only a diff against its cached small-frame state,
+  leaving the table area completely blank with only the status bar visible.
+  The fix discards stale transcript output and sends Ctrl+L (`\u000c`) over
+  the PTY to force a full ncurses repaint at the correct dimensions.
 
-- Replace sidebar hover tracking bridges with direct hover handling so recent-file hover state clears cleanly when the pointer leaves the list
-- Clip hover glows to the matching rounded or circular control shapes to avoid bleed, overscaled highlights, and unstable hit-area visuals near the sidebar edge
-- Keep collapsed-header, footer, and status/input hover affordances visually stable under repeated hover transitions and narrow-window relayout
-- Expand layout regression coverage around hover glow containment, sidebar bounds, and recent-file hover-state reset behavior
-
-## Notes
-
-- Primary install path:
-  - `brew install --cask laleoarrow/tap/idata`
-- Recommended VisiData install path:
-  - `pipx install visidata`
-  - `pipx inject visidata openpyxl pyxlsb xlrd zstandard`
+- **Re-clicking the active file no longer restarts VisiData.**
+  Selecting a file that is already open and running in the active session now
+  focuses the terminal and updates the status message instead of tearing down
+  and relaunching the session unnecessarily.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.1/iData-v0.2.1-macos-universal.zip" length="3997957" type="application/octet-stream" sparkle:edSignature="ZmuS3/yKTIBfqai7M6VvhcgivQSor9I2i13QiIbj2tnGSEsMJbMDVymcwl0jJVq7x0Y0oCHOuy5RLjoLtGPDAA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.2/iData-v0.2.2-macos-universal.zip" length="4007631" type="application/octet-stream" sparkle:edSignature="ve/VWd6A5Lu4hmPTuxUdyFzGXXqcwuXjT72dcpzwopGO6HY7Le216qMLPqsLK5e+94dFBsBcHa3p5/baWM5lAQ=="/>
         </item>
     </channel>
 </rss>
