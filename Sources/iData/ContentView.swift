@@ -2419,11 +2419,13 @@ private struct StatusAndInputCard: View {
                     )
                 )
                 .opacity(isHovering ? 1 : 0)
+                .allowsHitTesting(false)
         }
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .inset(by: 1)
                 .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0), lineWidth: 0.9)
+                .allowsHitTesting(false)
         }
         .animation(.easeOut(duration: 0.18), value: isHovering)
         .onHover { hovering in
