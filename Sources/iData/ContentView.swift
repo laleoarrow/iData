@@ -1738,7 +1738,7 @@ private struct WelcomeDetailView: View {
                         }
                     }
 
-                    Text(isChinese ? "在原生 macOS 壳中打开超大表格文件，同时保留 VisiData 完整的行为、快捷键和运行速度。" : "Open large tables in a native macOS shell while keeping real VisiData behavior, shortcuts, and speed.")
+                    Text(isChinese ? "以原生体验极速打开超大表格，完美保留 VisiData 的行为、快捷键与处理能力。" : "Open large tables with a native macOS experience while keeping full VisiData behavior, shortcuts, and speed.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1820,7 +1820,7 @@ private struct WelcomeDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Text(isChinese ? "大多数生信文件后缀会直接透传。压缩的 `.gz` / `.bgz` 文件会直接流式读取，无需解压。" : "Most bioinformatics suffixes are passed through directly. Compressed `.gz` / `.bgz` files are streamed without extracting.")
+            Text(isChinese ? "大多数数据文件会交由引擎直接处理。原生支持读取 `.gz` / `.bgz` 等压缩流，无需预先解压。" : "Most data files are delegated to the underlying engine. Compressed `.gz` / `.bgz` files are streamed natively without extracting.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -1946,8 +1946,8 @@ private struct WelcomeDetailView: View {
                 icon: "waveform.path.ecg.rectangle",
                 detail: localizedText(
                     isChinese,
-                    english: "\(model.visiDataDependencySummary) Files are no longer restricted by suffix; iData only special-cases compressed gzip-like inputs.",
-                    chinese: "\(model.visiDataDependencySummary) 现在文件不再受后缀限制；iData 只会对 gzip 类压缩输入做少量特殊处理。"
+                    english: "\(model.visiDataDependencySummary) Automatic format detection enabled. Compressed .gz/.bgz streams are natively supported.",
+                    chinese: "\(model.visiDataDependencySummary) 格式自动识别已启用，且原生支持读取 .gz / .bgz 等各类压缩数据流。"
                 )
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
