@@ -1695,9 +1695,9 @@ private struct WelcomeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 heroCard
+                quickTipsCard
                 tutorialEntryCard
                 summaryCards
-                quickTipsCard
                 formatsCard
 
                 if let errorMessage = model.errorMessage {
