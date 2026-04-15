@@ -1301,7 +1301,7 @@ private struct HelpView: View {
 
     private var visiDataTips: [QuickTip] {
         [
-            QuickTip(keys: "hjkl / ←↑↓→", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "不离开键盘也能在单元格和列之间快速移动。")),
+            QuickTip(keys: "← ↑ ↓ →  /  h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "不离开键盘也能在单元格和列之间快速移动。")),
             QuickTip(keys: "/  ?  n  N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward, then jump through matches.", chinese: "支持向前或向后搜索，并在匹配结果间跳转。")),
             QuickTip(keys: "[  ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "对当前列执行升序或降序排序。")),
             QuickTip(keys: "s  t  u", title: localizedText(isChinese, english: "Select", chinese: "选择"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows for later commands.", chinese: "选择、切换或取消选择行，供后续命令使用。")),
@@ -1615,7 +1615,7 @@ private struct WelcomeDetailView: View {
 
     private var quickTips: [QuickTip] {
         [
-            QuickTip(keys: "hjkl / ←↑↓→", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate rows and columns quickly without leaving the keyboard.", chinese: "不离开键盘也能快速移动行和列。")),
+            QuickTip(keys: "← ↑ ↓ →  /  h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate rows and columns quickly without leaving the keyboard.", chinese: "不离开键盘也能快速移动行和列。")),
             QuickTip(keys: "/  ?  n  N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward in the current sheet, then jump to next or previous match.", chinese: "在当前工作表中向前或向后搜索，然后跳到下一个或上一个匹配项。")),
             QuickTip(keys: "s  t  u", title: localizedText(isChinese, english: "Select Rows", chinese: "选择行"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows before profiling or exporting.", chinese: "在统计分析或导出之前，先选择、切换或取消选择行。")),
             QuickTip(keys: "[  ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "对当前列执行升序或降序排序。")),
