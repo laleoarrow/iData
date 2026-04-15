@@ -276,7 +276,7 @@ private struct SidebarHeaderCard: View {
                     Text(localizedText(
                         isChinese,
                         english: "Native shell for large-table workflows with VisiData",
-                        chinese: "面向超大表格工作流的原生 VisiData 壳层"
+                        chinese: "在原生 macOS 中轻松查看超大表格"
                     ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -444,7 +444,7 @@ private struct EmptySidebarState: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label(localizedText(isChinese, english: "No recent files yet", chinese: "还没有最近文件"), systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+            Label(localizedText(isChinese, english: "No recent files yet", chinese: "暂无最近文件"), systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                 .font(.headline)
 
             Text(localizedText(
@@ -563,7 +563,7 @@ private struct RecentFileRow: View {
                 )
                 .help(isPinned
                     ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
-                    : localizedText(isChinese, english: "Pin to top", chinese: "置顶到顶部"))
+                    : localizedText(isChinese, english: "Pin to top", chinese: "置顶"))
 
                 RecentFileActionButton(
                     symbol: "xmark",
@@ -1243,7 +1243,7 @@ private struct HelpView: View {
                 detail: localizedText(
                     isChinese,
                     english: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData.",
-                    chinese: "用工具栏打开文件，或直接把文件拖进主窗口。iData 会把真实文件转交给内嵌的 VisiData。"
+                    chinese: "用工具栏打开文件，或直接拖入窗口。iData 会将文件交由内嵌的 VisiData 处理。"
                 )
             ),
             QuickTip(
@@ -1280,11 +1280,11 @@ private struct HelpView: View {
             ),
             QuickTip(
                 keys: ".gz / .bgz",
-                title: localizedText(isChinese, english: "Stream Compression", chinese: "压缩流式读取"),
+                title: localizedText(isChinese, english: "Stream Compression", chinese: "流式解压"),
                 detail: localizedText(
                     isChinese,
                     english: "Compressed files are streamed into VisiData without extracting them to disk first.",
-                    chinese: "压缩文件会直接流式送入 VisiData，不需要先解压到磁盘。"
+                    chinese: "压缩文件无需先解压，直接流式送入 VisiData 处理。"
                 )
             ),
             QuickTip(
@@ -1293,7 +1293,7 @@ private struct HelpView: View {
                 detail: localizedText(
                     isChinese,
                     english: "VisiData can read Excel, but that depends on the Python environment having the required loader installed. If Excel fails, install the missing VisiData dependency in the same Python environment as `vd`.",
-                    chinese: "VisiData 可以读取 Excel，但前提是 `vd` 所在的 Python 环境已经装好了对应的读取依赖。如果 Excel 打不开，请在同一个 `vd` 环境里补装缺失依赖。"
+                    chinese: "VisiData 支持 Excel，但需要 `vd` 所在 Python 环境中安装相应依赖。若 Excel 打不开，请在该环境中补装缺失依赖。"
                 )
             ),
         ]
@@ -1397,15 +1397,15 @@ private struct HelpView: View {
                     Text(localizedText(
                         isChinese,
                         english: "iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.",
-                        chinese: "iData 是包裹真实 VisiData 的原生 macOS 外壳。外层应用负责打开文件、历史记录、更新和设置；中间的主表格区域仍然是真正的 VisiData，因此你熟悉的 VisiData 命令在会话里依然有效。"
+                        chinese: "iData 是 VisiData 的原生 macOS 封装。外层负责文件管理、历史记录、更新与设置；主表格区域运行的是真正的 VisiData，你熟悉的所有命令依然有效。"
                     ))
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 10) {
-                        StatusPill(title: localizedText(isChinese, english: "Native macOS shell", chinese: "原生 macOS 壳层"), tint: .white.opacity(0.12), icon: "macwindow")
-                        StatusPill(title: localizedText(isChinese, english: "Real VisiData core", chinese: "真实 VisiData 内核"), tint: Color.accentColor.opacity(0.20), icon: "terminal")
+                        StatusPill(title: localizedText(isChinese, english: "Native macOS shell", chinese: "原生 macOS 界面"), tint: .white.opacity(0.12), icon: "macwindow")
+                        StatusPill(title: localizedText(isChinese, english: "Real VisiData core", chinese: "VisiData 驱动"), tint: Color.accentColor.opacity(0.20), icon: "terminal")
                     }
                 }
             }
