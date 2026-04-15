@@ -76,6 +76,7 @@ Known failure modes:
 - SwiftUI reuses the same representable without rebuilding the bridge
 - xterm layout does not stabilize until resize
 - detail routing uses a stale `activeSession` instead of a running `displayedSession`
+- **ncurses delta-optimization leaves main table blank** — see section below
 
 ### 3. Wrong app instance opens files
 
@@ -130,3 +131,28 @@ Record any visual defects such as:
 - resize
 
 This is important because xterm may initially render before stable dimensions are available.
+
+## ncurses delta-optimization blank screen
+
+**Symptom**: After the first click on a file (or a fast file switch), the main VisiData table area is blank. Only the bottom status/command bar is visible. The terminal header row may appear but rows are missing.
+
+**Root cause**: `VisiDataSessionController.open()` launches VisiData with a fallback size of `120×32` when no real terminal measurement is available yet (`displaySink == nil` or `hasMeasuredDisplaySize == false`). VisiData/ncurses paints a full UI for the small 32-row frame and caches that layout. When the xterm view finishes initialising and the real size arrives via `session.resize()`, ioctl + SIGWINCH tell VisiData the new dimensions — but ncurses sends only a *diff* against its cached 32-row frame, not a full repaint. The rows between the old bottom and the new bottom are never drawn, leaving a giant blank area.
+
+**Fix location**: `VisiDataSessionController.resize()` — the `launchedBeforeMeasuredDisplaySize` branch.
+
+**Correct fix pattern**:
+```swift
+if childPID > 0, launchedBeforeMeasuredDisplaySize {
+    launchedBeforeMeasuredDisplaySize = false
+    transcript.reset()                          // discard stale frames
+    enqueuePTYWrite(Data("\u{0C}".utf8))        // Ctrl+L forces full ncurses repaint
+}
+```
+
+- `transcript.reset()` discards buffered output that was painted for the wrong (smaller) size so `presentInitialTranscript()` does not replay it.
+- `\u{0C}` (Ctrl+L) is the standard ncurses "redraw screen" key. Sending it over the PTY instructs VisiData to repaint every cell unconditionally, bypassing ncurses' delta cache.
+- Do **not** call `displaySink?.resetTerminalDisplay()` here — that would tear down the xterm surface while VisiData is already running and can drop the full-screen paint state.
+
+**Distinguishing signal**: If you see `KEY_RESIZE` in the VisiData status bar alongside a blank table, the SIGWINCH arrived but ncurses chose to diff. Ctrl+L is the correct recovery, not a second SIGWINCH.
+
+**Test coverage**: `VisiDataSessionControllerTests.firstMeasuredResizeAfterFallbackLaunchDiscardsStaleTranscript` verifies that after a fallback launch, the first measured resize clears the transcript and does not rebuild the xterm surface.
