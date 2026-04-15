@@ -4,7 +4,7 @@
         <title>iData</title>
         <item>
             <title>0.2.2</title>
-            <pubDate>Wed, 15 Apr 2026 17:11:15 +0800</pubDate>
+            <pubDate>Thu, 16 Apr 2026 01:24:08 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
             <sparkle:version>22</sparkle:version>
             <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
@@ -26,7 +26,7 @@
   focuses the terminal and updates the status message instead of tearing down
   and relaunching the session unnecessarily.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.2/iData-v0.2.2-macos-universal.zip" length="4007631" type="application/octet-stream" sparkle:edSignature="ve/VWd6A5Lu4hmPTuxUdyFzGXXqcwuXjT72dcpzwopGO6HY7Le216qMLPqsLK5e+94dFBsBcHa3p5/baWM5lAQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.2/iData-v0.2.2-macos-universal.zip" length="4038606" type="application/octet-stream" sparkle:edSignature="bsjnDE3goXcMHXV6+jEeLwvcDZsreaP3lQj1H0DlZI/3HJnMPTz+fmKUtSD2HlVrbIjvreiIkcL9HqV2lmKvDA=="/>
         </item>
     </channel>
 </rss>
