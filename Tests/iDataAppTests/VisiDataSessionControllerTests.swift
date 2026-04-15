@@ -143,6 +143,7 @@ struct VisiDataSessionControllerTests {
         session.bind(displaySink: sink)
         try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
         #expect(observer.isEmpty())
+        #expect(sink.resetCount == 1)
         session.resize(cols: 195, rows: 41)
         defer {
             session.terminate()
@@ -179,27 +180,36 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
-    func firstMeasuredResizeAfterFallbackLaunchRebuildsTerminalDisplay() {
+    func firstMeasuredResizeAfterFallbackLaunchDiscardsStaleTranscript() {
         let sink = TerminalDisplaySinkBuffer()
         let signalSpy = SignalSenderSpy()
         let session = VisiDataSessionController(signalSender: signalSpy.send)
         session.bind(displaySink: sink)
         session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: open("/dev/null", O_RDONLY))
 
+        // Simulate stale output painted for the wrong default size.
+        session.appendOutputForTesting(Data("STALE\n".utf8))
+
         #expect(sink.resetCount == 0)
 
         session.resize(cols: 180, rows: 40)
 
-        #expect(sink.resetCount == 1)
+        // Terminal surface is NOT rebuilt (avoids dropping full-screen paint),
+        // but the stale transcript is discarded.
+        #expect(sink.resetCount == 0)
         #expect(signalSpy.signalCount == 1)
+
+        // markDisplayReady replays the transcript — it should be empty now.
+        session.markDisplayReady()
+        #expect(sink.writes.isEmpty)
 
         session.resize(cols: 180, rows: 40)
 
-        #expect(sink.resetCount == 1)
+        #expect(sink.resetCount == 0)
     }
 
     @Test
-    func firstMeasuredResizeRebuildsDisplayAfterSessionBindsPostLaunch() throws {
+    func firstMeasuredResizeAfterSessionBindsPostLaunchDiscardsStaleOutput() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-session-post-bind-resize-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
@@ -226,7 +236,11 @@ struct VisiDataSessionControllerTests {
 
         session.resize(cols: 180, rows: 40)
 
-        #expect(sink.resetCount == 1)
+        // No xterm rebuild, but transcript cleared.
+        #expect(sink.resetCount == 0)
+
+        session.markDisplayReady()
+        #expect(sink.writes.isEmpty)
     }
 
     @Test

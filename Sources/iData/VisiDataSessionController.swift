@@ -306,6 +306,11 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor
+    func focusTerminalDisplay() {
+        displaySink?.focusTerminalDisplay()
+    }
+
+    @MainActor
     func open(fileURL: URL, explicitVDPath: String?) throws {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             throw LaunchError.fileMissing(fileURL.path)
@@ -330,7 +335,14 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         terminalDebugTrace("session.open session=\(ObjectIdentifier(self)) file=\(fileURL.lastPathComponent) generation=\(self.outputGeneration) displayReady=\(self.isDisplayReady)")
         pendingOpenRequest = PendingOpenRequest(fileURL: fileURL, vdURL: vdURL, generation: outputGeneration)
 
-        let shouldAwaitDisplayMeasurement = displaySink != nil && !hasMeasuredDisplaySize
+        let hasBoundDisplaySink = displaySink != nil
+        if hasBoundDisplaySink {
+            // Recreate and remeasure the terminal on every in-place file switch.
+            // This avoids stale viewport state carrying over between sessions.
+            displaySink?.resetTerminalDisplay()
+            hasMeasuredDisplaySize = false
+        }
+        let shouldAwaitDisplayMeasurement = hasBoundDisplaySink
 
         do {
             if !shouldAwaitDisplayMeasurement {
@@ -407,9 +419,17 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
 
         if childPID > 0, launchedBeforeMeasuredDisplaySize {
+            // The process was launched with a default size before the real
+            // terminal measurement arrived. Discard any output that VisiData
+            // painted for the stale default dimensions so that
+            // presentInitialTranscript() does not replay misaligned frames.
+            // The ioctl + SIGWINCH below will tell VisiData the real size, but
+            // ncurses might only send a diff, leaving the table area blank.
+            // We enqueue a Ctrl+L (\u{0C}) to force a full redraw bypassing diffs.
             launchedBeforeMeasuredDisplaySize = false
-            terminalDebugTrace("session.resize rebuildDisplayAfterFallbackLaunch session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows)")
-            displaySink?.resetTerminalDisplay()
+            transcript.reset()
+            enqueuePTYWrite(Data("\u{0C}".utf8))
+            terminalDebugTrace("session.resize settleAfterFallbackLaunch session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows)")
         }
 
         var windowSize = winsize(
@@ -660,12 +680,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
         pendingLaunchTask?.cancel()
         pendingLaunchTask = nil
-
-        if isDisplayReady {
-            logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) open() clears terminal immediately because display is already ready")
-            terminalDebugTrace("session.open immediateClear generation=\(pendingOpenRequest.generation)")
-            displaySink?.resetTerminalDisplay()
-        }
 
         // Rebuild the terminal on the first measured resize whenever the PTY
         // launched before we had a real container measurement, even if the
