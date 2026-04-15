@@ -1068,11 +1068,31 @@ final class AppModel: ObservableObject {
             return
         }
 
+        if
+            let session = activeSession,
+            session.currentFileURL?.standardizedFileURL == url.standardizedFileURL,
+            session.isRunning,
+            session.errorMessage == nil
+        {
+            session.focusTerminalDisplay()
+            statusMessage = localized(
+                english: "Already showing \(url.lastPathComponent).",
+                chinese: "当前已在显示 \(url.lastPathComponent)。"
+            )
+            errorMessage = nil
+            return
+        }
+
         do {
             let explicitPath = normalizedVDExecutablePath()
             let session = activeSession ?? VisiDataSessionController()
+            
             try session.open(fileURL: url, explicitVDPath: explicitPath)
-            activeSession = session
+            
+            if activeSession !== session {
+                activeSession = session
+            }
+            
             lastOpenedFile = url
             performAnimatedMutation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
                 recentFilesStore.record(url, maxCount: Self.recentFilesLimit)

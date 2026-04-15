@@ -1275,7 +1275,7 @@ struct AppModelTests {
     }
 
     @Test
-    func switchingFilesReusesSingleSessionController() throws {
+    func switchingFilesReusesSessionController() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
@@ -1304,12 +1304,51 @@ struct AppModelTests {
         }
 
         model.openExternalFile(first)
-        let sharedSession = try #require(model.activeSession)
+        let firstSession = try #require(model.activeSession)
 
         model.openExternalFile(second)
 
-        #expect(model.activeSession === sharedSession)
+        let secondSession = try #require(model.activeSession)
+        #expect(secondSession === firstSession)
         #expect(model.activeSession?.currentFileURL?.standardizedFileURL == second.standardizedFileURL)
+    }
+
+    @Test
+    func reopeningActiveRecentFileDoesNotRestartSession() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-reopen-same-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let target = tempRoot.appendingPathComponent("same.tsv")
+        try Data("id\tvalue\n1\tA\n".utf8).write(to: target)
+
+        let model = AppModel(defaults: defaults)
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        model.openExternalFile(target)
+        let session = try #require(model.activeSession)
+        let initialGeneration = session.outputGenerationForTesting
+
+        model.openExternalFile(target)
+
+        #expect(model.activeSession === session)
+        #expect(session.outputGenerationForTesting == initialGeneration)
+        #expect(model.statusMessage?.contains(target.lastPathComponent) == true)
     }
 
     @Test
