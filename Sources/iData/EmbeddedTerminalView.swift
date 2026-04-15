@@ -2,6 +2,28 @@ import SwiftUI
 import WebKit
 import OSLog
 
+/// WKWebView subclass that prevents the terminal from eating the first mouse
+/// click when focus needs to move to a sibling SwiftUI control (e.g. sidebar).
+///
+/// On macOS, when a WKWebView holds first-responder status, clicking outside
+/// it (e.g. on a sidebar Button) normally just transfers focus without
+/// triggering the button action.  Overriding `acceptsFirstMouse` and properly
+/// resigning first-responder fixes this.
+final class TerminalWebView: WKWebView {
+    /// Allow clicks on the window to pass through even when the window is
+    /// becoming key, so sidebar buttons respond on the very first click.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    /// When another view claims first-responder (e.g. the user clicks the
+    /// sidebar), blur the embedded xterm so key events stop going to it.
+    override func resignFirstResponder() -> Bool {
+        evaluateJavaScript("window.iDataBlurTerminal && window.iDataBlurTerminal();")
+        return super.resignFirstResponder()
+    }
+}
+
 struct EmbeddedTerminalView: NSViewRepresentable {
     @ObservedObject var session: VisiDataSessionController
 
@@ -15,7 +37,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         contentController.add(context.coordinator, name: "idata")
         configuration.userContentController = contentController
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = TerminalWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.wantsLayer = true
