@@ -561,7 +561,7 @@ struct AppModelTests {
         )
 
         #expect(model.visiDataDependencySummary.contains("未找到"))
-        #expect(model.visiDataDependencySummary.contains("一键"))
+        #expect(model.visiDataDependencySummary.contains("一键配置"))
         #expect(model.visiDataDependencySummary.contains("pipx install visidata"))
         #expect(model.visiDataDependencySummary.contains("偏好设置"))
     }
@@ -573,7 +573,7 @@ struct AppModelTests {
 
         #expect(excel?.localizedDisplayName(for: .english) == "Excel Workbook")
         #expect(excel?.localizedDisplayName(for: .chinese) == "Excel 工作簿")
-        #expect(gzip?.localizedDisplayName(for: .chinese) == "压缩 GZip")
+        #expect(gzip?.localizedDisplayName(for: .chinese) == "GZip 压缩文件")
     }
 
     @Test
@@ -904,7 +904,7 @@ struct AppModelTests {
 
         let updater = AppUpdaterController()
 
-        #expect(updater.statusMessage.contains("自动更新") || updater.statusMessage.contains("GitHub 发布页"))
+        #expect(updater.statusMessage.contains("自动更新") || updater.statusMessage.contains("GitHub 发布页面"))
     }
 
     @Test
@@ -1215,8 +1215,8 @@ struct AppModelTests {
         let model = AppModel(defaults: defaults, preferredLanguagesProvider: { ["zh-Hans-CN"] })
         model.beginTutorialGuide()
 
-        #expect(model.tutorialProgressText.contains("第 1"))
-        #expect(model.tutorialProgressText.contains("步"))
+        #expect(model.tutorialProgressText.contains("第 1 步"))
+        #expect(model.tutorialProgressText.contains(" / "))
     }
 
     @Test
@@ -1225,8 +1225,8 @@ struct AppModelTests {
 
         model.openExternalFiles([URL(fileURLWithPath: "/tmp/results", isDirectory: true)])
 
-        #expect(model.errorMessage?.contains("不要拖文件夹") == true)
-        #expect(model.errorMessage?.contains("不会先解压") == true)
+        #expect(model.errorMessage?.contains("请拖入文件，不要拖入文件夹。") == true)
+        #expect(model.errorMessage?.contains("会直接流式读取 .gz/.bgz 压缩文件") == true)
     }
 
     @Test

@@ -196,8 +196,8 @@ final class AppModel: ObservableObject {
         SupportedFormat(displayName: "GFF3", chineseDisplayName: "GFF3", fileExtension: "gff3"),
         SupportedFormat(displayName: "AnnData", chineseDisplayName: "AnnData", fileExtension: "h5ad"),
         SupportedFormat(displayName: "Loom", chineseDisplayName: "Loom", fileExtension: "loom"),
-        SupportedFormat(displayName: "Compressed GZip", chineseDisplayName: "压缩 GZip", fileExtension: "gz"),
-        SupportedFormat(displayName: "Compressed BGZip", chineseDisplayName: "压缩 BGZip", fileExtension: "bgz"),
+        SupportedFormat(displayName: "Compressed GZip", chineseDisplayName: "GZip 压缩文件", fileExtension: "gz"),
+        SupportedFormat(displayName: "Compressed BGZip", chineseDisplayName: "BGZip 压缩文件", fileExtension: "bgz"),
     ]
     static let formatPanelFormats: [SupportedFormat] = {
         let conciseExamples = [
@@ -559,7 +559,7 @@ final class AppModel: ObservableObject {
         }
         return localized(
             english: "\(chapter.title) · Step \(tutorialStepIndex + 1) of \(chapter.steps.count)",
-            chinese: "\(chapter.title) · 第 \(tutorialStepIndex + 1) / \(chapter.steps.count) 步"
+            chinese: "\(chapter.title) · 第 \(tutorialStepIndex + 1) 步 / 共 \(chapter.steps.count) 步"
         )
     }
 
@@ -575,7 +575,7 @@ final class AppModel: ObservableObject {
         case .english:
             return "App interface currently shown in English."
         case .chinese:
-            return "App 界面当前显示为中文。"
+            return "当前界面语言：中文。"
         }
     }
 
@@ -655,7 +655,7 @@ final class AppModel: ObservableObject {
         case .english:
             return "Use iData's one-click setup, or install with `pipx install visidata` and `pipx inject visidata openpyxl`. `brew install visidata` also works. You can set the executable path in Preferences."
         case .chinese:
-            return "可先使用 iData 的一键安装，或执行 `pipx install visidata` 和 `pipx inject visidata openpyxl`。`brew install visidata` 也可用；也可以在偏好设置中指定可执行文件路径。"
+            return "可先使用 iData 的一键配置，或执行 `pipx install visidata` 和 `pipx inject visidata openpyxl`。`brew install visidata` 也可用；你也可以在偏好设置中指定可执行文件路径。"
         }
     }
 
@@ -834,7 +834,7 @@ final class AppModel: ObservableObject {
     var smallFileRoutingSummary: String {
         localized(
             english: "Finder-opened files at or below 100 MiB prefer WPS Office, then Microsoft Excel, unless you choose a different global app here. Compressed .gz/.bgz files always stay in iData.",
-            chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，默认优先交给 WPS Office，其次 Microsoft Excel；你也可以在这里改成别的统一应用。压缩 .gz/.bgz 文件始终留在 iData。"
+            chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，默认优先交给 WPS Office，其次 Microsoft Excel；也可在此改为其他统一应用。.gz/.bgz 压缩文件始终在 iData 中打开。"
         )
     }
 
@@ -968,7 +968,7 @@ final class AppModel: ObservableObject {
             statusMessage = nil
             errorMessage = localized(
                 english: "Drop a regular file, not a folder. iData streams compressed .gz/.bgz files without extracting.",
-                chinese: "请拖入普通文件，不要拖文件夹。iData 会直接流式读取 .gz/.bgz 压缩文件，不会先解压。"
+                chinese: "请拖入文件，不要拖入文件夹。iData 会直接流式读取 .gz/.bgz 压缩文件。"
             )
             return
         }
@@ -985,7 +985,7 @@ final class AppModel: ObservableObject {
             statusMessage = nil
             errorMessage = localized(
                 english: "Drop a regular file, not a folder. iData streams compressed .gz/.bgz files without extracting.",
-                chinese: "请拖入普通文件，不要拖文件夹。iData 会直接流式读取 .gz/.bgz 压缩文件，不会先解压。"
+                chinese: "请拖入文件，不要拖入文件夹。iData 会直接流式读取 .gz/.bgz 压缩文件。"
             )
             return .activateApp
         }
@@ -1436,7 +1436,7 @@ final class AppModel: ObservableObject {
             statusMessage = nil
             errorMessage = localized(
                 english: "Drop a regular file, not a folder. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
-                chinese: "请拖入普通文件，不要拖文件夹。iData 会直接打开大多数文件后缀，并对 .gz/.bgz 文件进行流式读取而不解压。"
+                chinese: "请拖入文件，不要拖入文件夹。iData 可直接打开大多数文件类型，并会流式读取 .gz/.bgz 压缩文件。"
             )
             return false
         }

@@ -183,22 +183,22 @@ final class AppUpdaterController: ObservableObject {
             case .sparkleMissingInBuild:
                 return AppModel.localized(
                     english: "This build does not include Sparkle yet. You can still download updates from GitHub Releases.",
-                    chinese: "当前构建还没有包含 Sparkle。你仍然可以从 GitHub 发布页下载更新。"
+                    chinese: "当前构建未包含 Sparkle。你仍可前往 GitHub 发布页面下载更新。"
                 )
             case .feedNotPublishedYet:
                 return AppModel.localized(
                     english: "Update feed is not published yet. GitHub Releases remains available for manual installs.",
-                    chinese: "更新 feed 还没有发布。你仍然可以从 GitHub 发布页手动安装。"
+                    chinese: "更新 feed 尚未发布。你仍可前往 GitHub 发布页面手动安装。"
                 )
             case .feedNotLiveOpeningReleases:
                 return AppModel.localized(
                     english: "Update feed is not live yet. Opening GitHub Releases instead.",
-                    chinese: "更新 feed 还没有上线，正在改为打开 GitHub 发布页。"
+                    chinese: "更新 feed 尚未上线，现将打开 GitHub 发布页面。"
                 )
             case .sparkleUnavailableOpeningReleases:
                 return AppModel.localized(
                     english: "Sparkle is unavailable in this build. Opening GitHub Releases.",
-                    chinese: "这个构建当前无法使用 Sparkle，正在打开 GitHub 发布页。"
+                    chinese: "当前构建无法使用 Sparkle，现将打开 GitHub 发布页面。"
                 )
             }
         }
