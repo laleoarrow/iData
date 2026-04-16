@@ -1933,22 +1933,7 @@ private struct WelcomeDetailView: View {
                 .padding(.top, 2)
             }
         }
-        .padding(22)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.20),
-                    Color.white.opacity(0.05),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
+        .glassCard()
         .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
         .onAppear { startCarouselTimer() }
         .onDisappear { tutorialCarouselTimer?.invalidate() }
@@ -2019,6 +2004,7 @@ private struct WelcomeDetailView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .glassCard()
     }
 
     private var quickTipsCard: some View {
@@ -2226,12 +2212,7 @@ private struct WelcomeDetailView: View {
                 }
             }
         }
-        .padding(22)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
-        )
+        .glassCard()
         .onAppear {
             refreshDisplayedFormatAssociationStatus()
         }
@@ -2850,13 +2831,33 @@ private struct CommandShortcutBadge: View {
 
 private let detailBackground = LinearGradient(
     colors: [
-        Color.accentColor.opacity(0.18),
-        Color(nsColor: .windowBackgroundColor),
-        Color.black.opacity(0.06),
+        Color.accentColor.opacity(0.12),
+        Color(nsColor: .windowBackgroundColor).opacity(0.8),
+        Color.black.opacity(0.04),
     ],
     startPoint: .topLeading,
     endPoint: .bottomTrailing
 )
+
+struct GlassCardModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+    func body(content: Content) -> some View {
+        content
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.4), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 16, x: 0, y: 8)
+    }
+}
+
+extension View {
+    func glassCard() -> some View {
+        self.modifier(GlassCardModifier())
+    }
+}
 
 struct IDataAnimationsEnabledKey: EnvironmentKey {
     static let defaultValue = true
@@ -3182,12 +3183,7 @@ private struct SummaryCard: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
-        )
+        .glassCard()
         .quietInteractiveSurface(
             enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
             hoverScale: 1.008,
@@ -3297,9 +3293,8 @@ private struct MessageCard: View {
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .glassCard()
+        .background(color.opacity(0.5), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .quietInteractiveSurface(
             enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
             hoverScale: 1.006,
