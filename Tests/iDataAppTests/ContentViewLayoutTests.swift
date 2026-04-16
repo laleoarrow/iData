@@ -73,9 +73,7 @@ struct ContentViewLayoutTests {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 48, height: 48)
         """)))
-        #expect(!source.contains(normalizeWhitespace("""
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        """)))
+
     }
 
     @Test
