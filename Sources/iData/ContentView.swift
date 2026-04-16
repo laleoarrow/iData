@@ -234,12 +234,12 @@ private struct SidebarHeaderCard: View {
             }
         }
         .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
     }
 
@@ -458,9 +458,9 @@ private struct EmptySidebarState: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
         )
         .quietInteractiveSurface(
@@ -485,9 +485,9 @@ private struct EmptySidebarRailState: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
         )
         .quietInteractiveSurface(
@@ -538,12 +538,12 @@ private struct RecentFileRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .padding(.trailing, 70)
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-        .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(borderColor)
         )
         .overlay {
@@ -576,7 +576,7 @@ private struct RecentFileRow: View {
             }
             .padding(.trailing, 14)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onHover { hovering in
             isHovering = hovering
         }
@@ -931,7 +931,7 @@ private struct SidebarAmbientGlow: View {
                 .blur(radius: 34)
                 .offset(x: isCollapsed ? -28 : 34, y: isCollapsed ? -12 : -2)
 
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(
                     RadialGradient(
                         colors: [
@@ -1352,9 +1352,9 @@ private struct HelpView: View {
             }
         }
         .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.08))
         )
     }
@@ -1366,7 +1366,7 @@ private struct HelpView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 92, height: 92)
-                    .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: .black.opacity(0.16), radius: 20, y: 8)
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -1421,10 +1421,10 @@ private struct HelpView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
         .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
@@ -1517,9 +1517,9 @@ private struct TutorialHubView: View {
             }
         }
         .padding(24)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.12))
         )
         .shadow(color: .black.opacity(0.14), radius: 22, y: 8)
@@ -1585,9 +1585,9 @@ private struct TutorialHubView: View {
             }
         }
         .padding(18)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
         .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
@@ -1719,7 +1719,7 @@ private struct WelcomeDetailView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 88, height: 88)
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -1832,10 +1832,10 @@ private struct WelcomeDetailView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
         .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
@@ -2043,10 +2043,10 @@ private struct WelcomeDetailView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
     }
@@ -2316,10 +2316,10 @@ private struct SessionDetailView: View {
                 EmbeddedTerminalView(session: session)
                     .id(ObjectIdentifier(session))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(Color.white.opacity(0.08))
                     )
                     .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
@@ -2784,14 +2784,14 @@ private struct TutorialCoachOverlay: View {
                     endPoint: .bottomTrailing
                 )
             }
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .inset(by: 1)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
         )
@@ -2844,9 +2844,9 @@ struct GlassCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(24)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.4), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 16, x: 0, y: 8)
@@ -3294,7 +3294,7 @@ private struct MessageCard: View {
                 .textSelection(.enabled)
         }
         .glassCard()
-        .background(color.opacity(0.5), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(color.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .quietInteractiveSurface(
             enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
             hoverScale: 1.006,
