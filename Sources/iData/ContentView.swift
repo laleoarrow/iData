@@ -2090,22 +2090,45 @@ private struct WelcomeDetailView: View {
 
     private var formatsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 10) {
                 Text(localizedText(isChinese, english: "Supported Formats", chinese: "支持的格式"))
                     .font(.headline)
+                
+                Button {
+                    refreshDisplayedFormatAssociationStatus()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(6)
+                        .background(Color.accentColor.opacity(0.12), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .help(localizedText(isChinese, english: "Refresh system defaults", chinese: "从系统刷新默认设置状态"))
                 
                 Spacer()
                 
                 Button {
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 } label: {
-                    Label(
-                        localizedText(isChinese, english: "Small File Handoff Rules", chinese: "小文件转交给其他应用…"),
-                        systemImage: "gearshape.arrow.triangle.2.circlepath"
+                    HStack(spacing: 6) {
+                        Image(systemName: "gearshape.fill")
+                        Text(localizedText(isChinese, english: "Handoff Rules", chinese: "设置转交规则"))
+                    }
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(LinearGradient(colors: [.accentColor.opacity(0.18), .accentColor.opacity(0.08)], startPoint: .top, endPoint: .bottom))
                     )
-                    .font(.caption.weight(.medium))
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
+                    )
                 }
-                .buttonStyle(.link)
+                .buttonStyle(.plain)
+                .quietInteractiveSurface(enabled: motionEnabled)
             }
 
             Text(localizedText(

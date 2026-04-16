@@ -2105,7 +2105,7 @@ private enum FileTypeAssociation {
         guard let currentDefaultApp = currentDefaultApp(forExtension: fileExtension) else {
             return false
         }
-        return currentDefaultApp.bundleIdentifier == iDataBundleIdentifier
+        return isIDataBundleIdentifier(currentDefaultApp.bundleIdentifier)
     }
 
     static func currentDefaultApp(forExtension fileExtension: String) -> DefaultApplicationHandler? {
