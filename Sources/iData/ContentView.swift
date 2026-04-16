@@ -2090,8 +2090,23 @@ private struct WelcomeDetailView: View {
 
     private var formatsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(localizedText(isChinese, english: "Supported Formats", chinese: "支持的格式"))
-                .font(.headline)
+            HStack(alignment: .center) {
+                Text(localizedText(isChinese, english: "Supported Formats", chinese: "支持的格式"))
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button {
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                } label: {
+                    Label(
+                        localizedText(isChinese, english: "Small File Handoff Rules", chinese: "小文件转交给其他应用…"),
+                        systemImage: "gearshape.arrow.triangle.2.circlepath"
+                    )
+                    .font(.caption.weight(.medium))
+                }
+                .buttonStyle(.link)
+            }
 
             Text(localizedText(
                 isChinese,

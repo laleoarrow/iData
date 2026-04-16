@@ -808,6 +808,7 @@ final class AppModel: ObservableObject {
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
         panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
 
         guard panel.runModal() == .OK, let appURL = panel.url else {
             return
