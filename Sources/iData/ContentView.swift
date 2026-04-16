@@ -1881,6 +1881,8 @@ private struct WelcomeDetailView: View {
                     Label(isChinese ? "开始" : "Start", systemImage: "play.fill")
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(.accentColor)
                 .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1)
             }
 
@@ -2099,7 +2101,9 @@ private struct WelcomeDetailView: View {
                 } label: {
                     Label(localizedText(isChinese, english: "Handoff Rules", chinese: "设置转交规则"), systemImage: "gearshape.fill")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(.accentColor)
                 .quietInteractiveSurface(enabled: motionEnabled)
             }
 
@@ -2158,6 +2162,8 @@ private struct WelcomeDetailView: View {
                         Label(customAssociationActionTitle, systemImage: customAssociationActionIcon)
                     }
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .tint(.accentColor)
                     .disabled(!canSubmitCustomAssociation)
                     .quietInteractiveSurface(enabled: motionEnabled)
                 }

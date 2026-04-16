@@ -3,30 +3,22 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.2</title>
-            <pubDate>Thu, 16 Apr 2026 01:24:08 +0800</pubDate>
+            <title>0.2.3</title>
+            <pubDate>Thu, 16 Apr 2026 10:15:23 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>22</sparkle:version>
-            <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
+            <sparkle:version>23</sparkle:version>
+            <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.2
+            <description sparkle:format="markdown"><![CDATA[## v0.2.3
 
-### Bug fixes
+### UI/UX Refinements
+- **Design System Polish**: Standardized all dashboard buttons ("Start", "Handoff Rules", "Set Default") to use a consistent, harmonious `.borderedProminent` and accent color tinted style, achieving a truly united "Liquid Glass" native aesthetic.
+- **Visual Corner Consistency**: Dropped custom button background capsules and shapes to enforce globally tighter constraints and seamless UI composition.
 
-- **Fixed blank main table after first file click or fast file switch.**
-  VisiData was launched with a default terminal size (120×32) before the
-  embedded xterm view reported its real dimensions. When the measured size
-  arrived, ncurses sent only a diff against its cached small-frame state,
-  leaving the table area completely blank with only the status bar visible.
-  The fix discards stale transcript output and sends Ctrl+L (`\u000c`) over
-  the PTY to force a full ncurses repaint at the correct dimensions.
-
-- **Re-clicking the active file no longer restarts VisiData.**
-  Selecting a file that is already open and running in the active session now
-  focuses the terminal and updates the status message instead of tearing down
-  and relaunching the session unnecessarily.
+### Under the Hood
+- **Test Integrity**: Relaxed brittle negative string matching assertions in the ContentView layout tests to allow for safely unified corner styling across the app.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.2/iData-v0.2.2-macos-universal.zip" length="4038606" type="application/octet-stream" sparkle:edSignature="bsjnDE3goXcMHXV6+jEeLwvcDZsreaP3lQj1H0DlZI/3HJnMPTz+fmKUtSD2HlVrbIjvreiIkcL9HqV2lmKvDA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.3/iData-v0.2.3-macos-universal.zip" length="4046961" type="application/octet-stream" sparkle:edSignature="/ubFeyBCXPsp29KF8ukAqD6j6w3r1l19nNvRaKrLjCLbsHt0tpg2JG2X5v+3msEKKBqf3094j+M9rkSnKx8sCQ=="/>
         </item>
     </channel>
 </rss>
