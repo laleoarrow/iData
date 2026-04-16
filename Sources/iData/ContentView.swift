@@ -2097,23 +2097,9 @@ private struct WelcomeDetailView: View {
                 Button {
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gearshape.fill")
-                        Text(localizedText(isChinese, english: "Handoff Rules", chinese: "设置转交规则"))
-                    }
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(
-                        Capsule()
-                            .fill(LinearGradient(colors: [.accentColor.opacity(0.18), .accentColor.opacity(0.08)], startPoint: .top, endPoint: .bottom))
-                    )
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
-                    )
+                    Label(localizedText(isChinese, english: "Handoff Rules", chinese: "设置转交规则"), systemImage: "gearshape.fill")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.bordered)
                 .quietInteractiveSurface(enabled: motionEnabled)
             }
 
