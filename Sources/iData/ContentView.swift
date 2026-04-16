@@ -1675,14 +1675,7 @@ private struct WelcomeDetailView: View {
             return (index: index, format: format, isDefault: isDefault)
         }
 
-        return snapshot
-            .sorted { lhs, rhs in
-                if lhs.isDefault != rhs.isDefault {
-                    return lhs.isDefault && !rhs.isDefault
-                }
-                return lhs.index < rhs.index
-            }
-            .map { (format: $0.format, isDefault: $0.isDefault) }
+        return snapshot.map { (format: $0.format, isDefault: $0.isDefault) }
     }
 
     private func refreshDisplayedFormatAssociationStatus() {
