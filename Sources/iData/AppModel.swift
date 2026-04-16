@@ -2072,7 +2072,7 @@ private enum FileTypeAssociation {
     }
 
     static func isIDataBundleIdentifier(_ bundleIdentifier: String) -> Bool {
-        bundleIdentifier == iDataBundleIdentifier
+        bundleIdentifier == iDataBundleIdentifier || bundleIdentifier.starts(with: "io.github.leoarrow.idata")
     }
 
     private static func contentType(forExtension fileExtension: String) -> UTType? {
