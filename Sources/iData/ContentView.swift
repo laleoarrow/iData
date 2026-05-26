@@ -104,17 +104,15 @@ private struct SidebarView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
-                .overlay(
-                    LinearGradient(
-                        colors: [
-                            Color.accentColor.opacity(0.06),
-                            Color.clear,
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .windowBackgroundColor),
+                    Color.accentColor.opacity(0.10),
+                    Color.black.opacity(0.08),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             .overlay {
                 SidebarAmbientGlow(
                     isCollapsed: model.isSidebarCollapsed,
@@ -551,7 +549,7 @@ private struct RecentFileRow: View {
         .overlay {
             SidebarHoverGlow(
                 isVisible: isHovering,
-                style: .rounded(12)
+                style: .rounded(20)
             )
         }
         .overlay(alignment: .trailing) {
@@ -1323,7 +1321,7 @@ private struct HelpView: View {
             .padding(28)
         }
         .frame(width: 700, height: 620)
-        .background(DetailBackgroundView().ignoresSafeArea())
+        .background(detailBackground.ignoresSafeArea())
     }
 
     @ViewBuilder
@@ -1459,7 +1457,7 @@ private struct TutorialHubView: View {
         .frame(width: 760, height: 640)
         .background(
             ZStack {
-                DetailBackgroundView()
+                detailBackground
                 RadialGradient(
                     colors: [
                         Color.accentColor.opacity(0.22),
@@ -1600,10 +1598,6 @@ private struct WelcomeDetailView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @Environment(\.colorScheme) private var colorScheme
-    @FocusState private var isTextFieldFocused: Bool
-    @State private var shakeOffset: CGFloat = 0
-    @State private var isErrorActive = false
     @State private var customAssociationInput = ""
     @State private var tutorialPreviewChapterIndex: Int = 0
     @State private var tutorialCarouselTimer: Timer?
@@ -1715,7 +1709,7 @@ private struct WelcomeDetailView: View {
             }
             .padding(28)
         }
-        .background(DetailBackgroundView().ignoresSafeArea())
+        .background(detailBackground.ignoresSafeArea())
     }
 
     private var heroCard: some View {
@@ -1830,28 +1824,21 @@ private struct WelcomeDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
         .background(
-            ZStack {
-                Color.accentColor.opacity(0.10)
-                Color.white.opacity(0.02)
-            }
-            .background(.thinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.18),
+                    Color.white.opacity(0.05),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.20 : 0.65),
-                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
+                .strokeBorder(Color.white.opacity(0.10))
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.14 : 0.04), radius: 20, y: 8)
+        .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
     }
 
     private var showsReadyDependencyPillInTitleRow: Bool {
@@ -1900,30 +1887,31 @@ private struct WelcomeDetailView: View {
             }
 
             if let chapter {
-                ZStack(alignment: .topLeading) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        // Chapter sub-header
-                        HStack(spacing: 8) {
-                            Image(systemName: chapter.icon)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
-                            Text(chapter.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.primary)
-                        }
-
-                        VStack(spacing: 9) {
-                            ForEach(Array(chapter.steps.prefix(4)), id: \.id) { step in
-                                tutorialPreviewRow(step)
-                            }
-                        }
-                    }
-                    .id(chapter.id)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity.combined(with: .move(edge: .leading))
-                    ))
+                // Chapter sub-header
+                HStack(spacing: 8) {
+                    Image(systemName: chapter.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                    Text(chapter.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
                 }
+                .id(chapter.id + "-header")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+
+                VStack(spacing: 9) {
+                    ForEach(Array(chapter.steps.prefix(4)), id: \.id) { step in
+                        tutorialPreviewRow(step)
+                    }
+                }
+                .id(chapter.id + "-steps")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
             }
 
             // Page indicator dots
@@ -1936,7 +1924,9 @@ private struct WelcomeDetailView: View {
                             .frame(width: 6, height: 6)
                             .scaleEffect(index == (tutorialPreviewChapterIndex % chapters.count) ? 1.15 : 1)
                             .onTapGesture {
-                                tutorialPreviewChapterIndex = index
+                                withAnimation(.easeInOut(duration: 0.35)) {
+                                    tutorialPreviewChapterIndex = index
+                                }
                                 restartCarouselTimer()
                             }
                     }
@@ -1946,7 +1936,7 @@ private struct WelcomeDetailView: View {
             }
         }
         .glassCard()
-        .animation(motionEnabled ? .spring(response: 0.35, dampingFraction: 0.82) : nil, value: tutorialPreviewChapterIndex)
+        .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
         .onAppear { startCarouselTimer() }
         .onDisappear { tutorialCarouselTimer?.invalidate() }
     }
@@ -2047,26 +2037,19 @@ private struct WelcomeDetailView: View {
         }
         .padding(22)
         .background(
-            ZStack {
-                Color.accentColor.opacity(0.12)
-                Color.white.opacity(0.02)
-            }
-            .background(.thinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            LinearGradient(
+                colors: [
+                    Color.accentColor.opacity(0.20),
+                    Color.white.opacity(0.05),
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.22 : 0.65),
-                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
+                .strokeBorder(Color.white.opacity(0.10))
         )
     }
 
@@ -2162,47 +2145,27 @@ private struct WelcomeDetailView: View {
                 Text(localizedText(isChinese, english: "Custom Suffix", chinese: "自定义后缀"))
                     .font(.subheadline.weight(.semibold))
 
-                HStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(isErrorActive ? .red : (isTextFieldFocused ? Color.accentColor : Color.secondary))
-                            .animation(.easeOut(duration: 0.2), value: isTextFieldFocused)
-                            .animation(.easeOut(duration: 0.2), value: isErrorActive)
-
-                        TextField(isChinese ? "输入自定义后缀，如 vcf..." : "Enter custom suffix, e.g. vcf...", text: $customAssociationInput)
-                            .textFieldStyle(.plain)
-                            .font(.system(.subheadline, design: .monospaced))
-                            .autocorrectionDisabled()
-                            .focused($isTextFieldFocused)
-                            .onSubmit {
-                                handleCustomAssociationSubmit()
+                HStack(spacing: 10) {
+                    TextField(".vcf / vcf / my.ext", text: $customAssociationInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.subheadline, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .onSubmit {
+                            if canSubmitCustomAssociation {
+                                model.setFormatAsDefault(forExtension: customAssociationInput)
                             }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(
-                                isErrorActive ? Color.red.opacity(0.8) : (isTextFieldFocused ? Color.accentColor.opacity(0.6) : Color.white.opacity(0.12)),
-                                lineWidth: 1.0
-                            )
-                    )
-                    .shadow(color: isTextFieldFocused ? Color.accentColor.opacity(0.15) : Color.clear, radius: 6, x: 0, y: 0)
-                    .offset(x: shakeOffset)
-                    .animation(motionEnabled ? .interactiveSpring(response: 0.15, dampingFraction: 0.25, blendDuration: 0) : nil, value: shakeOffset)
+                        }
 
                     Button {
-                        handleCustomAssociationSubmit()
+                        model.setFormatAsDefault(forExtension: customAssociationInput)
                     } label: {
                         Label(customAssociationActionTitle, systemImage: customAssociationActionIcon)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                     .tint(.accentColor)
-                    .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.0)
-                    .disabled(model.isSettingFormatDefault)
+                    .disabled(!canSubmitCustomAssociation)
+                    .quietInteractiveSurface(enabled: motionEnabled)
                 }
 
                 if !normalizedCustomAssociationExtension.isEmpty {
@@ -2253,42 +2216,6 @@ private struct WelcomeDetailView: View {
                 return
             }
             model.refreshFormatAssociationStatuses(forExtensions: [newValue])
-        }
-    }
-
-    private func handleCustomAssociationSubmit() {
-        guard !model.isSettingFormatDefault else { return }
-
-        if AppModel.canSetAssociationExtensionInput(customAssociationInput) {
-            model.setFormatAsDefault(forExtension: customAssociationInput)
-        } else {
-            triggerShake()
-        }
-    }
-
-    private func triggerShake() {
-        guard motionEnabled else {
-            isErrorActive = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                isErrorActive = false
-            }
-            return
-        }
-
-        isErrorActive = true
-        withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.25, blendDuration: 0)) {
-            shakeOffset = -8
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.25, blendDuration: 0)) {
-                shakeOffset = 8
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.25, blendDuration: 0)) {
-                    shakeOffset = 0
-                }
-                isErrorActive = false
-            }
         }
     }
 }
@@ -2394,9 +2321,9 @@ private struct SessionDetailView: View {
                         .padding(.top, 62)
                         .padding(.trailing, 16)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
-                        .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.86, blendDuration: 0.12) : nil, value: model.isTutorialActive)
                 }
             }
+            .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.86, blendDuration: 0.12) : nil, value: model.isTutorialActive)
 
             if let errorMessage = model.errorMessage {
                 MessageCard(
@@ -2425,7 +2352,7 @@ private struct SessionDetailView: View {
             }
         }
         .padding(24)
-        .background(DetailBackgroundView().ignoresSafeArea())
+        .background(detailBackground.ignoresSafeArea())
         .onAppear {
             pickRandomSessionHint()
         }
@@ -2760,32 +2687,26 @@ private struct TutorialCoachOverlay: View {
                 .foregroundStyle(.secondary)
 
             if model.isTutorialCoachExpanded, let chapter = model.tutorialCurrentChapter, let step = model.tutorialCurrentStep {
-                ZStack(alignment: .topLeading) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(step.title)
-                            .font(.title3.weight(.bold))
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(step.title)
+                        .font(.title3.weight(.bold))
 
-                        Text(step.instruction)
-                            .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
+                    Text(step.instruction)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                        Text(step.command)
-                            .font(.system(.subheadline, design: .monospaced, weight: .semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.accentColor.opacity(0.18), in: Capsule())
+                    Text(step.command)
+                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.accentColor.opacity(0.18), in: Capsule())
 
-                        Text(step.detail)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .id(step.id)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.96)),
-                        removal: .opacity
-                    ))
+                    Text(step.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
 
                 HStack(spacing: 8) {
                     ForEach(chapter.steps, id: \.id) { item in
@@ -2866,9 +2787,17 @@ private struct TutorialCoachOverlay: View {
                 .inset(by: 1)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
         )
-        .shadow(color: .black.opacity(0.22), radius: 16, y: 6)
-        .animation(motionEnabled ? .spring(response: 0.32, dampingFraction: 0.82) : nil, value: model.tutorialStepIndex)
-        .animation(motionEnabled ? .spring(response: 0.32, dampingFraction: 0.82) : nil, value: model.isTutorialCoachExpanded)
+        .shadow(color: .black.opacity(0.28), radius: 22, y: 10)
+        .shadow(color: Color.accentColor.opacity(0.16), radius: 26, y: 0)
+        .quietInteractiveSurface(
+            enabled: motionEnabled,
+            hoverScale: 1.004,
+            hoverYOffset: -0.5,
+            shadowOpacity: 0.06,
+            shadowRadius: 8
+        )
+        .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: model.tutorialStepIndex)
+        .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: model.isTutorialCoachExpanded)
     }
 }
 
@@ -2907,22 +2836,12 @@ struct GlassCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(24)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(colorScheme == .dark ? 0.15 : 0.65),
-                                Color.white.opacity(colorScheme == .dark ? 0.03 : 0.15)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 0.5
-                    )
+                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.4), lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.16 : 0.04), radius: 14, x: 0, y: 6)
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 16, x: 0, y: 8)
     }
 }
 
@@ -3375,43 +3294,5 @@ private struct MessageCard: View {
             shadowOpacity: 0.05,
             shadowRadius: 8
         )
-    }
-}
-
-struct VisualEffectView: NSViewRepresentable {
-    var material: NSVisualEffectView.Material = .sidebar
-    var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
-    var state: NSVisualEffectView.State = .followsWindowActiveState
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = material
-        view.blendingMode = blendingMode
-        view.state = state
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-        nsView.blendingMode = blendingMode
-        nsView.state = state
-    }
-}
-
-struct DetailBackgroundView: View {
-    var body: some View {
-        ZStack {
-            VisualEffectView(material: .underWindowBackground, blendingMode: .behindWindow)
-
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.12),
-                    Color.clear,
-                    Color.black.opacity(0.04),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
     }
 }

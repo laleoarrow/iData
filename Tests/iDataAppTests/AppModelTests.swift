@@ -944,46 +944,6 @@ struct AppModelTests {
     }
 
     @Test
-    func menuBarItemDefaultsToVisibleAndDockIconDefaultsToShown() {
-        let suiteName = "AppModelTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-
-        let model = AppModel(defaults: defaults)
-
-        #expect(model.showsMenuBarItem)
-        #expect(!model.hidesDockIcon)
-        #expect(!model.shouldTerminateAfterLastWindowClosed)
-    }
-
-    @Test
-    func dockIconHiddenPreferencePersistsAndKeepsMenuBarAvailable() {
-        let suiteName = "AppModelTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-
-        let model = AppModel(defaults: defaults)
-        model.showsMenuBarItem = false
-        model.hidesDockIcon = true
-
-        let reloadedModel = AppModel(defaults: defaults)
-        #expect(reloadedModel.showsMenuBarItem)
-        #expect(reloadedModel.hidesDockIcon)
-        #expect(!reloadedModel.shouldTerminateAfterLastWindowClosed)
-    }
-
-    @Test
-    func lastWindowCloseTerminationFollowsMenuBarAndDockVisibility() {
-        #expect(!AppModel.shouldTerminateAfterLastWindowClosed(showsMenuBarItem: true, hidesDockIcon: false))
-        #expect(!AppModel.shouldTerminateAfterLastWindowClosed(showsMenuBarItem: false, hidesDockIcon: true))
-        #expect(AppModel.shouldTerminateAfterLastWindowClosed(showsMenuBarItem: false, hidesDockIcon: false))
-    }
-
-    @Test
     func sidebarCollapsePreferencePersists() {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

@@ -27,7 +27,7 @@ struct PreferencesView: View {
         }
         .scrollIndicators(.hidden)
         .frame(width: 620, height: 660)
-        .background(DetailBackgroundView().ignoresSafeArea())
+        .background(preferencesBackground.ignoresSafeArea())
         .environment(\EnvironmentValues.idataAnimationsEnabled, model.animationsEnabled)
     }
 
@@ -78,20 +78,6 @@ struct PreferencesView: View {
                     .toggleStyle(.switch)
 
                 Text(isChinese ? "降低应用内的大部分弹性、悬停和渐显动画强度。系统的“减少动态效果”设置仍然会被优先遵循。" : "Turns down most spring, hover, and reveal animations across the app. System Reduce Motion is still respected.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Divider()
-
-                Toggle(isChinese ? "在菜单栏显示 iData" : "Show iData in the menu bar", isOn: $model.showsMenuBarItem)
-                    .toggleStyle(.switch)
-                    .disabled(model.hidesDockIcon)
-
-                Toggle(isChinese ? "隐藏 Dock 图标" : "Hide Dock icon", isOn: $model.hidesDockIcon)
-                    .toggleStyle(.switch)
-
-                Text(isChinese ? "隐藏 Dock 图标时，菜单栏入口会保持开启，用于重新显示窗口或退出应用。" : "When the Dock icon is hidden, the menu bar item stays enabled so you can reopen the window or quit.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -245,7 +231,6 @@ private struct PreferencesCard<Content: View>: View {
     let title: String
     let icon: String
     @ViewBuilder let content: Content
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -256,20 +241,10 @@ private struct PreferencesCard<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.15 : 0.65),
-                            Color.white.opacity(colorScheme == .dark ? 0.03 : 0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 0.5
-                )
+                .strokeBorder(Color.white.opacity(0.08))
         )
     }
 }

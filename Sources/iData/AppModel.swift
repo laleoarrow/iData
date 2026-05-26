@@ -128,22 +128,6 @@ final class AppModel: ObservableObject {
             defaults.set(reduceAnimations, forKey: Self.reduceAnimationsKey)
         }
     }
-    @Published var showsMenuBarItem: Bool {
-        didSet {
-            if hidesDockIcon && !showsMenuBarItem {
-                showsMenuBarItem = true
-            }
-            defaults.set(showsMenuBarItem, forKey: Self.showsMenuBarItemKey)
-        }
-    }
-    @Published var hidesDockIcon: Bool {
-        didSet {
-            if hidesDockIcon && !showsMenuBarItem {
-                showsMenuBarItem = true
-            }
-            defaults.set(hidesDockIcon, forKey: Self.hidesDockIconKey)
-        }
-    }
     @Published var vdExecutablePath: String {
         didSet {
             defaults.set(vdExecutablePath, forKey: Self.vdExecutablePathKey)
@@ -168,8 +152,6 @@ final class AppModel: ObservableObject {
     nonisolated static let vdExecutablePathKey = "vdExecutablePath"
     nonisolated static let pinnedRecentFilesKey = "pinnedRecentFiles"
     nonisolated static let reduceAnimationsKey = "reduceAnimations"
-    nonisolated static let showsMenuBarItemKey = "showsMenuBarItem"
-    nonisolated static let hidesDockIconKey = "hidesDockIcon"
     nonisolated static let isSidebarCollapsedKey = "isSidebarCollapsed"
     nonisolated static let appLanguagePreferenceKey = "appLanguagePreference"
     nonisolated static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
@@ -472,13 +454,6 @@ final class AppModel: ObservableObject {
             pinned: Self.loadPinnedRecentFiles(defaults: defaults)
         )
         self.reduceAnimations = defaults.object(forKey: Self.reduceAnimationsKey) as? Bool ?? false
-        let initialHidesDockIcon = defaults.object(forKey: Self.hidesDockIconKey) as? Bool ?? false
-        let initialShowsMenuBarItem = defaults.object(forKey: Self.showsMenuBarItemKey) as? Bool ?? true
-        self.hidesDockIcon = initialHidesDockIcon
-        self.showsMenuBarItem = initialHidesDockIcon ? true : initialShowsMenuBarItem
-        if initialHidesDockIcon && !initialShowsMenuBarItem {
-            defaults.set(true, forKey: Self.showsMenuBarItemKey)
-        }
         self.vdExecutablePath = defaults.string(forKey: Self.vdExecutablePathKey) ?? ""
         self.isSidebarCollapsed = defaults.object(forKey: Self.isSidebarCollapsedKey) as? Bool ?? false
         self.appLanguagePreference = AppLanguagePreference(
@@ -519,13 +494,6 @@ final class AppModel: ObservableObject {
 
     var animationsEnabled: Bool {
         !reduceAnimations
-    }
-
-    var shouldTerminateAfterLastWindowClosed: Bool {
-        Self.shouldTerminateAfterLastWindowClosed(
-            showsMenuBarItem: showsMenuBarItem,
-            hidesDockIcon: hidesDockIcon
-        )
     }
 
     var effectiveLanguage: AppResolvedLanguage {
@@ -654,13 +622,6 @@ final class AppModel: ObservableObject {
             rawValue: defaults.string(forKey: Self.appLanguagePreferenceKey) ?? ""
         ) ?? .system
         return resolvedLanguage(preference: preference, preferredLanguages: preferredLanguagesProvider())
-    }
-
-    nonisolated static func shouldTerminateAfterLastWindowClosed(
-        showsMenuBarItem: Bool,
-        hidesDockIcon: Bool
-    ) -> Bool {
-        !(showsMenuBarItem || hidesDockIcon)
     }
 
     nonisolated static func localized(
