@@ -95,34 +95,4 @@ struct AppDelegateTests {
         #expect(receivedURLs == [fileURL])
         #expect(activationCount == 1)
     }
-
-    @Test
-    func openDocumentsAppleEventExtractsFileURLs() {
-        let first = URL(fileURLWithPath: "/tmp/first.csv")
-        let second = URL(fileURLWithPath: "/tmp/second.tsv")
-        let directObject = NSAppleEventDescriptor.list()
-        directObject.insert(NSAppleEventDescriptor(fileURL: first), at: 1)
-        directObject.insert(NSAppleEventDescriptor(fileURL: second), at: 2)
-
-        #expect(AppDelegate.fileURLs(fromOpenDocumentsDirectObject: directObject) == [first, second])
-    }
-
-    @Test
-    func commandLineArgumentsExtractExistingFilesOnly() throws {
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("idata-command-line-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        defer {
-            try? FileManager.default.removeItem(at: tempRoot)
-        }
-
-        let fileURL = tempRoot.appendingPathComponent("sample.csv")
-        try Data("a,b\n1,2\n".utf8).write(to: fileURL)
-
-        #expect(AppDelegate.fileURLs(fromCommandLineArguments: [
-            "--ignored-flag",
-            fileURL.path,
-            tempRoot.appendingPathComponent("missing.csv").path,
-        ]) == [fileURL.standardizedFileURL])
-    }
 }

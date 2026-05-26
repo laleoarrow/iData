@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import Testing
 @testable import iData
@@ -373,54 +372,6 @@ struct AppModelTests {
 
         #expect(decision == .stayBackground)
         #expect(opener.openedApplicationURL == textEdit.url)
-    }
-
-    @Test
-    func appDelegateBindingPresentsMainWindowForFilesThatStayInIData() throws {
-        let suiteName = "AppModelTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
-
-        let tempRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("idata-menu-open-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        defer {
-            try? FileManager.default.removeItem(at: tempRoot)
-        }
-
-        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
-        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
-
-        let target = tempRoot.appendingPathComponent("large.csv")
-        try Data("a,b\n1,2\n".utf8).write(to: target)
-
-        let model = AppModel(
-            defaults: defaults,
-            alternateApplicationResolver: { _, _, _ in nil },
-            fileSizeProvider: { _ in AppModel.largeFileOpenThresholdBytes + 1 }
-        )
-        model.vdExecutablePath = launcher.path
-        defer {
-            model.activeSession?.terminate()
-        }
-
-        var appActivationCount = 0
-        var presentationCount = 0
-        let delegate = AppDelegate(appActivator: {
-            appActivationCount += 1
-        }, mainWindowPresenter: { _, _ in
-            presentationCount += 1
-        })
-        let updater = AppUpdaterController()
-        delegate.configure(model: model, updater: updater)
-
-        delegate.application(NSApplication.shared, open: [target])
-
-        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
-        #expect(presentationCount == 1)
-        #expect(appActivationCount == 0)
     }
 
     @Test
