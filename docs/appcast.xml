@@ -3,22 +3,25 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.3</title>
-            <pubDate>Thu, 16 Apr 2026 10:15:23 +0800</pubDate>
+            <title>0.2.4</title>
+            <pubDate>Wed, 27 May 2026 00:26:02 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>23</sparkle:version>
-            <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
+            <sparkle:version>24</sparkle:version>
+            <sparkle:shortVersionString>0.2.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.3
+            <description sparkle:format="markdown"><![CDATA[## v0.2.4
 
 ### UI/UX Refinements
-- **Design System Polish**: Standardized all dashboard buttons ("Start", "Handoff Rules", "Set Default") to use a consistent, harmonious `.borderedProminent` and accent color tinted style, achieving a truly united "Liquid Glass" native aesthetic.
-- **Visual Corner Consistency**: Dropped custom button background capsules and shapes to enforce globally tighter constraints and seamless UI composition.
+- **Unified Carousel Transitions**: Wrapped the welcome screen tutorial preview carousel in a single transitioning block with spring curves, eliminating conflicting animations and layout stutter.
+- **Optimized Tutorial Coach**: Rewrote the active tutorial coach overlay to use a single spring animation and unified shadow. Removed redundant colored shadows and container hover scale modifiers, preventing layout thrashing and making tutorial navigation extremely fluid.
+- **Aligned Hover Glows**: Aligned the sidebar recent file row hover glow corner radius to match the button background (12pt), resolving overlapping rounded borders.
 
-### Under the Hood
-- **Test Integrity**: Relaxed brittle negative string matching assertions in the ContentView layout tests to allow for safely unified corner styling across the app.
+### Navigation and macOS Integration
+- **Horizontal Wheel Navigation**: Horizontal mouse wheels and trackpad left/right gestures now move across VisiData columns, matching the existing vertical scroll behavior for rows.
+- **Menu Bar Access**: iData now shows a menu bar item by default, with quick actions for showing the main window, opening a file, preferences, update checks, and quit.
+- **Optional Dock Hiding**: Added a preference to hide the Dock icon while keeping the menu bar item available so the app remains easy to reopen.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.3/iData-v0.2.3-macos-universal.zip" length="4046961" type="application/octet-stream" sparkle:edSignature="/ubFeyBCXPsp29KF8ukAqD6j6w3r1l19nNvRaKrLjCLbsHt0tpg2JG2X5v+3msEKKBqf3094j+M9rkSnKx8sCQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.4/iData-v0.2.4-macos-universal.zip" length="4218594" type="application/octet-stream" sparkle:edSignature="69aAVovyTPgNkQMXQrLvQpjrkmcl3IXYSkwQFha90q2N3VPljv72Uwq/rZAfO1+ILNv8c7u2Lt2e7vFXkIxBCA=="/>
         </item>
     </channel>
 </rss>
