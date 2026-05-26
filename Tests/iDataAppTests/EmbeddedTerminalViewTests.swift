@@ -191,6 +191,45 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLConvertsHorizontalWheelToRightArrowInput() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(300))
+        try await harness.clearMessages()
+
+        try await harness.dispatchWheel(deltaX: 96, deltaY: 4)
+
+        let inputMessages = try await harness.messages().filter { $0.type == "input" }
+        #expect(inputMessages.map(\.data) == ["\u{1B}[C\u{1B}[C"])
+    }
+
+    @Test
+    func terminalHTMLConvertsShiftVerticalWheelToHorizontalInput() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(300))
+        try await harness.clearMessages()
+
+        try await harness.dispatchWheel(deltaX: 0, deltaY: -72, shiftKey: true)
+
+        let inputMessages = try await harness.messages().filter { $0.type == "input" }
+        #expect(inputMessages.map(\.data) == ["\u{1B}[D\u{1B}[D"])
+    }
+
+    @Test
+    func terminalHTMLLeavesVerticalWheelForXterm() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(300))
+        try await harness.clearMessages()
+
+        try await harness.dispatchWheel(deltaX: 2, deltaY: 80)
+
+        let inputMessages = try await harness.messages().filter { $0.type == "input" }
+        #expect(inputMessages.isEmpty)
+    }
+
+    @Test
     func terminalHTMLForcesResizeWhenFocusReenters() throws {
         let html = try terminalHTML()
 
@@ -422,6 +461,7 @@ private struct TerminalMessage: Decodable {
     let type: String
     let cols: Int?
     let rows: Int?
+    let data: String?
 }
 
 @MainActor
@@ -579,6 +619,24 @@ private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
 
     func clearMessages() async throws {
         _ = try await evaluate("window.__clearMessages();")
+    }
+
+    func dispatchWheel(
+        deltaX: Int,
+        deltaY: Int,
+        shiftKey: Bool = false,
+        deltaMode: Int = 0
+    ) async throws {
+        _ = try await evaluate("""
+        terminalRoot.dispatchEvent(new WheelEvent('wheel', {
+          deltaX: \(deltaX),
+          deltaY: \(deltaY),
+          deltaMode: \(deltaMode),
+          shiftKey: \(shiftKey ? "true" : "false"),
+          bubbles: true,
+          cancelable: true
+        }));
+        """)
     }
 
     func messages() async throws -> [TerminalMessage] {

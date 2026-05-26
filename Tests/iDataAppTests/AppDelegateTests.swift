@@ -15,6 +15,21 @@ struct AppDelegateTests {
     }
 
     @Test
+    func boundAppCanStayRunningAfterLastWindowCloses() {
+        let delegate = AppDelegate(appActivator: {})
+        delegate.bind(
+            openHandler: { _ in .stayBackground },
+            terminateHandler: {},
+            shouldTerminateAfterLastWindowClosed: { false }
+        )
+
+        let shouldTerminate = (delegate as NSApplicationDelegate)
+            .applicationShouldTerminateAfterLastWindowClosed?(NSApplication.shared)
+
+        #expect(shouldTerminate == false)
+    }
+
+    @Test
     func queuedOpenFilesAreDeliveredAfterBinding() async {
         let fileURL = URL(fileURLWithPath: "/tmp/queued.csv")
         let delegate = AppDelegate(appActivator: {})

@@ -78,6 +78,13 @@
     let deferredMeasureBudgetRemaining = 0;
     let metricSettleHandle = null;
     let metricSettleBudgetRemaining = 0;
+    let horizontalWheelStepPixels = 36;
+    let horizontalWheelMaxRepeats = 12;
+    let leftArrowInput = '\x1b[D';
+    let rightArrowInput = '\x1b[C';
+    let domDeltaLine = 1;
+    let domDeltaPage = 2;
+    let horizontalWheelRemainder = { value: 0 };
 
     function post(message) {
       window.webkit?.messageHandlers?.idata?.postMessage(message);
@@ -85,6 +92,56 @@
 
     function debug(message) {
       post({ type: 'debug', message });
+    }
+
+    function horizontalWheelDelta(event) {
+      const deltaX = Number(event.deltaX) || 0;
+      const deltaY = Number(event.deltaY) || 0;
+
+      if (event.shiftKey && Math.abs(deltaY) > Math.abs(deltaX)) {
+        return deltaY;
+      }
+
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        return deltaX;
+      }
+
+      return 0;
+    }
+
+    function horizontalWheelStep(event) {
+      if (event.deltaMode === domDeltaLine || event.deltaMode === domDeltaPage) {
+        return 1;
+      }
+      return horizontalWheelStepPixels;
+    }
+
+    function sendHorizontalWheelInput(event) {
+      const delta = horizontalWheelDelta(event);
+      if (delta === 0) {
+        return false;
+      }
+
+      const step = horizontalWheelStep(event);
+      if (horizontalWheelRemainder.value !== 0 && Math.sign(delta) !== Math.sign(horizontalWheelRemainder.value)) {
+        horizontalWheelRemainder.value = 0;
+      }
+
+      horizontalWheelRemainder.value += delta;
+      const repeats = Math.min(
+        horizontalWheelMaxRepeats,
+        Math.trunc(Math.abs(horizontalWheelRemainder.value) / step)
+      );
+
+      if (repeats <= 0) {
+        return true;
+      }
+
+      const direction = horizontalWheelRemainder.value > 0 ? 1 : -1;
+      const input = direction > 0 ? rightArrowInput : leftArrowInput;
+      horizontalWheelRemainder.value -= direction * repeats * step;
+      post({ type: 'input', data: input.repeat(repeats) });
+      return true;
     }
 
     function makeTerminalOptions() {
@@ -495,9 +552,12 @@
       scheduleTerminalLayoutPasses({ forceResize: true });
     });
 
-    terminalRoot.addEventListener('wheel', () => {
+    terminalRoot.addEventListener('wheel', (event) => {
       debug(`wheel term=${term?.cols ?? 0}x${term?.rows ?? 0} last=${lastSentSize ?? 'nil'}`);
-    }, { passive: true });
+      if (sendHorizontalWheelInput(event)) {
+        event.preventDefault();
+      }
+    }, { passive: false });
 
     requestAnimationFrame(() => {
       scheduleTerminalLayoutPasses({ forceResize: true });

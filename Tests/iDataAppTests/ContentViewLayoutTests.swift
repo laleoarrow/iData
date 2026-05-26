@@ -54,11 +54,13 @@ struct ContentViewLayoutTests {
 
         #expect(source.contains(normalizeWhitespace("""
         .background(
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.20),
-                    Color.white.opacity(0.05),
-                ],
+            ZStack {
+                Color.accentColor.opacity(0.12)
+                Color.white.opacity(0.02)
+            }
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        )
         """)))
     }
 
@@ -120,7 +122,7 @@ struct ContentViewLayoutTests {
         .overlay {
             SidebarHoverGlow(
                 isVisible: isHovering,
-                style: .rounded(20)
+                style: .rounded(12)
             )
         }
         """)))
