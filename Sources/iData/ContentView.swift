@@ -69,19 +69,6 @@ struct ContentView: View {
         .dropDestination(for: URL.self) { items, _ in
             model.handleDroppedFiles(items)
         }
-        .toolbar {
-            ToolbarItemGroup {
-                Button(localizedText(isChinese, english: "Open…", chinese: "打开…")) {
-                    model.openDocument()
-                }
-                .keyboardShortcut("o")
-
-                Button(localizedText(isChinese, english: "Reopen", chinese: "重新打开")) {
-                    model.reopenLastFile()
-                }
-                .disabled(model.lastOpenedFile == nil)
-            }
-        }
         .sheet(isPresented: $model.isHelpPresented) {
             HelpView(model: model)
         }
@@ -2657,42 +2644,8 @@ private struct SessionDetailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(session.currentFileURL?.lastPathComponent ?? localizedText(isChinese, english: "VisiData Session", chinese: "VisiData 会话"))
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.82)
-                        Text(session.currentFileURL?.path ?? localizedText(isChinese, english: "No file loaded", chinese: "尚未加载文件"))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                            .textSelection(.enabled)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let fileURL = session.currentFileURL {
-                        SessionHeaderActions(
-                            isChinese: isChinese,
-                            fileURL: fileURL,
-                            motionEnabled: motionEnabled,
-                            revealAction: { model.revealInFinder(fileURL) },
-                            copyAction: { model.copyPathToPasteboard(fileURL) }
-                        )
-                        .layoutPriority(1)
-                    }
-                }
-
-                if shouldShowSessionInfoHint {
-                    SessionInfoHintRow(
-                        isChinese: isChinese,
-                        message: sessionInfoHint
-                    )
-                    .frame(maxWidth: 560, alignment: .leading)
-                    .transition(AnyTransition.move(edge: .top).combined(with: .opacity))
-                }
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            sessionHeader
             .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: shouldShowSessionInfoHint)
 
             ZStack(alignment: .topTrailing) {
@@ -2742,7 +2695,10 @@ private struct SessionDetailView: View {
                 .id("\(statusMessage)-\(inputSourceMonitor.displayName)-\(inputSourceMonitor.isLikelyEnglish)")
             }
         }
-        .padding(24)
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
+        .padding(.bottom, 20)
+        .ignoresSafeArea(.container, edges: .top)
         .onAppear {
             pickRandomSessionHint()
         }
@@ -2774,37 +2730,125 @@ private struct SessionDetailView: View {
             sessionInfoHint = next
         }
     }
+
+    private var sessionHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(session.currentFileURL?.lastPathComponent ?? localizedText(isChinese, english: "VisiData Session", chinese: "VisiData 会话"))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .minimumScaleFactor(0.78)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let fileURL = session.currentFileURL {
+                    SessionHeaderActions(
+                        isChinese: isChinese,
+                        fileURL: fileURL,
+                        canReopen: model.lastOpenedFile != nil,
+                        motionEnabled: motionEnabled,
+                        openAction: { model.openDocument() },
+                        reopenAction: { model.reopenLastFile() },
+                        revealAction: { model.revealInFinder(fileURL) },
+                        copyAction: { model.copyPathToPasteboard(fileURL) }
+                    )
+                    .layoutPriority(1)
+                }
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 10) {
+                    sessionPathLabel
+                    Spacer(minLength: 12)
+                    sessionHint
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    sessionPathLabel
+                    sessionHint
+                }
+            }
+        }
+    }
+
+    private var sessionPathLabel: some View {
+        Text(session.currentFileURL?.path ?? localizedText(isChinese, english: "No file loaded", chinese: "尚未加载文件"))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private var sessionHint: some View {
+        if shouldShowSessionInfoHint {
+            SessionInfoHintRow(
+                isChinese: isChinese,
+                message: sessionInfoHint
+            )
+            .transition(AnyTransition.opacity.combined(with: .scale(scale: 0.98)))
+        }
+    }
 }
 
 private struct SessionHeaderActions: View {
     let isChinese: Bool
     let fileURL: URL
+    let canReopen: Bool
     let motionEnabled: Bool
+    let openAction: () -> Void
+    let reopenAction: () -> Void
     let revealAction: () -> Void
     let copyAction: () -> Void
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                Button {
-                    revealAction()
-                } label: {
-                    Label(localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"), systemImage: "finder")
-                }
-                .buttonStyle(.bordered)
-                .quietInteractiveSurface(enabled: motionEnabled)
+            HStack(spacing: 8) {
+                headerActionButton(
+                    title: localizedText(isChinese, english: "Open…", chinese: "打开…"),
+                    systemImage: "folder",
+                    action: openAction
+                )
+                .keyboardShortcut("o")
 
-                Button {
-                    copyAction()
-                } label: {
-                    Label(localizedText(isChinese, english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
-                }
-                .buttonStyle(.bordered)
-                .quietInteractiveSurface(enabled: motionEnabled)
+                headerActionButton(
+                    title: localizedText(isChinese, english: "Reopen", chinese: "重新打开"),
+                    systemImage: "arrow.clockwise",
+                    action: reopenAction
+                )
+                .disabled(!canReopen)
+
+                headerActionButton(
+                    title: localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"),
+                    systemImage: "finder",
+                    action: revealAction
+                )
+
+                headerActionButton(
+                    title: localizedText(isChinese, english: "Copy Path", chinese: "复制路径"),
+                    systemImage: "doc.on.doc",
+                    action: copyAction
+                )
             }
             .fixedSize(horizontal: true, vertical: false)
 
             Menu {
+                Button {
+                    openAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Open…", chinese: "打开…"), systemImage: "folder")
+                }
+                .keyboardShortcut("o")
+
+                Button {
+                    reopenAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Reopen", chinese: "重新打开"), systemImage: "arrow.clockwise")
+                }
+                .disabled(!canReopen)
+
+                Divider()
+
                 Button {
                     revealAction()
                 } label: {
@@ -2826,6 +2870,20 @@ private struct SessionHeaderActions: View {
                 chinese: "\(fileURL.lastPathComponent) 的操作"
             ))
         }
+    }
+
+    private func headerActionButton(
+        title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .lineLimit(1)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .quietInteractiveSurface(enabled: motionEnabled)
     }
 }
 
@@ -3057,41 +3115,21 @@ private struct StatusAndInputCard: View {
                 cardTint
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.05),
-                        Color.clear,
+                        Color.white.opacity(isHovering ? 0.07 : 0.05),
+                        Color.accentColor.opacity(isHovering ? 0.08 : 0),
                         Color.black.opacity(0.04),
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .inset(by: 1)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.12),
-                                Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.10),
-                                Color.white.opacity(0.06),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .opacity(isHovering ? 1 : 0)
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .inset(by: 1)
-                .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0), lineWidth: 0.9)
+                .strokeBorder(Color.white.opacity(isHovering ? 0.16 : 0.10), lineWidth: 1)
                 .allowsHitTesting(false)
-        }
+        )
         .animation(.easeOut(duration: 0.18), value: isHovering)
         .onHover { hovering in
             isHovering = hovering
@@ -3201,42 +3239,28 @@ private struct SessionInfoHintRow: View {
     let message: String
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "info.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
 
             Text(message)
-                .font(.subheadline)
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: 360, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
         .background(
-            ZStack {
-                Color.clear
-                    .background(.ultraThinMaterial)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.06),
-                        Color.accentColor.opacity(0.10),
-                        Color.blue.opacity(0.08),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(0.06))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.16), lineWidth: 1)
+            Capsule(style: .continuous)
+                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.16), radius: 12, y: 4)
         .help(isChinese ? "随机提示" : "Random tip")
     }
 }
@@ -3384,12 +3408,7 @@ private struct TutorialCoachOverlay: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.20), lineWidth: 1)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .inset(by: 1)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
+                .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.28), radius: 22, y: 10)
         .shadow(color: Color.accentColor.opacity(0.16), radius: 26, y: 0)

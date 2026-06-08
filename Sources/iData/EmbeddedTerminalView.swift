@@ -41,8 +41,8 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.wantsLayer = true
-        webView.layer?.cornerRadius = 24
-        webView.layer?.masksToBounds = true
+        webView.layer?.cornerRadius = 0
+        webView.layer?.masksToBounds = false
         context.coordinator.bind(session: session, webView: webView)
         context.coordinator.loadTerminalPage()
         return webView

@@ -278,7 +278,8 @@ struct ContentViewLayoutTests {
             end: "private struct SessionInfoHintRow: View {"
         ))
 
-        #expect(normalizedCard.contains(normalizeWhitespace("""
+        #expect(normalizedCard.contains(".strokeBorder(Color.white.opacity(isHovering ? 0.16 : 0.10), lineWidth: 1)"))
+        #expect(!normalizedCard.contains(normalizeWhitespace("""
         RoundedRectangle(cornerRadius: 16, style: .continuous)
             .inset(by: 1)
             .fill(
@@ -338,6 +339,72 @@ struct ContentViewLayoutTests {
         #expect(sessionSection.contains("ViewThatFits(in: .horizontal)"))
         #expect(sessionSection.contains("Menu {"))
         #expect(sessionSection.contains("Label(localizedText(isChinese, english: \"Actions\", chinese: \"操作\")"))
+        #expect(sessionSection.contains("headerActionButton("))
+        #expect(sessionSection.contains("english: \"Open…\", chinese: \"打开…\""))
+        #expect(sessionSection.contains("english: \"Reopen\", chinese: \"重新打开\""))
+        #expect(sessionSection.contains("english: \"Show in Finder\", chinese: \"在 Finder 中显示\""))
+        #expect(sessionSection.contains("english: \"Copy Path\", chinese: \"复制路径\""))
+        #expect(!sessionSection.contains("ToolbarItemGroup"))
+        #expect(!sessionSection.contains(".toolbar {"))
+    }
+
+    @Test
+    func sessionHeaderKeepsTipInlineWithFileMetadata() throws {
+        let source = try contentViewSource()
+        let sessionSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SessionDetailView: View {",
+            end: "private struct SessionHeaderActions: View {"
+        ))
+        let hintSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SessionInfoHintRow: View {",
+            end: "private struct TutorialCoachOverlay: View {"
+        ))
+
+        #expect(sessionSection.contains("private var sessionHeader: some View"))
+        #expect(sessionSection.contains("ViewThatFits(in: .horizontal)"))
+        #expect(sessionSection.contains("sessionPathLabel"))
+        #expect(sessionSection.contains("sessionHint"))
+        #expect(!sessionSection.contains(".frame(maxWidth: 560, alignment: .leading)"))
+        #expect(hintSection.contains("Capsule(style: .continuous)"))
+        #expect(hintSection.contains(".font(.caption.weight(.semibold))"))
+        #expect(!hintSection.contains(".ultraThinMaterial"))
+        #expect(!hintSection.contains("LinearGradient("))
+    }
+
+    @Test
+    func terminalAndFloatingPanelsUseSingleVisibleRoundedBorder() throws {
+        let source = try contentViewSource()
+        let sessionSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SessionDetailView: View {",
+            end: "private struct SessionHeaderActions: View {"
+        ))
+        let statusCard = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct StatusAndInputCard: View {",
+            end: "private struct OrbButtonStyle: ButtonStyle {"
+        ))
+        let tutorialOverlay = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct TutorialCoachOverlay: View {",
+            end: "private struct CommandShortcutBadge: View {"
+        ))
+
+        #expect(sessionSection.contains("EmbeddedTerminalView(session: session)"))
+        #expect(sessionSection.contains(".clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))"))
+        #expect(sessionSection.contains(".background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))"))
+        #expect(sessionSection.contains(".strokeBorder(Color.white.opacity(0.08))"))
+        #expect(!sessionSection.contains("cornerRadius: 24"))
+        #expect(!sessionSection.contains(".inset(by: 1) .strokeBorder"))
+
+        #expect(statusCard.contains(".strokeBorder(Color.white.opacity(isHovering ? 0.16 : 0.10), lineWidth: 1)"))
+        #expect(!statusCard.contains(".inset(by: 1) .strokeBorder"))
+        #expect(!statusCard.contains("RoundedRectangle(cornerRadius: 16, style: .continuous) .inset(by: 1) .fill"))
+
+        #expect(tutorialOverlay.contains(".strokeBorder(Color.white.opacity(0.18), lineWidth: 1)"))
+        #expect(!tutorialOverlay.contains(".inset(by: 1) .strokeBorder"))
     }
 
     @Test
@@ -394,7 +461,9 @@ struct ContentViewLayoutTests {
         ))
 
         #expect(welcomeSection.contains("ScrollView {"))
-        #expect(sessionSection.contains("VStack(alignment: .leading, spacing: 18)"))
+        #expect(sessionSection.contains("VStack(alignment: .leading, spacing: 10)"))
+        #expect(sessionSection.contains(".padding(.top, 16)"))
+        #expect(sessionSection.contains(".ignoresSafeArea(.container, edges: .top)"))
         #expect(!welcomeSection.contains(".background(detailBackground.ignoresSafeArea())"))
         #expect(!sessionSection.contains(".background(detailBackground.ignoresSafeArea())"))
     }

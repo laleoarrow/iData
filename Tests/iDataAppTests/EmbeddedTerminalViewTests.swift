@@ -214,6 +214,16 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func embeddedTerminalViewLeavesCornerMaskingToSwiftUIContainer() throws {
+        let source = try embeddedTerminalViewSource()
+
+        #expect(source.contains("webView.layer?.cornerRadius = 0"))
+        #expect(source.contains("webView.layer?.masksToBounds = false"))
+        #expect(!source.contains("webView.layer?.cornerRadius = 24"))
+        #expect(!source.contains("webView.layer?.masksToBounds = true"))
+    }
+
+    @Test
     func terminalHTMLAvoidsViewportAndIMEForcedResizeStorms() throws {
         let html = try terminalHTML()
 
