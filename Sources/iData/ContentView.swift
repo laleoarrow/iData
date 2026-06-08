@@ -41,12 +41,10 @@ struct ContentView: View {
                 .frame(width: sidebarWidth)
                 .frame(maxHeight: .infinity)
 
-            Divider()
-                .overlay(Color.white.opacity(0.04))
-
             detailContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background(detailBackground.ignoresSafeArea())
         .overlay {
             AppSweepShimmer(active: motionEnabled)
         }
@@ -119,94 +117,87 @@ private struct SidebarView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(nsColor: .windowBackgroundColor),
-                    Color.accentColor.opacity(0.10),
-                    Color.black.opacity(0.08),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .overlay {
-                SidebarAmbientGlow(
-                    isCollapsed: model.isSidebarCollapsed,
-                    motionEnabled: motionEnabled
-                )
-            }
+            Color.clear
 
-            VStack(alignment: .leading, spacing: model.isSidebarCollapsed ? 14 : 16) {
-                SidebarHeaderCard(model: model)
+            FloatingSidebarRail {
+                VStack(alignment: .leading, spacing: model.isSidebarCollapsed ? 14 : 16) {
+                    SidebarHeaderCard(model: model)
 
-                if model.recentFiles.isEmpty {
-                    if model.isSidebarCollapsed {
-                        EmptySidebarRailState(
-                            isChinese: model.effectiveLanguage == .chinese,
-                            openAction: { model.openDocument() }
-                        )
+                    if model.recentFiles.isEmpty {
+                        if model.isSidebarCollapsed {
+                            EmptySidebarRailState(
+                                isChinese: model.effectiveLanguage == .chinese,
+                                openAction: { model.openDocument() }
+                            )
+                        } else {
+                            EmptySidebarState(
+                                isChinese: model.effectiveLanguage == .chinese,
+                                openAction: { model.openDocument() },
+                                tutorialAction: { model.presentTutorialHub() }
+                            )
+                        }
                     } else {
-                        EmptySidebarState(
-                            isChinese: model.effectiveLanguage == .chinese,
-                            openAction: { model.openDocument() },
-                            tutorialAction: { model.presentTutorialHub() }
-                        )
-                    }
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: model.isSidebarCollapsed ? 12 : 10) {
-                            ForEach(model.recentFiles, id: \.standardizedFileURL.path) { fileURL in
-                                Group {
-                                    if model.isSidebarCollapsed {
-                                        CollapsedRecentFileRow(
-                                            fileURL: fileURL,
-                                            isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
-                                            isHovering: recentFileHoverBinding(for: fileURL),
-                                            isChinese: model.effectiveLanguage == .chinese,
-                                            openAction: { model.openExternalFile(fileURL) },
-                                            removeAction: { model.removeRecentFile(fileURL) }
-                                        )
-                                    } else {
-                                        RecentFileRow(
-                                            fileURL: fileURL,
-                                            isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
-                                            isPinned: model.isPinnedRecentFile(fileURL),
-                                            isHovering: recentFileHoverBinding(for: fileURL),
-                                            isChinese: model.effectiveLanguage == .chinese,
-                                            openAction: { model.openExternalFile(fileURL) },
-                                            togglePinAction: { model.togglePinnedRecentFile(fileURL) },
-                                            removeAction: { model.removeRecentFile(fileURL) }
-                                        )
+                        ScrollView {
+                            LazyVStack(spacing: model.isSidebarCollapsed ? 12 : 10) {
+                                ForEach(model.recentFiles, id: \.standardizedFileURL.path) { fileURL in
+                                    Group {
+                                        if model.isSidebarCollapsed {
+                                            CollapsedRecentFileRow(
+                                                fileURL: fileURL,
+                                                isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                                isHovering: recentFileHoverBinding(for: fileURL),
+                                                isChinese: model.effectiveLanguage == .chinese,
+                                                openAction: { model.openExternalFile(fileURL) },
+                                                removeAction: { model.removeRecentFile(fileURL) }
+                                            )
+                                        } else {
+                                            RecentFileRow(
+                                                fileURL: fileURL,
+                                                isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                                isPinned: model.isPinnedRecentFile(fileURL),
+                                                isHovering: recentFileHoverBinding(for: fileURL),
+                                                isChinese: model.effectiveLanguage == .chinese,
+                                                openAction: { model.openExternalFile(fileURL) },
+                                                togglePinAction: { model.togglePinnedRecentFile(fileURL) },
+                                                removeAction: { model.removeRecentFile(fileURL) }
+                                            )
+                                        }
                                     }
-                                }
-                                .transition(
-                                    .asymmetric(
-                                        insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
-                                        removal: .scale(scale: 0.96).combined(with: .opacity)
+                                    .transition(
+                                        .asymmetric(
+                                            insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
+                                            removal: .scale(scale: 0.96).combined(with: .opacity)
+                                        )
                                     )
-                                )
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, model.isSidebarCollapsed ? 0 : 2)
+                            .padding(.bottom, 6)
+                        }
+                        .scrollIndicators(.hidden)
+                        .animation(listAnimation, value: model.recentFiles)
+                        .onHover { hovering in
+                            if !hovering {
+                                hoveredRecentFilePath = nil
                             }
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, model.isSidebarCollapsed ? 0 : 2)
-                        .padding(.bottom, 6)
-                    }
-                    .scrollIndicators(.hidden)
-                    .animation(listAnimation, value: model.recentFiles)
-                    .onHover { hovering in
-                        if !hovering {
+                        .onChange(of: model.recentFiles.map { $0.standardizedFileURL.path }) { _, _ in
                             hoveredRecentFilePath = nil
                         }
                     }
-                    .onChange(of: model.recentFiles.map { $0.standardizedFileURL.path }) { _, _ in
-                        hoveredRecentFilePath = nil
-                    }
+
+                    Spacer(minLength: 0)
+
+                    SidebarFooter(model: model)
                 }
-
-                Spacer(minLength: 0)
-
-                SidebarFooter(model: model)
+                .padding(model.isSidebarCollapsed
+                    ? EdgeInsets(top: 14, leading: 8, bottom: 14, trailing: 8)
+                    : EdgeInsets(top: 16, leading: 14, bottom: 16, trailing: 14))
             }
-            .padding(16)
+            .padding(.vertical, 12)
+            .padding(.leading, model.isSidebarCollapsed ? 10 : 14)
+            .padding(.trailing, model.isSidebarCollapsed ? 6 : 10)
         }
         .clipped()
     }
@@ -223,6 +214,16 @@ private struct SidebarView: View {
                 }
             }
         )
+    }
+}
+
+private struct FloatingSidebarRail<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Color.clear)
     }
 }
 
@@ -252,14 +253,8 @@ private struct SidebarHeaderCard: View {
             collapsedBody
         } else {
             expandedBody
-                .padding(16)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
+                .padding(.horizontal, 2)
+                .padding(.vertical, 4)
         }
     }
 
@@ -892,102 +887,18 @@ private struct SidebarFooterActionIcon: View {
 
     var body: some View {
         SidebarFooterIcon(symbol: symbol)
-            .frame(width: 34, height: 34)
-            .background(
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: isHovering
-                                ? [
-                                    Color.white.opacity(0.14),
-                                    Color.accentColor.opacity(0.12),
-                                ]
-                                : [
-                                    Color.white.opacity(0.05),
-                                    Color.white.opacity(0.02),
-                                ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
+            .foregroundStyle(isHovering ? Color.accentColor : Color.secondary)
+            .frame(width: 36, height: 36)
+            .background(Color.white.opacity(isHovering ? 0.12 : 0.05), in: Circle())
             .overlay(
                 Circle()
-                    .strokeBorder(
-                        isHovering ? Color.white.opacity(0.18) : Color.white.opacity(0.08)
-                    )
-            )
-            .overlay {
-                Circle()
-                    .inset(by: 1)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.16),
-                                Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.14),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .opacity(isHovering ? 1 : 0)
-            }
-            .overlay {
-                Circle()
-                    .inset(by: 1)
-                    .strokeBorder(Color.white.opacity(isHovering ? 0.20 : 0), lineWidth: 1)
-            }
-            .shadow(
-                color: .black.opacity(isHovering ? 0.04 : 0),
-                radius: isHovering ? 6 : 0,
-                y: isHovering ? 2 : 0
+                    .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
             )
             .contentShape(Circle())
             .animation(.easeOut(duration: 0.18), value: isHovering)
             .onHover { hovering in
                 isHovering = hovering
             }
-    }
-}
-
-private struct SidebarAmbientGlow: View {
-    let isCollapsed: Bool
-    let motionEnabled: Bool
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.accentColor.opacity(isCollapsed ? 0.18 : 0.12),
-                            Color.white.opacity(isCollapsed ? 0.02 : 0.08),
-                            .clear,
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .blur(radius: 34)
-                .offset(x: isCollapsed ? -28 : 34, y: isCollapsed ? -12 : -2)
-
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color.white.opacity(isCollapsed ? 0.08 : 0.10),
-                            .clear,
-                        ],
-                        center: isCollapsed ? .topLeading : .topTrailing,
-                        startRadius: 8,
-                        endRadius: 220
-                    )
-                )
-                .blur(radius: 18)
-                .offset(x: isCollapsed ? -12 : 24, y: -20)
-        }
-        .allowsHitTesting(false)
-        .animation(motionEnabled ? .easeInOut(duration: 0.58) : nil, value: isCollapsed)
     }
 }
 
@@ -1049,19 +960,6 @@ private struct SidebarHoverGlow: View {
                     )
                 )
 
-            shape.inset(by: 1)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.18),
-                            haloBlue.opacity(0.14),
-                            Color.white.opacity(0.06),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
         }
         .clipShape(shape)
     }
@@ -1756,7 +1654,6 @@ private struct WelcomeDetailView: View {
             }
             .padding(28)
         }
-        .background(detailBackground.ignoresSafeArea())
     }
 
     private var heroCard: some View {
@@ -2494,7 +2391,6 @@ private struct SessionDetailView: View {
             }
         }
         .padding(24)
-        .background(detailBackground.ignoresSafeArea())
         .onAppear {
             pickRandomSessionHint()
         }

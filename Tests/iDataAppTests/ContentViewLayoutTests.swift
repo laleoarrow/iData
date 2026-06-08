@@ -109,6 +109,7 @@ struct ContentViewLayoutTests {
         #expect(!glowSection.contains(".scaleEffect(1.08)"))
         #expect(!glowSection.contains(".scaleEffect(1.16)"))
         #expect(!glowSection.contains(".scaleEffect(1.18)"))
+        #expect(!glowSection.contains(".strokeBorder("))
         #expect(glowSection.contains(".clipShape(shape)"))
     }
 
@@ -136,7 +137,7 @@ struct ContentViewLayoutTests {
         let footerSection = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct SidebarFooterActionIcon: View {",
-            end: "private struct SidebarAmbientGlow: View {"
+            end: "enum SidebarHoverGlowStyle: Equatable {"
         ))
 
         #expect(normalized.contains("private struct SidebarFooterActionIcon: View"))
@@ -150,11 +151,12 @@ struct ContentViewLayoutTests {
             .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.05, hoverYOffset: -1, glowStyle: .circle)
         """)))
         #expect(footerSection.contains(normalizeWhitespace("""
-        Circle()
-            .inset(by: 1)
-            .fill(
+        .foregroundStyle(isHovering ? Color.accentColor : Color.secondary)
         """)))
+        #expect(footerSection.contains(".background(Color.white.opacity(isHovering ? 0.12 : 0.05), in: Circle())"))
         #expect(footerSection.contains(".onHover { hovering in"))
+        #expect(!footerSection.contains("LinearGradient("))
+        #expect(!footerSection.contains("Color(red: 1.0"))
         #expect(!footerSection.contains("SidebarHoverTrackingRegion"))
     }
 
@@ -185,7 +187,8 @@ struct ContentViewLayoutTests {
             collapsedBody
         } else {
             expandedBody
-                .padding(16)
+                .padding(.horizontal, 2)
+                .padding(.vertical, 4)
         """)))
         #expect(collapsedHeaderSection.contains("Circle()"))
         #expect(collapsedHeaderSection.contains("if isHovering { Circle()"))
@@ -277,6 +280,58 @@ struct ContentViewLayoutTests {
         let source = normalizeWhitespace(try contentViewSource())
 
         #expect(source.contains(".frame(minWidth: 860, minHeight: 580)"))
+    }
+
+    @Test
+    func sidebarSharesRootBackgroundWithoutIndependentPanel() throws {
+        let source = try contentViewSource()
+        let normalized = normalizeWhitespace(source)
+        let sidebarSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarView: View {",
+            end: "private struct SidebarHeaderCard: View {"
+        ))
+        let railSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct FloatingSidebarRail<Content: View>: View {",
+            end: "private struct SidebarHeaderCard: View {"
+        ))
+
+        #expect(normalized.contains(".background(detailBackground.ignoresSafeArea())"))
+        #expect(!normalized.contains("Divider() .overlay(Color.white.opacity(0.04))"))
+        #expect(sidebarSection.contains("Color.clear"))
+        #expect(sidebarSection.contains("FloatingSidebarRail {"))
+        #expect(!sidebarSection.contains("SidebarPanelEdgeBlend"))
+        #expect(!sidebarSection.contains("SidebarAmbientGlow"))
+        #expect(sidebarSection.contains(".padding(.vertical, 12)"))
+        #expect(railSection.contains(".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)"))
+        #expect(railSection.contains(".background(Color.clear)"))
+        #expect(!railSection.contains(".fill(.ultraThinMaterial)"))
+        #expect(!railSection.contains(".fill(detailBackground)"))
+        #expect(!railSection.contains("SidebarRailBottomFade"))
+        #expect(!railSection.contains(".strokeBorder("))
+        #expect(!railSection.contains(".shadow(color:"))
+        #expect(!normalized.contains("private struct SidebarAmbientGlow"))
+    }
+
+    @Test
+    func welcomeAndSessionPagesUseRootWindowBackgroundOnly() throws {
+        let source = try contentViewSource()
+        let welcomeSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct WelcomeDetailView: View {",
+            end: "private var heroCard: some View {"
+        ))
+        let sessionSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SessionDetailView: View {",
+            end: "private func pickRandomSessionHint() {"
+        ))
+
+        #expect(welcomeSection.contains("ScrollView {"))
+        #expect(sessionSection.contains("VStack(alignment: .leading, spacing: 18)"))
+        #expect(!welcomeSection.contains(".background(detailBackground.ignoresSafeArea())"))
+        #expect(!sessionSection.contains(".background(detailBackground.ignoresSafeArea())"))
     }
 
     @Test
