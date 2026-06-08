@@ -162,6 +162,11 @@ struct ContentViewLayoutTests {
     func collapsedSidebarHeaderHoverStaysInsideSidebarBounds() throws {
         let source = try contentViewSource()
         let normalized = normalizeWhitespace(source)
+        let sidebarHeaderSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarHeaderCard: View {",
+            end: "private struct CollapsedSidebarHeaderIconButton<Content: View>: View {"
+        ))
         let collapsedHeaderSection = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct CollapsedSidebarHeaderIconButton<Content: View>: View {",
@@ -175,7 +180,18 @@ struct ContentViewLayoutTests {
         """)))
         #expect(normalized.contains(".clipped()"))
         #expect(normalized.contains("private struct CollapsedSidebarHeaderIconButton<Content: View>: View"))
+        #expect(sidebarHeaderSection.contains(normalizeWhitespace("""
+        if model.isSidebarCollapsed {
+            collapsedBody
+        } else {
+            expandedBody
+                .padding(16)
+        """)))
         #expect(collapsedHeaderSection.contains("Circle()"))
+        #expect(collapsedHeaderSection.contains("if isHovering { Circle()"))
+        #expect(collapsedHeaderSection.contains(".frame(width: 54, height: 54)"))
+        #expect(!collapsedHeaderSection.contains("Color.white.opacity(0.04)"))
+        #expect(!collapsedHeaderSection.contains("Color.white.opacity(0.02)"))
         #expect(!collapsedHeaderSection.contains("RoundedRectangle(cornerRadius: 14"))
         #expect(!collapsedHeaderSection.contains("SidebarHoverTrackingRegion"))
     }

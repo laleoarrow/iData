@@ -248,21 +248,19 @@ private struct SidebarHeaderCard: View {
     }
 
     var body: some View {
-        Group {
-            if model.isSidebarCollapsed {
-                collapsedBody
-            } else {
-                expandedBody
-            }
+        if model.isSidebarCollapsed {
+            collapsedBody
+        } else {
+            expandedBody
+                .padding(16)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.10))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
         }
-        .padding(16)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .shadow(color: .black.opacity(0.10), radius: 24, y: 8)
     }
 
     private var expandedBody: some View {
@@ -351,40 +349,31 @@ private struct CollapsedSidebarHeaderIconButton<Content: View>: View {
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: isHovering
-                            ? [
-                                Color.white.opacity(0.14),
-                                Color.accentColor.opacity(0.12),
-                                Color.white.opacity(0.05),
-                            ]
-                            : [
-                                Color.white.opacity(0.04),
-                                Color.white.opacity(0.02),
-                            ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            if isHovering {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+                    .overlay(
+                        Circle()
+                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
                     )
-                )
-
-            Circle()
-                .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
+                    .transition(.opacity)
+            }
 
             content
+                .opacity(showsClearGlyph ? 0 : 1)
 
             if showsClearGlyph {
                 Image(systemName: "xmark")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 48)
-                    .background(Color.white.opacity(0.08), in: Circle())
+                    .frame(width: 42, height: 42)
+                    .background(Color.white.opacity(0.10), in: Circle())
             }
         }
-        .frame(width: 60, height: 60)
+        .frame(width: 54, height: 54)
         .contentShape(Circle())
         .animation(.easeOut(duration: 0.18), value: isHovering)
+        .animation(.easeOut(duration: 0.18), value: showsClearGlyph)
     }
 }
 
