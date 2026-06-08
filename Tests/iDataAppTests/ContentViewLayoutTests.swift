@@ -90,6 +90,18 @@ struct ContentViewLayoutTests {
         #expect(source.contains(".padding(.trailing, 70)"))
         #expect(source.contains(normalizeWhitespace("""
         .overlay(alignment: .trailing) {
+            RecentFileActionButton(
+                symbol: isPinned ? "pin.fill" : "pin",
+        """)))
+        #expect(source.contains(normalizeWhitespace("""
+        .overlay(alignment: .trailing) {
+            RecentFileActionButton(
+                symbol: "xmark",
+        """)))
+        #expect(source.contains(".offset(x: -46)"))
+        #expect(source.contains(".offset(x: -14)"))
+        #expect(!source.contains(normalizeWhitespace("""
+        .overlay(alignment: .trailing) {
             HStack(spacing: 8) {
         """)))
     }
@@ -602,6 +614,23 @@ struct ContentViewLayoutTests {
         #expect(!collapsedRow.contains("SidebarHoverTrackingRegion"))
         #expect(!collapsedRow.contains(".scaleEffect(motionEnabled && isHovering ? 1.02 : 1)"))
         #expect(!collapsedRow.contains(".offset(y: motionEnabled && isHovering ? -1 : 0)"))
+    }
+
+    @Test
+    func collapsedRecentFileRowUsesFixedCircularButtonHitTarget() throws {
+        let source = try contentViewSource()
+        let collapsedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct CollapsedRecentFileRow: View {",
+            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+        ))
+
+        #expect(collapsedRow.contains("HStack { Spacer(minLength: 0) Button(action: primaryAction) {"))
+        #expect(collapsedRow.contains(".frame(width: 46, height: 46) .frame(width: 54, height: 54) .contentShape(Circle())"))
+        #expect(collapsedRow.contains(".buttonStyle(.plain)"))
+        #expect(collapsedRow.contains(".background(backgroundStyle, in: Circle())"))
+        #expect(collapsedRow.contains(".frame(maxWidth: .infinity)"))
+        #expect(!collapsedRow.contains(".frame(maxWidth: .infinity) .contentShape(Circle())"))
     }
 
     @Test

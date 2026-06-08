@@ -830,28 +830,28 @@ private struct RecentFileRow: View {
                 .strokeBorder(borderColor)
         )
         .overlay(alignment: .trailing) {
-            HStack(spacing: 8) {
-                RecentFileActionButton(
-                    symbol: isPinned ? "pin.fill" : "pin",
-                    foregroundStyle: isPinned ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary),
-                    backgroundFill: isPinned ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.08),
-                    isVisible: isHovering,
-                    action: togglePinAction
-                )
-                .help(isPinned
-                    ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
-                    : localizedText(isChinese, english: "Pin to top", chinese: "置顶"))
-
-                RecentFileActionButton(
-                    symbol: "xmark",
-                    foregroundStyle: AnyShapeStyle(.secondary),
-                    backgroundFill: Color.white.opacity(0.08),
-                    isVisible: isHovering,
-                    action: removeAction
-                )
-                .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
-            }
-            .padding(.trailing, 14)
+            RecentFileActionButton(
+                symbol: isPinned ? "pin.fill" : "pin",
+                foregroundStyle: isPinned ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary),
+                backgroundFill: isPinned ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.08),
+                isVisible: isHovering,
+                action: togglePinAction
+            )
+            .offset(x: -46)
+            .help(isPinned
+                ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
+                : localizedText(isChinese, english: "Pin to top", chinese: "置顶"))
+        }
+        .overlay(alignment: .trailing) {
+            RecentFileActionButton(
+                symbol: "xmark",
+                foregroundStyle: AnyShapeStyle(.secondary),
+                backgroundFill: Color.white.opacity(0.08),
+                isVisible: isHovering,
+                action: removeAction
+            )
+            .offset(x: -14)
+            .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
         }
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onHover { hovering in
@@ -961,33 +961,41 @@ private struct CollapsedRecentFileRow: View {
     }
 
     var body: some View {
-        Button(action: primaryAction) {
-            ZStack {
-                Text(AppModel.collapsedRecentFileBadgeText(for: fileURL))
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-                    .opacity(isCommandHovering ? 0 : 1)
+        HStack {
+            Spacer(minLength: 0)
 
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .opacity(isCommandHovering ? 1 : 0)
+            Button(action: primaryAction) {
+                ZStack {
+                    Text(AppModel.collapsedRecentFileBadgeText(for: fileURL))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+                        .opacity(isCommandHovering ? 0 : 1)
+
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .opacity(isCommandHovering ? 1 : 0)
+                }
+                .frame(width: 46, height: 46)
+                .frame(width: 54, height: 54)
+                .contentShape(Circle())
             }
-            .frame(width: 46, height: 46)
+            .buttonStyle(.plain)
+            .help(primaryHelpText)
+            .background(backgroundStyle, in: Circle())
+            .overlay(
+                Circle()
+                    .strokeBorder(borderColor)
+            )
+            .contentShape(Circle())
+            .onHover { hovering in
+                isHovering = hovering
+            }
+            .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
+
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .help(primaryHelpText)
-        .background(backgroundStyle, in: Circle())
-        .overlay(
-            Circle()
-                .strokeBorder(borderColor)
-        )
         .frame(maxWidth: .infinity)
-        .contentShape(Circle())
-        .onHover { hovering in
-            isHovering = hovering
-        }
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 
     private var primaryHelpText: String {
