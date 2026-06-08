@@ -70,6 +70,120 @@ struct AppModelTests {
     }
 
     @Test
+    func smallSupportedFileShowsReturnableHandoffNotice() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-handoff-notice-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let target = URL(fileURLWithPath: "/tmp/small.xlsx")
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let opener = RecordingExternalFileOpener()
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in wps },
+            fileSizeProvider: { _ in 10 }
+        )
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
+        #expect(model.externalHandoffNotice?.fileURL.standardizedFileURL == target.standardizedFileURL)
+        #expect(model.externalHandoffNotice?.applicationName == "WPS Office")
+        #expect(model.externalHandoffNotice?.state == .opened)
+    }
+
+    @Test
+    func failedStartedHandoffKeepsReturnableFailureNotice() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-handoff-failed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let target = URL(fileURLWithPath: "/tmp/small.csv")
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let opener = RecordingExternalFileOpener()
+        opener.completionResult = false
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in wps },
+            fileSizeProvider: { _ in 10 }
+        )
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
+        #expect(model.externalHandoffNotice?.fileURL.standardizedFileURL == target.standardizedFileURL)
+        #expect(model.externalHandoffNotice?.applicationName == "WPS Office")
+        #expect(model.externalHandoffNotice?.state == .failed)
+        #expect(model.errorMessage?.contains("WPS Office") == true)
+    }
+
+    @Test
+    func returnFromExternalHandoffOpensOriginalFileInsideIData() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-handoff-return-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+        let target = tempRoot.appendingPathComponent("small.xlsx")
+        try Data("ok".utf8).write(to: target)
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let opener = RecordingExternalFileOpener()
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in wps },
+            fileSizeProvider: { _ in 10 }
+        )
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let action = model.routeExternalFile(target)
+        model.returnExternalHandoffToIData()
+
+        #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
+        #expect(model.externalHandoffNotice == nil)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
+    }
+
+    @Test
     func preferredSmallFileApplicationOverridesResolverForSmallFiles() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -346,7 +460,7 @@ struct AppModelTests {
     }
 
     @Test
-    func forwardedExternalOpenKeepsAppInBackground() throws {
+    func forwardedExternalOpenActivatesToShowHandoffNotice() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-external-open-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
@@ -370,8 +484,21 @@ struct AppModelTests {
 
         let decision = model.handleExternalFileOpen([target])
 
-        #expect(decision == .stayBackground)
+        #expect(decision == .activateApp)
         #expect(opener.openedApplicationURL == textEdit.url)
+        #expect(model.externalHandoffNotice?.applicationName == "TextEdit")
+    }
+
+    @Test
+    func workspaceExternalFileOpenerDoesNotWaitForOpenProcessExit() throws {
+        let source = try appModelSource()
+        let openerSection = try extractSection(
+            from: source,
+            start: "struct WorkspaceExternalFileOpener: ExternalFileOpening {",
+            end: "enum ExternalOpenAction: Equatable {"
+        )
+
+        #expect(!openerSection.contains("waitUntilExit"))
     }
 
     @Test
@@ -788,6 +915,27 @@ struct AppModelTests {
     }
 
     @Test
+    func preferredSmallFileOpenApplicationRecognizesKingsoftWPSBundleIdentifier() {
+        let excel = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/Microsoft Excel.app"),
+            bundleIdentifier: "com.microsoft.Excel",
+            displayName: "Microsoft Excel"
+        )
+        let wps = DefaultApplicationHandler(
+            url: URL(fileURLWithPath: "/Applications/wpsoffice.app"),
+            bundleIdentifier: "com.kingsoft.wpsoffice.mac",
+            displayName: "Kingsoft Office"
+        )
+
+        let chosen = preferredSmallFileOpenApplication(
+            storedPreviousDefault: nil,
+            fallbackCandidates: [excel, wps]
+        )
+
+        #expect(chosen == wps)
+    }
+
+    @Test
     func preferredSmallFileOpenApplicationFallsBackToExcelWhenWPSMissing() {
         let stored = DefaultApplicationHandler(
             url: URL(fileURLWithPath: "/Applications/Numbers.app"),
@@ -806,6 +954,18 @@ struct AppModelTests {
         )
 
         #expect(chosen == excel)
+    }
+
+    @Test
+    func alternateResolverUsesSmallFileSpecificFallbackCandidates() throws {
+        let source = try appModelSource()
+        let resolverSection = try extractSection(
+            from: source,
+            start: "static func resolveAlternateApplication(",
+            end: "private func updateAssociationStatus"
+        )
+
+        #expect(resolverSection.contains("FileTypeAssociation.smallFileOpenFallbackCandidates"))
     }
 
     @Test
@@ -1034,6 +1194,41 @@ struct AppModelTests {
 
         let reloadedModel = AppModel(defaults: defaults)
         #expect(reloadedModel.preferredSmallFileApplication == wps)
+    }
+
+    @Test
+    func testSmallFileHandoffCreatesSampleAndUsesPreferredApplication() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-test-handoff-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let opener = RecordingExternalFileOpener()
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in nil },
+            fileSizeProvider: { _ in 128 }
+        )
+        model.setPreferredSmallFileApplication(wps)
+
+        let action = try model.testSmallFileHandoff()
+
+        #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
+        #expect(opener.openedApplicationURL == wps.url)
+        #expect(opener.openedFileURL?.lastPathComponent == AppModel.smallFileHandoffTestFilename)
+        #expect(model.externalHandoffNotice?.state == .opened)
     }
 
     @Test
@@ -1599,18 +1794,24 @@ private final class RecordingExternalFileOpener: ExternalFileOpening {
     private(set) var openedFileURL: URL?
     private(set) var openedApplicationURL: URL?
     var shouldSucceed = true
+    var completionResult: Bool?
     private let failingApplicationURLs: Set<URL>
 
     init(failingApplicationURLs: Set<URL> = []) {
         self.failingApplicationURLs = failingApplicationURLs
     }
 
-    func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool {
+    func open(
+        _ fileURL: URL,
+        withApplicationAt applicationURL: URL,
+        completion: @escaping @MainActor (Bool) -> Void
+    ) -> Bool {
         openedFileURL = fileURL
         openedApplicationURL = applicationURL
         if failingApplicationURLs.contains(applicationURL) {
             return false
         }
+        completion(completionResult ?? shouldSucceed)
         return shouldSucceed
     }
 }
@@ -1651,6 +1852,26 @@ private func makeFakeApplicationHandler(
         bundleIdentifier: bundleIdentifier,
         displayName: displayName
     )
+}
+
+private func appModelSource(filePath: StaticString = #filePath) throws -> String {
+    let fileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = fileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let appModelURL = repositoryRoot.appendingPathComponent("Sources/iData/AppModel.swift")
+    return try String(contentsOf: appModelURL, encoding: .utf8)
+}
+
+private func extractSection(from source: String, start: String, end: String) throws -> String {
+    guard let startRange = source.range(of: start) else {
+        throw NSError(domain: "AppModelTests", code: 1)
+    }
+    guard let endRange = source.range(of: end, range: startRange.upperBound..<source.endIndex) else {
+        throw NSError(domain: "AppModelTests", code: 2)
+    }
+    return String(source[startRange.lowerBound..<endRange.lowerBound])
 }
 
 private func writeLargeTSV(to url: URL, rows: Int, prefix: String) throws {

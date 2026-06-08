@@ -17,9 +17,9 @@ struct PreferencesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 preferencesHero
+                smallFileRoutingCard
                 animationsCard
                 appLanguageCard
-                smallFileRoutingCard
                 runtimeCard
                 updatesCard
             }
@@ -44,7 +44,7 @@ struct PreferencesView: View {
                     Text(isChinese ? "偏好设置" : "Preferences")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
 
-                    Text(isChinese ? "配置 `iData` 查找 `VisiData` 的位置，控制更新行为，并在打开大文件前确认当前运行状态。" : "Configure where `iData` finds `VisiData`, control update behavior, and verify the current runtime state before opening large files.")
+                    Text(isChinese ? "配置小文件打开方式、VisiData 位置、更新行为，并确认当前运行状态。" : "Configure small-file opening, VisiData location, update behavior, and current runtime state.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -125,31 +125,78 @@ struct PreferencesView: View {
     }
 
     private var smallFileRoutingCard: some View {
-        PreferencesCard(title: isChinese ? "小文件转交" : "Small-File Handoff", icon: "arrowshape.turn.up.right.circle") {
+        PreferencesCard(title: isChinese ? "小文件打开方式" : "Small-File Opening", icon: "arrowshape.turn.up.right.circle") {
             VStack(alignment: .leading, spacing: 14) {
-                Text(model.smallFileRoutingSummary)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 38, height: 38)
+                        .background(Color.accentColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(isChinese ? "默认目标：\(model.preferredSmallFileApplicationDisplayName)" : "Default target: \(model.preferredSmallFileApplicationDisplayName)")
+                            .font(.headline)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(model.smallFileRoutingSummary)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    PreferencePill(
+                        title: isChinese ? "≤ \(AppModel.smallFileRoutingThresholdDisplay)" : "≤ \(AppModel.smallFileRoutingThresholdDisplay)",
+                        tint: Color.accentColor.opacity(0.16),
+                        icon: "scalemass",
+                        animated: motionEnabled
+                    )
+
+                    PreferencePill(
+                        title: isChinese ? "压缩文件留在 iData" : "Compressed files stay in iData",
+                        tint: Color.green.opacity(0.16),
+                        icon: "archivebox",
+                        animated: motionEnabled
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    ForEach([".csv", ".tsv", ".xlsx", ".xls"], id: \.self) { suffix in
+                        Text(suffix)
+                            .font(.system(.caption, design: .monospaced, weight: .semibold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(Color.white.opacity(0.08), in: Capsule())
+                    }
+                }
 
                 Text(isChinese ? "仅影响 Finder / 系统把文件交给 iData 的外部打开流程；不会改变你在 iData 内点“打开…”时的行为。" : "This only affects files handed to iData by Finder or other system open events. It does not change what happens when you click Open inside iData.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(isChinese ? "当前外部应用" : "Current external app")
-                        .font(.subheadline.weight(.semibold))
-                    Text(model.preferredSmallFileApplicationDisplayName)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                }
-
                 HStack(spacing: 10) {
                     Button(isChinese ? "选择应用…" : "Choose App…") {
                         model.choosePreferredSmallFileApplication()
                     }
                     .buttonStyle(.borderedProminent)
+                    .quietInteractiveSurface(enabled: motionEnabled)
+
+                    Button(isChinese ? "测试转交" : "Test Handoff") {
+                        do {
+                            _ = try model.testSmallFileHandoff()
+                        } catch {
+                            model.statusMessage = nil
+                            model.errorMessage = model.localized(
+                                english: "Could not prepare the handoff test: \(error.localizedDescription)",
+                                chinese: "无法准备转交测试：\(error.localizedDescription)"
+                            )
+                        }
+                    }
+                    .buttonStyle(.bordered)
                     .quietInteractiveSurface(enabled: motionEnabled)
 
                     Button(isChinese ? "清除" : "Clear") {

@@ -50,8 +50,23 @@ struct ContentView: View {
         .overlay {
             AppSweepShimmer(active: motionEnabled)
         }
-        .frame(minWidth: 960, minHeight: 620)
+        .overlay(alignment: .topTrailing) {
+            if let notice = model.externalHandoffNotice {
+                ExternalHandoffNoticeBanner(
+                    isChinese: isChinese,
+                    notice: notice,
+                    motionEnabled: motionEnabled,
+                    onReturn: { model.returnExternalHandoffToIData() },
+                    onDismiss: { model.dismissExternalHandoffNotice() }
+                )
+                .padding(.top, 18)
+                .padding(.trailing, 20)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .frame(minWidth: 860, minHeight: 580)
         .animation(sidebarLayoutAnimation, value: model.isSidebarCollapsed)
+        .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.88, blendDuration: 0.12) : nil, value: model.externalHandoffNotice)
         .dropDestination(for: URL.self) { items, _ in
             model.handleDroppedFiles(items)
         }
@@ -2096,9 +2111,7 @@ private struct WelcomeDetailView: View {
                 
                 Spacer()
                 
-                Button {
-                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                } label: {
+                SettingsLink {
                     Label(localizedText(isChinese, english: "Handoff Rules", chinese: "设置转交规则"), systemImage: "gearshape.fill")
                 }
                 .buttonStyle(.borderedProminent)
@@ -2261,45 +2274,39 @@ private struct SessionDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(session.currentFileURL?.lastPathComponent ?? localizedText(isChinese, english: "VisiData Session", chinese: "VisiData 会话"))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                    Text(session.currentFileURL?.path ?? localizedText(isChinese, english: "No file loaded", chinese: "尚未加载文件"))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(session.currentFileURL?.lastPathComponent ?? localizedText(isChinese, english: "VisiData Session", chinese: "VisiData 会话"))
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.82)
+                        Text(session.currentFileURL?.path ?? localizedText(isChinese, english: "No file loaded", chinese: "尚未加载文件"))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                            .textSelection(.enabled)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let fileURL = session.currentFileURL {
+                        SessionHeaderActions(
+                            isChinese: isChinese,
+                            fileURL: fileURL,
+                            motionEnabled: motionEnabled,
+                            revealAction: { model.revealInFinder(fileURL) },
+                            copyAction: { model.copyPathToPasteboard(fileURL) }
+                        )
+                        .layoutPriority(1)
+                    }
                 }
 
-                Spacer(minLength: 0)
-
-                VStack(alignment: .trailing, spacing: 12) {
-                    if let fileURL = session.currentFileURL {
-                        HStack(spacing: 10) {
-                            Button {
-                                model.revealInFinder(fileURL)
-                            } label: {
-                                Label(localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"), systemImage: "finder")
-                            }
-                            .buttonStyle(.bordered)
-                            .quietInteractiveSurface(enabled: motionEnabled)
-
-                            Button {
-                                model.copyPathToPasteboard(fileURL)
-                            } label: {
-                                Label(localizedText(isChinese, english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
-                            }
-                            .buttonStyle(.bordered)
-                            .quietInteractiveSurface(enabled: motionEnabled)
-                        }
-                    }
-
-                    if shouldShowSessionInfoHint {
-                        SessionInfoHintRow(
-                            isChinese: isChinese,
-                            message: sessionInfoHint
-                        )
-                        .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
-                    }
+                if shouldShowSessionInfoHint {
+                    SessionInfoHintRow(
+                        isChinese: isChinese,
+                        message: sessionInfoHint
+                    )
+                    .frame(maxWidth: 560, alignment: .leading)
+                    .transition(AnyTransition.move(edge: .top).combined(with: .opacity))
                 }
             }
             .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: shouldShowSessionInfoHint)
@@ -2386,11 +2393,215 @@ private struct SessionDetailView: View {
     }
 }
 
+private struct SessionHeaderActions: View {
+    let isChinese: Bool
+    let fileURL: URL
+    let motionEnabled: Bool
+    let revealAction: () -> Void
+    let copyAction: () -> Void
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                Button {
+                    revealAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"), systemImage: "finder")
+                }
+                .buttonStyle(.bordered)
+                .quietInteractiveSurface(enabled: motionEnabled)
+
+                Button {
+                    copyAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.bordered)
+                .quietInteractiveSurface(enabled: motionEnabled)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+
+            Menu {
+                Button {
+                    revealAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"), systemImage: "finder")
+                }
+
+                Button {
+                    copyAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
+                }
+            } label: {
+                Label(localizedText(isChinese, english: "Actions", chinese: "操作"), systemImage: "ellipsis.circle")
+            }
+            .buttonStyle(.bordered)
+            .help(localizedText(
+                isChinese,
+                english: "Actions for \(fileURL.lastPathComponent)",
+                chinese: "\(fileURL.lastPathComponent) 的操作"
+            ))
+        }
+    }
+}
+
 func statusPanelUsesRunningTint(for statusMessage: String) -> Bool {
     let normalized = statusMessage.lowercased()
     return normalized.contains("running visidata")
         || normalized.contains("正在运行 visidata")
         || normalized.contains("运行 visidata")
+}
+
+private struct ExternalHandoffNoticeBanner: View {
+    let isChinese: Bool
+    let notice: AppModel.ExternalHandoffNotice
+    let motionEnabled: Bool
+    let onReturn: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var isHovering = false
+
+    private var title: String {
+        switch notice.state {
+        case .opening:
+            return localizedText(
+                isChinese,
+                english: "Opening in \(notice.applicationName)",
+                chinese: "正在用 \(notice.applicationName) 打开"
+            )
+        case .opened:
+            return localizedText(
+                isChinese,
+                english: "Opened in \(notice.applicationName)",
+                chinese: "已用 \(notice.applicationName) 打开"
+            )
+        case .failed:
+            return localizedText(
+                isChinese,
+                english: "\(notice.applicationName) did not respond",
+                chinese: "\(notice.applicationName) 没有响应"
+            )
+        }
+    }
+
+    private var detail: String {
+        switch notice.state {
+        case .opening:
+            return localizedText(
+                isChinese,
+                english: "\(notice.fileURL.lastPathComponent) is being handed off. You can still open it in iData.",
+                chinese: "\(notice.fileURL.lastPathComponent) 正在转交。你仍可改用 iData 打开。"
+            )
+        case .opened:
+            return localizedText(
+                isChinese,
+                english: "\(notice.fileURL.lastPathComponent) is with \(notice.applicationName). Open in iData to continue analysis.",
+                chinese: "\(notice.fileURL.lastPathComponent) 已交给 \(notice.applicationName)。需要继续分析时可改用 iData 打开。"
+            )
+        case .failed:
+            return localizedText(
+                isChinese,
+                english: "Open \(notice.fileURL.lastPathComponent) in iData or choose another app in Settings.",
+                chinese: "可在 iData 中打开 \(notice.fileURL.lastPathComponent)，或到设置中选择其他应用。"
+            )
+        }
+    }
+
+    private var iconName: String {
+        switch notice.state {
+        case .opening:
+            return "arrowshape.turn.up.right.fill"
+        case .opened:
+            return "checkmark.circle.fill"
+        case .failed:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    private var iconTint: Color {
+        switch notice.state {
+        case .opening:
+            return Color.accentColor
+        case .opened:
+            return Color.green
+        case .failed:
+            return Color.yellow
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: iconName)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(iconTint)
+                .frame(width: 36, height: 36)
+                .background(iconTint.opacity(0.16), in: Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                onReturn()
+            } label: {
+                Label(localizedText(isChinese, english: "Open in iData", chinese: "用 iData 打开"), systemImage: "arrow.uturn.backward.circle.fill")
+                    .labelStyle(.titleAndIcon)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help(localizedText(isChinese, english: "Open this file in iData", chinese: "在 iData 中打开此文件"))
+
+            Button {
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.08), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(localizedText(isChinese, english: "Dismiss", chinese: "关闭提示"))
+        }
+        .padding(12)
+        .frame(width: 420, alignment: .leading)
+        .background {
+            ZStack {
+                Color.clear.background(.ultraThinMaterial)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.10),
+                        Color.accentColor.opacity(0.14),
+                        Color.black.opacity(0.04),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(isHovering ? 0.24 : 0.14), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.24), radius: 22, y: 8)
+        .shadow(color: Color.accentColor.opacity(isHovering ? 0.18 : 0.08), radius: 28, y: 0)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
+    }
 }
 
 private struct StatusAndInputCard: View {
@@ -2418,16 +2629,17 @@ private struct StatusAndInputCard: View {
     }
 
     private var cardTint: Color {
-        statusPanelUsesRunningTint(for: statusMessage) ? Color.green.opacity(0.14) : Color.white.opacity(0.08)
+        statusPanelUsesRunningTint(for: statusMessage) ? Color.green.opacity(0.09) : Color.white.opacity(0.06)
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(isChinese ? "状态" : "Status")
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
 
                 Text(statusMessage)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
@@ -2441,7 +2653,7 @@ private struct StatusAndInputCard: View {
                 )
 
                 Text(inputDisplayName)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -2453,7 +2665,8 @@ private struct StatusAndInputCard: View {
                 onTap: onSwitchToEnglish
             )
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             ZStack {

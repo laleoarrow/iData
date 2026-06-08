@@ -209,6 +209,36 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
+    func sameSizeFirstMeasuredResizeAfterFallbackStillForcesRedraw() async throws {
+        let sink = TerminalDisplaySinkBuffer()
+        let recorder = PTYWriteRecorder()
+        let driver = PTYWriteDriver(
+            writeCall: recorder.write(fileDescriptor:buffer:count:),
+            sleepCall: { _ in }
+        )
+        let session = VisiDataSessionController(ptyWriteDriver: driver)
+        session.bind(displaySink: sink)
+
+        // Establish a previously measured size, matching a normal in-place
+        // switch where the next xterm measurement reports the same geometry.
+        session.resize(cols: 180, rows: 40)
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: open("/dev/null", O_RDONLY))
+        defer {
+            session.terminate()
+        }
+
+        session.appendOutputForTesting(Data("STALE\n".utf8))
+        session.resize(cols: 180, rows: 40)
+
+        try await waitForCondition(timeout: 2.0) {
+            recorder.recordedData.contains(Data("\u{0C}".utf8))
+        }
+
+        session.markDisplayReady()
+        #expect(sink.writes.isEmpty)
+    }
+
+    @Test
     func firstMeasuredResizeAfterSessionBindsPostLaunchDiscardsStaleOutput() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-session-post-bind-resize-\(UUID().uuidString)", isDirectory: true)
@@ -364,6 +394,27 @@ private final class LaunchObserver {
     }
 }
 
+private final class PTYWriteRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var chunks: [Data] = []
+
+    var recordedData: Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return chunks.reduce(into: Data()) { result, chunk in
+            result.append(chunk)
+        }
+    }
+
+    func write(fileDescriptor _: Int32, buffer: UnsafeRawPointer, count: Int) -> Int {
+        let data = Data(bytes: buffer, count: count)
+        lock.lock()
+        chunks.append(data)
+        lock.unlock()
+        return count
+    }
+}
+
 private func waitForChildPID(in fileURL: URL, timeout: TimeInterval) async throws -> pid_t {
     let deadline = Date().addingTimeInterval(timeout)
 
@@ -379,6 +430,19 @@ private func waitForChildPID(in fileURL: URL, timeout: TimeInterval) async throw
     }
 
     throw TestError.missingChildPIDFile(fileURL.path)
+}
+
+private func waitForCondition(timeout: TimeInterval, predicate: @escaping @Sendable () -> Bool) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+        if predicate() {
+            return
+        }
+        try await Task.sleep(for: .milliseconds(20))
+    }
+
+    #expect(predicate())
 }
 
 @MainActor

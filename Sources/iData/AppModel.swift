@@ -8,22 +8,33 @@ import UniformTypeIdentifiers
 
 @MainActor
 protocol ExternalFileOpening {
-    func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool
+    func open(
+        _ fileURL: URL,
+        withApplicationAt applicationURL: URL,
+        completion: @escaping @MainActor (Bool) -> Void
+    ) -> Bool
 }
 
 struct WorkspaceExternalFileOpener: ExternalFileOpening {
     @MainActor
-    func open(_ fileURL: URL, withApplicationAt applicationURL: URL) -> Bool {
-        do {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-            process.arguments = ["-a", applicationURL.path, fileURL.path]
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus == 0
-        } catch {
-            return false
-        }
+    func open(
+        _ fileURL: URL,
+        withApplicationAt applicationURL: URL,
+        completion: @escaping @MainActor (Bool) -> Void
+    ) -> Bool {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open(
+            [fileURL],
+            withApplicationAt: applicationURL,
+            configuration: configuration,
+            completionHandler: { _, error in
+                Task { @MainActor in
+                    completion(error == nil)
+                }
+            }
+        )
+        return true
     }
 }
 
@@ -97,11 +108,37 @@ final class AppModel: ObservableObject {
         }
     }
 
+    enum ExternalHandoffState: Equatable {
+        case opening
+        case opened
+        case failed
+    }
+
+    struct ExternalHandoffNotice: Identifiable, Equatable {
+        let id: UUID
+        let fileURL: URL
+        let applicationName: String
+        let state: ExternalHandoffState
+
+        init(
+            id: UUID = UUID(),
+            fileURL: URL,
+            applicationName: String,
+            state: ExternalHandoffState = .opening
+        ) {
+            self.id = id
+            self.fileURL = fileURL
+            self.applicationName = applicationName
+            self.state = state
+        }
+    }
+
     @Published var activeSession: VisiDataSessionController?
     @Published var recentFiles: [URL]
     @Published var lastOpenedFile: URL?
     @Published var statusMessage: String?
     @Published var errorMessage: String?
+    @Published var externalHandoffNotice: ExternalHandoffNotice?
     @Published var isHelpPresented = false
     @Published var isTutorialHubPresented = false
     @Published var isTutorialActive = false
@@ -159,8 +196,10 @@ final class AppModel: ObservableObject {
     nonisolated static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
     nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     nonisolated static let defaultTutorialChapterID = "basic"
+    nonisolated static let smallFileHandoffTestFilename = "idata_handoff_test.csv"
     nonisolated static let recentFilesLimit = 10
     static let largeFileOpenThresholdBytes: Int64 = 100 * 1024 * 1024
+    static let smallFileRoutingThresholdDisplay = "100 MiB"
     static let sharedVisiDataHelperPath = "/Users/Shared/iData/Configure VisiData.command"
     static let supportedFormats: [SupportedFormat] = [
         SupportedFormat(displayName: "CSV", chineseDisplayName: "CSV", fileExtension: "csv"),
@@ -802,6 +841,19 @@ final class AppModel: ObservableObject {
         )
     }
 
+    func dismissExternalHandoffNotice() {
+        externalHandoffNotice = nil
+    }
+
+    func returnExternalHandoffToIData() {
+        guard let notice = externalHandoffNotice else {
+            return
+        }
+
+        externalHandoffNotice = nil
+        openExternalFile(notice.fileURL)
+    }
+
     func choosePreferredSmallFileApplication() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
@@ -825,6 +877,12 @@ final class AppModel: ObservableObject {
         setPreferredSmallFileApplication(handler)
     }
 
+    @discardableResult
+    func testSmallFileHandoff() throws -> ExternalOpenAction {
+        let sampleURL = try makeSmallFileHandoffSampleFile()
+        return routeExternalFile(sampleURL)
+    }
+
     var preferredSmallFileApplicationDisplayName: String {
         preferredSmallFileApplication?.displayName ?? localized(
             english: "Prefer WPS Office, then Microsoft Excel",
@@ -837,6 +895,21 @@ final class AppModel: ObservableObject {
             english: "Finder-opened files at or below 100 MiB prefer WPS Office, then Microsoft Excel, unless you choose a different global app here. Compressed .gz/.bgz files always stay in iData.",
             chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，默认优先交给 WPS Office，其次 Microsoft Excel；也可在此改为其他统一应用。.gz/.bgz 压缩文件始终在 iData 中打开。"
         )
+    }
+
+    private func makeSmallFileHandoffSampleFile() throws -> URL {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("io.github.leoarrow.idata.handoff-test", isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+
+        let fileURL = directoryURL.appendingPathComponent(Self.smallFileHandoffTestFilename)
+        let contents = """
+        column,value
+        target,WPS handoff
+        size,small
+        """
+        try contents.write(to: fileURL, atomically: true, encoding: .utf8)
+        return fileURL
     }
 
     func presentTutorialHub() {
@@ -995,12 +1068,13 @@ final class AppModel: ObservableObject {
         case .openedInIData, .presentedError:
             return .activateApp
         case .forwardedToAlternateApp:
-            return .stayBackground
+            return .activateApp
         }
     }
 
     func routeExternalFile(_ url: URL) -> ExternalOpenAction {
         guard Self.supportsTableFile(url) else {
+            externalHandoffNotice = nil
             statusMessage = nil
             errorMessage = localized(
                 english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
@@ -1021,6 +1095,7 @@ final class AppModel: ObservableObject {
             )
 
             guard !candidateApplications.isEmpty else {
+                externalHandoffNotice = nil
                 statusMessage = nil
                 errorMessage = localized(
                     english: "Could not find a non-iData app to open \(url.lastPathComponent).",
@@ -1029,7 +1104,9 @@ final class AppModel: ObservableObject {
                 return .presentedError
             }
 
+            var lastAttemptedApp: DefaultApplicationHandler?
             for alternateApp in candidateApplications {
+                lastAttemptedApp = alternateApp
                 guard FileManager.default.fileExists(atPath: alternateApp.url.path) else {
                     if preferredSmallFileApplication == alternateApp {
                         preferredSmallFileApplication = nil
@@ -1037,17 +1114,67 @@ final class AppModel: ObservableObject {
                     continue
                 }
 
-                if externalFileOpener.open(url, withApplicationAt: alternateApp.url) {
-                    statusMessage = nil
-                    errorMessage = nil
+                let noticeID = UUID()
+                externalHandoffNotice = ExternalHandoffNotice(
+                    id: noticeID,
+                    fileURL: url,
+                    applicationName: alternateApp.displayName,
+                    state: .opening
+                )
+                statusMessage = nil
+                errorMessage = nil
+
+                if externalFileOpener.open(
+                    url,
+                    withApplicationAt: alternateApp.url,
+                    completion: { [weak self] didOpen in
+                        guard let self, self.externalHandoffNotice?.id == noticeID else {
+                            return
+                        }
+
+                        if didOpen {
+                            self.externalHandoffNotice = ExternalHandoffNotice(
+                                id: noticeID,
+                                fileURL: url,
+                                applicationName: alternateApp.displayName,
+                                state: .opened
+                            )
+                            self.statusMessage = nil
+                            self.errorMessage = nil
+                        } else {
+                            self.externalHandoffNotice = ExternalHandoffNotice(
+                                id: noticeID,
+                                fileURL: url,
+                                applicationName: alternateApp.displayName,
+                                state: .failed
+                            )
+                            self.statusMessage = nil
+                            self.errorMessage = self.externalHandoffFailureMessage(
+                                fileName: url.lastPathComponent,
+                                applicationName: alternateApp.displayName
+                            )
+                        }
+                    }
+                ) {
                     return .forwardedToAlternateApp(appName: alternateApp.displayName)
                 }
+
+                externalHandoffNotice = nil
             }
 
+            if let lastAttemptedApp {
+                externalHandoffNotice = ExternalHandoffNotice(
+                    fileURL: url,
+                    applicationName: lastAttemptedApp.displayName,
+                    state: .failed
+                )
+            } else {
+                externalHandoffNotice = nil
+            }
             statusMessage = nil
-            errorMessage = localized(
-                english: "Could not open \(url.lastPathComponent) with any configured non-iData app.",
-                chinese: "无法使用任何已配置的非 iData 应用打开 \(url.lastPathComponent)。"
+            errorMessage = externalHandoffFailureMessage(
+                fileName: url.lastPathComponent,
+                applicationName: lastAttemptedApp?.displayName
             )
             return .presentedError
         }
@@ -1061,6 +1188,7 @@ final class AppModel: ObservableObject {
 
     func openExternalFile(_ url: URL) {
         guard Self.supportsTableFile(url) else {
+            externalHandoffNotice = nil
             statusMessage = nil
             errorMessage = localized(
                 english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
@@ -1068,6 +1196,8 @@ final class AppModel: ObservableObject {
             )
             return
         }
+
+        externalHandoffNotice = nil
 
         if
             let session = activeSession,
@@ -1687,7 +1817,7 @@ final class AppModel: ObservableObject {
 
         return preferredSmallFileOpenApplication(
             storedPreviousDefault: storedPreviousDefaults[lookupExtension],
-            fallbackCandidates: FileTypeAssociation.alternativeApplicationCandidates(forExtension: lookupExtension)
+            fallbackCandidates: FileTypeAssociation.smallFileOpenFallbackCandidates(forExtension: lookupExtension)
         )
     }
 
@@ -1724,6 +1854,20 @@ final class AppModel: ObservableObject {
         }
 
         return candidates
+    }
+
+    private func externalHandoffFailureMessage(fileName: String, applicationName: String?) -> String {
+        if let applicationName {
+            return localized(
+                english: "\(applicationName) did not respond while opening \(fileName). You can retry, choose another app, or open it in iData.",
+                chinese: "\(applicationName) 打开 \(fileName) 时没有响应。你可以重试、选择其他应用，或改用 iData 打开。"
+            )
+        }
+
+        return localized(
+            english: "Could not open \(fileName) with any configured non-iData app.",
+            chinese: "无法使用任何已配置的非 iData 应用打开 \(fileName)。"
+        )
     }
 
     private func forgetPreviousDefaultApp(forLookupExtension lookupExtension: String) {
@@ -1920,11 +2064,19 @@ func preferredSmallFileOpenCandidates(
 }
 
 private func smallFileOpenPriorityRank(for handler: DefaultApplicationHandler) -> Int {
+    let bundleIdentifier = handler.bundleIdentifier.lowercased()
     let displayName = handler.displayName.lowercased()
 
-    switch handler.bundleIdentifier {
-    case "cn.wps.Office":
+    if
+        bundleIdentifier == "cn.wps.office"
+        || bundleIdentifier == "com.kingsoft.wpsoffice.mac"
+        || bundleIdentifier.contains("wps")
+        || bundleIdentifier.contains("kingsoft")
+    {
         return 0
+    }
+
+    switch handler.bundleIdentifier {
     case "com.microsoft.Excel":
         return 1
     default:
@@ -2153,6 +2305,68 @@ private enum FileTypeAssociation {
         return candidates
     }
 
+    static func smallFileOpenFallbackCandidates(forExtension fileExtension: String) -> [DefaultApplicationHandler] {
+        var candidates: [DefaultApplicationHandler] = []
+        var seenBundleIdentifiers: Set<String> = []
+
+        func append(_ handler: DefaultApplicationHandler?) {
+            guard let handler else {
+                return
+            }
+            guard !isIDataBundleIdentifier(handler.bundleIdentifier) else {
+                return
+            }
+            guard seenBundleIdentifiers.insert(handler.bundleIdentifier).inserted else {
+                return
+            }
+            candidates.append(handler)
+        }
+
+        for handler in preferredSmallFileInstalledApplications() {
+            append(handler)
+        }
+        for handler in alternativeApplicationCandidates(forExtension: fileExtension) {
+            append(handler)
+        }
+
+        return candidates
+    }
+
+    private static func preferredSmallFileInstalledApplications() -> [DefaultApplicationHandler] {
+        let preferredBundleIdentifiers = [
+            "cn.wps.Office",
+            "com.kingsoft.wpsoffice.mac",
+            "com.microsoft.Excel",
+        ]
+        let preferredApplicationPaths = [
+            "/Applications/WPS Office.app",
+            "/Applications/wpsoffice.app",
+            "/Applications/Microsoft Excel.app",
+        ]
+
+        var handlers: [DefaultApplicationHandler] = []
+        var seenBundleIdentifiers: Set<String> = []
+
+        func append(_ appURL: URL?) {
+            guard let appURL, let handler = applicationHandler(for: appURL) else {
+                return
+            }
+            guard seenBundleIdentifiers.insert(handler.bundleIdentifier).inserted else {
+                return
+            }
+            handlers.append(handler)
+        }
+
+        for bundleIdentifier in preferredBundleIdentifiers {
+            append(NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier))
+        }
+        for path in preferredApplicationPaths where FileManager.default.fileExists(atPath: path) {
+            append(URL(fileURLWithPath: path))
+        }
+
+        return handlers
+    }
+
     static func setIDataAsDefaultApp(forExtension fileExtension: String) async -> FileTypeAssociationSetResult {
         guard let appURL = appURL() else {
             return .missingAppBundle
@@ -2230,7 +2444,18 @@ private enum FileTypeAssociation {
         return DefaultApplicationHandler(
             url: appURL,
             bundleIdentifier: bundleIdentifier,
-            displayName: displayName
+            displayName: normalizedDisplayName(displayName, bundleIdentifier: bundleIdentifier)
         )
+    }
+
+    private static func normalizedDisplayName(_ displayName: String, bundleIdentifier: String) -> String {
+        switch bundleIdentifier {
+        case "cn.wps.Office", "com.kingsoft.wpsoffice.mac":
+            return "WPS Office"
+        case "com.microsoft.Excel":
+            return "Microsoft Excel"
+        default:
+            return displayName
+        }
     }
 }

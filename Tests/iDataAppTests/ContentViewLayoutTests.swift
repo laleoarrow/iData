@@ -212,6 +212,73 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func externalHandoffNoticeFloatsAboveRootShellWithReturnAction() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(normalizeWhitespace("""
+        .overlay(alignment: .topTrailing) {
+            if let notice = model.externalHandoffNotice {
+                ExternalHandoffNoticeBanner(
+        """)))
+        #expect(source.contains("onReturn: { model.returnExternalHandoffToIData() }"))
+        #expect(source.contains("onDismiss: { model.dismissExternalHandoffNotice() }"))
+        #expect(source.contains("private struct ExternalHandoffNoticeBanner: View {"))
+    }
+
+    @Test
+    func externalHandoffNoticeUsesStatefulCopyAndClearReturnLabel() throws {
+        let source = try contentViewSource()
+        let bannerSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct ExternalHandoffNoticeBanner: View {",
+            end: "private struct StatusAndInputCard: View {"
+        ))
+
+        #expect(bannerSection.contains("switch notice.state"))
+        #expect(bannerSection.contains("Open in iData"))
+        #expect(bannerSection.contains("用 iData 打开"))
+        #expect(bannerSection.contains("did not respond"))
+        #expect(bannerSection.contains("没有响应"))
+    }
+
+    @Test
+    func sessionHeaderActionsCollapseBeforeClipping() throws {
+        let source = try contentViewSource()
+        let sessionSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SessionDetailView: View {",
+            end: "private struct ExternalHandoffNoticeBanner: View {"
+        ))
+
+        #expect(sessionSection.contains("private struct SessionHeaderActions: View"))
+        #expect(sessionSection.contains("ViewThatFits(in: .horizontal)"))
+        #expect(sessionSection.contains("Menu {"))
+        #expect(sessionSection.contains("Label(localizedText(isChinese, english: \"Actions\", chinese: \"操作\")"))
+    }
+
+    @Test
+    func rootWindowAllowsNarrowOperationalLayout() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+
+        #expect(source.contains(".frame(minWidth: 860, minHeight: 580)"))
+    }
+
+    @Test
+    func handoffRulesButtonUsesSettingsLink() throws {
+        let source = try contentViewSource()
+        let formatsSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var formatsCard: some View {",
+            end: "private struct SessionDetailView: View {"
+        ))
+
+        #expect(formatsSection.contains("SettingsLink {"))
+        #expect(formatsSection.contains("Handoff Rules"))
+        #expect(formatsSection.contains("设置转交规则"))
+        #expect(!formatsSection.contains("showSettingsWindow:"))
+    }
+
+    @Test
     func sidebarTracksExactlyOneHoveredRecentFileAtATime() throws {
         let source = normalizeWhitespace(try contentViewSource())
 

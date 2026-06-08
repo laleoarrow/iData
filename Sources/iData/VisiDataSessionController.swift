@@ -414,10 +414,6 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
-        guard sizeChanged else {
-            return
-        }
-
         if childPID > 0, launchedBeforeMeasuredDisplaySize {
             // The process was launched with a default size before the real
             // terminal measurement arrived. Discard any output that VisiData
@@ -430,6 +426,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             transcript.reset()
             enqueuePTYWrite(Data("\u{0C}".utf8))
             terminalDebugTrace("session.resize settleAfterFallbackLaunch session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows)")
+        }
+
+        guard sizeChanged else {
+            return
         }
 
         var windowSize = winsize(
