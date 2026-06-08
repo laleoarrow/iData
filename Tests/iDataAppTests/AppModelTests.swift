@@ -1308,7 +1308,7 @@ struct AppModelTests {
     @Test
     func statusPanelRunningTintDependsOnVisiDataStatusOnly() {
         #expect(statusPanelUsesRunningTint(for: "Running VisiData for sample.tsv."))
-        #expect(statusPanelUsesRunningTint(for: "正在为 sample.tsv 运行 VisiData。"))
+        #expect(statusPanelUsesRunningTint(for: "正在用 VisiData 查看 sample.tsv。"))
         #expect(!statusPanelUsesRunningTint(for: "Ready to open a file"))
     }
 

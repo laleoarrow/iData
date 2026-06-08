@@ -701,7 +701,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         isRunning = true
         statusMessage = AppModel.localized(
             english: "Running VisiData for \(pendingOpenRequest.fileURL.lastPathComponent).",
-            chinese: "正在为 \(pendingOpenRequest.fileURL.lastPathComponent) 运行 VisiData。"
+            chinese: "正在用 VisiData 查看 \(pendingOpenRequest.fileURL.lastPathComponent)。"
         )
     }
 

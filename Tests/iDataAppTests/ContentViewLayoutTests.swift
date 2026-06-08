@@ -148,7 +148,7 @@ struct ContentViewLayoutTests {
         #expect(normalized.contains("private struct SidebarFooterActionIcon: View"))
         #expect(normalized.contains(normalizeWhitespace("""
         SettingsLink {
-            SidebarFooterActionIcon(symbol: "gearshape.fill")
+            SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
         }
         """)))
         #expect(!normalized.contains(normalizeWhitespace("""
@@ -163,6 +163,50 @@ struct ContentViewLayoutTests {
         #expect(!footerSection.contains("LinearGradient("))
         #expect(!footerSection.contains("Color(red: 1.0"))
         #expect(!footerSection.contains("SidebarHoverTrackingRegion"))
+    }
+
+    @Test
+    func circularIconButtonsUseReducedMotionAwareHoverAnimation() throws {
+        let source = try contentViewSource()
+        let helperSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private enum HoverAnimatedCircleSymbolKind",
+            end: "enum SidebarHoverGlowStyle: Equatable {"
+        ))
+        let inputOrb = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct InputMethodQuickSwitchOrbButton: View {",
+            end: "private struct SessionInfoHintRow: View {"
+        ))
+
+        #expect(helperSection.contains("case \"gearshape.fill\", \"gearshape\": return .gearSpin"))
+        #expect(helperSection.contains("case \"globe\": return .globeSpin"))
+        #expect(helperSection.contains("return Double(spinCycle) * 360"))
+        #expect(helperSection.contains(".rotation3DEffect( .degrees(depthRotationDegrees), axis: (x: 0, y: 1, z: 0), perspective: motionKind == .globeSpin ? 0.44 : 0 )"))
+        #expect(helperSection.contains("guard hovering && motionEnabled && motionKind.usesSpin else"))
+        #expect(helperSection.contains("spinCycle += 1"))
+        #expect(helperSection.contains(".animation(motionEnabled ? .spring(response: 0.22"))
+
+        #expect(inputOrb.contains("HoverAnimatedCircleSymbol( symbol: \"globe\""))
+        #expect(inputOrb.contains("@Environment(\\.idataAnimationsEnabled) private var idataAnimationsEnabled"))
+        #expect(inputOrb.contains("@Environment(\\.accessibilityReduceMotion) private var accessibilityReduceMotion"))
+        #expect(inputOrb.contains(".animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)"))
+    }
+
+    @Test
+    func chineseSessionHintsUseShortNativeCopy() throws {
+        let source = try contentViewSource()
+        let hintSection = try extractSection(
+            from: source,
+            start: "private var sessionInfoHints: [String] {",
+            end: "var body: some View {"
+        )
+
+        #expect(hintSection.contains("\"先按 z，再按 ?。这不是组合键。\""))
+        #expect(hintSection.contains("\"搜索后按 Enter；再用 n/N 看下一个结果。\""))
+        #expect(!hintSection.contains("提示："))
+        #expect(!hintSection.contains("不是同时按"))
+        #expect(!hintSection.contains("再实践一遍"))
     }
 
     @Test

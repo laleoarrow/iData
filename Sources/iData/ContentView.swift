@@ -637,7 +637,7 @@ private struct SidebarFooter: View {
             if model.isSidebarCollapsed {
                 VStack(spacing: 18) {
                     SettingsLink {
-                        SidebarFooterActionIcon(symbol: "gearshape.fill")
+                        SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
@@ -645,7 +645,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.isHelpPresented = true
                     } label: {
-                        SidebarFooterActionIcon(symbol: "questionmark.circle")
+                        SidebarFooterActionIcon(symbol: "questionmark.circle", motionEnabled: motionEnabled)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
@@ -653,7 +653,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.presentTutorialHub()
                     } label: {
-                        SidebarFooterActionIcon(symbol: "graduationcap.fill")
+                        SidebarFooterActionIcon(symbol: "graduationcap.fill", motionEnabled: motionEnabled)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
@@ -662,7 +662,7 @@ private struct SidebarFooter: View {
             } else {
                 HStack(spacing: 18) {
                     SettingsLink {
-                        SidebarFooterActionIcon(symbol: "gearshape.fill")
+                        SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
@@ -670,7 +670,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.isHelpPresented = true
                     } label: {
-                        SidebarFooterActionIcon(symbol: "questionmark.circle")
+                        SidebarFooterActionIcon(symbol: "questionmark.circle", motionEnabled: motionEnabled)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
@@ -678,7 +678,7 @@ private struct SidebarFooter: View {
                     Button {
                         model.presentTutorialHub()
                     } label: {
-                        SidebarFooterActionIcon(symbol: "graduationcap.fill")
+                        SidebarFooterActionIcon(symbol: "graduationcap.fill", motionEnabled: motionEnabled)
                     }
                     .buttonStyle(.plain)
                     .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
@@ -1107,10 +1107,16 @@ private struct SidebarCollapseToggleButton: View {
 
 private struct SidebarFooterIcon: View {
     let symbol: String
+    let isHovering: Bool
+    let motionEnabled: Bool
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 18, weight: .semibold))
+        HoverAnimatedCircleSymbol(
+            symbol: symbol,
+            font: .system(size: 18, weight: .semibold),
+            motionEnabled: motionEnabled,
+            isHovering: isHovering
+        )
             .frame(width: 24, height: 24)
             .contentShape(Rectangle())
     }
@@ -1118,11 +1124,12 @@ private struct SidebarFooterIcon: View {
 
 private struct SidebarFooterActionIcon: View {
     let symbol: String
+    let motionEnabled: Bool
 
     @State private var isHovering = false
 
     var body: some View {
-        SidebarFooterIcon(symbol: symbol)
+        SidebarFooterIcon(symbol: symbol, isHovering: isHovering, motionEnabled: motionEnabled)
             .foregroundStyle(isHovering ? Color.accentColor : Color.secondary)
             .frame(width: 36, height: 36)
             .background(Color.white.opacity(isHovering ? 0.12 : 0.05), in: Circle())
@@ -1131,9 +1138,108 @@ private struct SidebarFooterActionIcon: View {
                     .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
             )
             .contentShape(Circle())
-            .animation(.easeOut(duration: 0.18), value: isHovering)
+            .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
             .onHover { hovering in
                 isHovering = hovering
+            }
+    }
+}
+
+private enum HoverAnimatedCircleSymbolKind: Equatable {
+    case gearSpin
+    case globeSpin
+    case tiltLeft
+    case tiltRight
+    case none
+
+    static func forSymbol(_ symbol: String) -> HoverAnimatedCircleSymbolKind {
+        switch symbol {
+        case "gearshape.fill", "gearshape":
+            return .gearSpin
+        case "globe":
+            return .globeSpin
+        case "questionmark.circle":
+            return .tiltLeft
+        case "graduationcap.fill":
+            return .tiltRight
+        default:
+            return .none
+        }
+    }
+
+    var usesSpin: Bool {
+        self == .gearSpin || self == .globeSpin
+    }
+}
+
+private struct HoverAnimatedCircleSymbol: View {
+    let symbol: String
+    let font: Font
+    let motionEnabled: Bool
+    let isHovering: Bool
+
+    @State private var spinCycle = 0
+
+    private var motionKind: HoverAnimatedCircleSymbolKind {
+        HoverAnimatedCircleSymbolKind.forSymbol(symbol)
+    }
+
+    private var planarRotationDegrees: Double {
+        guard motionEnabled else {
+            return 0
+        }
+
+        switch motionKind {
+        case .gearSpin:
+            return Double(spinCycle) * 360
+        case .tiltLeft:
+            return isHovering ? -8 : 0
+        case .tiltRight:
+            return isHovering ? 7 : 0
+        case .globeSpin, .none:
+            return 0
+        }
+    }
+
+    private var depthRotationDegrees: Double {
+        guard motionEnabled, motionKind == .globeSpin else {
+            return 0
+        }
+        return Double(spinCycle) * 360
+    }
+
+    private var spinAnimation: Animation? {
+        guard motionEnabled else {
+            return nil
+        }
+
+        switch motionKind {
+        case .gearSpin:
+            return .easeInOut(duration: 0.58)
+        case .globeSpin:
+            return .easeInOut(duration: 0.72)
+        case .tiltLeft, .tiltRight, .none:
+            return nil
+        }
+    }
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(font)
+            .rotationEffect(.degrees(planarRotationDegrees))
+            .rotation3DEffect(
+                .degrees(depthRotationDegrees),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: motionKind == .globeSpin ? 0.44 : 0
+            )
+            .scaleEffect(motionEnabled && isHovering ? 1.06 : 1)
+            .animation(motionEnabled ? .spring(response: 0.22, dampingFraction: 0.72, blendDuration: 0.06) : nil, value: isHovering)
+            .animation(spinAnimation, value: spinCycle)
+            .onChange(of: isHovering) { _, hovering in
+                guard hovering && motionEnabled && motionKind.usesSpin else {
+                    return
+                }
+                spinCycle += 1
             }
     }
 }
@@ -2511,11 +2617,11 @@ private struct SessionDetailView: View {
     private var sessionInfoHints: [String] {
         if isChinese {
             return [
-                "提示：不是同时按 z?，而是先按 z，再按 ?。",
-                "提示：搜索时输入后只按一次 Enter，之后用 n/N 跳转。",
-                "提示：方向键和 hjkl 都能移动，先用顺手的就行。",
-                "提示：当前列排序是 ] 升序、[ 降序。",
-                "提示：有不确定命令时，先看教程清单再实践一遍。",
+                "先按 z，再按 ?。这不是组合键。",
+                "搜索后按 Enter；再用 n/N 看下一个结果。",
+                "方向键和 hjkl 都能移动，用顺手的就行。",
+                "当前列排序：] 升序，[ 降序。",
+                "不确定快捷键时，先打开教程看一眼。",
             ]
         }
 
@@ -2704,6 +2810,7 @@ private struct SessionHeaderActions: View {
 func statusPanelUsesRunningTint(for statusMessage: String) -> Bool {
     let normalized = statusMessage.lowercased()
     return normalized.contains("running visidata")
+        || normalized.contains("正在用 visidata")
         || normalized.contains("正在运行 visidata")
         || normalized.contains("运行 visidata")
 }
@@ -2986,14 +3093,24 @@ private struct InputMethodQuickSwitchOrbButton: View {
     let isChinese: Bool
     let onTap: () -> Void
 
+    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var isHovering = false
+
+    private var motionEnabled: Bool {
+        idataAnimationsEnabled && !accessibilityReduceMotion
+    }
 
     var body: some View {
         Button {
             onTap()
         } label: {
-            Image(systemName: "globe")
-                .font(.system(size: 16, weight: .semibold))
+            HoverAnimatedCircleSymbol(
+                symbol: "globe",
+                font: .system(size: 16, weight: .semibold),
+                motionEnabled: motionEnabled,
+                isHovering: isHovering
+            )
                 .foregroundStyle(Color.white.opacity(0.95))
                 .frame(width: 42, height: 42)
                 .background(
@@ -3050,7 +3167,7 @@ private struct InputMethodQuickSwitchOrbButton: View {
         }
         .buttonStyle(OrbButtonStyle())
         .help(isChinese ? "切换到英文输入法" : "Switch to English input")
-        .animation(.easeOut(duration: 0.18), value: isHovering)
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
         .onHover { hovering in
             isHovering = hovering
         }

@@ -336,7 +336,7 @@ final class AppModel: ObservableObject {
                     id: "basic-help",
                     title: TutorialLocalizedText(english: "Discover Commands", chinese: "命令发现"),
                     command: "z  then  ?",
-                    instruction: TutorialLocalizedText(english: "Press `z`, then `?` (not together). No extra text input is needed; a command-help sheet opens directly.", chinese: "先按 `z` 再按 `?`（不是同时按）。不需要再输入文字，会直接打开命令帮助页。"),
+                    instruction: TutorialLocalizedText(english: "Press `z`, then `?` (not together). No extra text input is needed; a command-help sheet opens directly.", chinese: "`z` 后再按 `?`。这不是组合键，也不用再输入文字。"),
                     detail: TutorialLocalizedText(english: "If nothing appears, check that keyboard focus is inside the terminal and input method is English.", chinese: "如果没有反应，先确认焦点在终端内部，且输入法是英文。")
                 ),
             ]
@@ -827,7 +827,7 @@ final class AppModel: ObservableObject {
         statusMessage = handler.map {
             localized(
                 english: "Small files at or below 100 MiB will be handed off to \($0.displayName). Compressed .gz/.bgz files always stay in iData.",
-                chinese: "小于等于 100 MiB 的文件将转交给 \($0.displayName)。压缩 .gz/.bgz 文件始终留在 iData 中打开。"
+                chinese: "100 MiB 以内的文件会交给 \($0.displayName)。.gz/.bgz 仍在 iData 中打开。"
             )
         }
     }
@@ -837,7 +837,7 @@ final class AppModel: ObservableObject {
         errorMessage = nil
         statusMessage = localized(
             english: "Small files at or below 100 MiB will fall back to the previous default app when possible. Compressed .gz/.bgz files always stay in iData.",
-            chinese: "小于等于 100 MiB 的文件会尽量回退到此前的默认应用。压缩 .gz/.bgz 文件始终留在 iData 中打开。"
+            chinese: "100 MiB 以内的文件会尽量交回原来的默认应用。.gz/.bgz 仍在 iData 中打开。"
         )
     }
 
@@ -893,7 +893,7 @@ final class AppModel: ObservableObject {
     var smallFileRoutingSummary: String {
         localized(
             english: "Finder-opened files at or below 100 MiB prefer WPS Office, then Microsoft Excel, unless you choose a different global app here. Compressed .gz/.bgz files always stay in iData.",
-            chinese: "通过 Finder 交给 iData 且小于等于 100 MiB 的文件，默认优先交给 WPS Office，其次 Microsoft Excel；也可在此改为其他统一应用。.gz/.bgz 压缩文件始终在 iData 中打开。"
+            chinese: "从 Finder 交给 iData 的小文件，默认先交给 WPS Office，其次 Microsoft Excel；你也可以改成其他应用。.gz/.bgz 仍在 iData 中打开。"
         )
     }
 
@@ -948,7 +948,7 @@ final class AppModel: ObservableObject {
             isTutorialHubPresented = false
             statusMessage = localized(
                 english: "Tutorial started with \(sampleURL.lastPathComponent). Follow the floating coach in the session.",
-                chinese: "已用 \(sampleURL.lastPathComponent) 启动教程。请跟随会话中的浮动引导继续操作。"
+                chinese: "教程已打开：\(sampleURL.lastPathComponent)。跟着浮动引导操作即可。"
             )
             errorMessage = nil
         } catch {
@@ -1208,7 +1208,7 @@ final class AppModel: ObservableObject {
             session.focusTerminalDisplay()
             statusMessage = localized(
                 english: "Already showing \(url.lastPathComponent).",
-                chinese: "当前已在显示 \(url.lastPathComponent)。"
+                chinese: "\(url.lastPathComponent) 已经打开。"
             )
             errorMessage = nil
             return
@@ -1233,14 +1233,14 @@ final class AppModel: ObservableObject {
                 finishTutorial()
                 statusMessage = localized(
                     english: "Opened \(url.lastPathComponent) inside iData. Tutorial ended because a different file is active.",
-                    chinese: "已在 iData 中打开 \(url.lastPathComponent)。由于当前激活的是其他文件，教程已结束。"
+                    chinese: "已打开 \(url.lastPathComponent)，教程已结束。"
                 )
                 errorMessage = nil
                 return
             }
             statusMessage = localized(
                 english: "Opened \(url.lastPathComponent) inside iData.",
-                chinese: "已在 iData 中打开 \(url.lastPathComponent)。"
+                chinese: "已打开 \(url.lastPathComponent)。"
             )
             errorMessage = nil
         } catch {
