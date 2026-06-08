@@ -140,9 +140,16 @@ private struct SidebarView: View {
 
                 if model.recentFiles.isEmpty {
                     if model.isSidebarCollapsed {
-                        EmptySidebarRailState()
+                        EmptySidebarRailState(
+                            isChinese: model.effectiveLanguage == .chinese,
+                            openAction: { model.openDocument() }
+                        )
                     } else {
-                        EmptySidebarState(isChinese: model.effectiveLanguage == .chinese)
+                        EmptySidebarState(
+                            isChinese: model.effectiveLanguage == .chinese,
+                            openAction: { model.openDocument() },
+                            tutorialAction: { model.presentTutorialHub() }
+                        )
                     }
                 } else {
                     ScrollView {
@@ -454,6 +461,8 @@ private struct SidebarFooter: View {
 
 private struct EmptySidebarState: View {
     let isChinese: Bool
+    let openAction: () -> Void
+    let tutorialAction: () -> Void
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
@@ -470,6 +479,24 @@ private struct EmptySidebarState: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button {
+                    openAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Open File", chinese: "打开文件"), systemImage: "tablecells")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+
+                Button {
+                    tutorialAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Tutorial", chinese: "教程"), systemImage: "graduationcap.fill")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
@@ -489,17 +516,26 @@ private struct EmptySidebarState: View {
 }
 
 private struct EmptySidebarRailState: View {
+    let isChinese: Bool
+    let openAction: () -> Void
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.secondary)
+        Button(action: openAction) {
+            VStack(spacing: 12) {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 34, height: 34)
+                    .background(Color.accentColor.opacity(0.14), in: Circle())
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
+        .buttonStyle(.plain)
+        .help(localizedText(isChinese, english: "Open a table", chinese: "打开一个表格"))
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1632,6 +1668,10 @@ private struct WelcomeDetailView: View {
         model.effectiveLanguage == .chinese
     }
 
+    private var showsFirstRunEmptyState: Bool {
+        model.recentFiles.isEmpty && model.lastOpenedFile == nil
+    }
+
     private var quickTips: [QuickTip] {
         [
             QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate rows and columns quickly without leaving the keyboard.", chinese: "不离开键盘也能快速移动行和列。")),
@@ -1703,6 +1743,9 @@ private struct WelcomeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 heroCard
+                if showsFirstRunEmptyState {
+                    firstRunEmptyStateCard
+                }
                 quickTipsCard
                 tutorialEntryCard
                 summaryCards
@@ -1856,6 +1899,105 @@ private struct WelcomeDetailView: View {
         .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
     }
 
+    private var firstRunEmptyStateCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "tablecells")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 38, height: 38)
+                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(localizedText(isChinese, english: "Start with a table", chinese: "先打开一份数据"))
+                        .font(.headline)
+                    Text(localizedText(
+                        isChinese,
+                        english: "Choose the path that matches this file: inspect it in iData, learn with a sample, or review small-file handoff.",
+                        chinese: "按文件目的选择下一步：在 iData 中查看、用示例练习，或确认小文件转交设置。"
+                    ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    firstRunActionButton(
+                        title: localizedText(isChinese, english: "Open First Table", chinese: "打开第一份表格"),
+                        symbol: "tablecells",
+                        prominent: true,
+                        action: { model.openDocument() }
+                    )
+
+                    firstRunActionButton(
+                        title: localizedText(isChinese, english: "Try Sample Tutorial", chinese: "试用示例教程"),
+                        symbol: "graduationcap.fill",
+                        prominent: false,
+                        action: { model.presentTutorialHub() }
+                    )
+
+                    SettingsLink {
+                        Label(localizedText(isChinese, english: "Review Handoff Settings", chinese: "查看转交设置"), systemImage: "arrow.triangle.branch")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .quietInteractiveSurface(enabled: motionEnabled)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    firstRunActionButton(
+                        title: localizedText(isChinese, english: "Open First Table", chinese: "打开第一份表格"),
+                        symbol: "tablecells",
+                        prominent: true,
+                        action: { model.openDocument() }
+                    )
+
+                    firstRunActionButton(
+                        title: localizedText(isChinese, english: "Try Sample Tutorial", chinese: "试用示例教程"),
+                        symbol: "graduationcap.fill",
+                        prominent: false,
+                        action: { model.presentTutorialHub() }
+                    )
+
+                    SettingsLink {
+                        Label(localizedText(isChinese, english: "Review Handoff Settings", chinese: "查看转交设置"), systemImage: "arrow.triangle.branch")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .quietInteractiveSurface(enabled: motionEnabled)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+    }
+
+    @ViewBuilder
+    private func firstRunActionButton(
+        title: String,
+        symbol: String,
+        prominent: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        if prominent {
+            Button(action: action) {
+                Label(title, systemImage: symbol)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.regular)
+            .quietInteractiveSurface(enabled: motionEnabled)
+        } else {
+            Button(action: action) {
+                Label(title, systemImage: symbol)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .quietInteractiveSurface(enabled: motionEnabled)
+        }
+    }
+
     private var showsReadyDependencyPillInTitleRow: Bool {
         if case .available = model.visiDataDependencyState {
             return true
@@ -1950,6 +2092,7 @@ private struct WelcomeDetailView: View {
                 .padding(.top, 2)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
         .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
         .onAppear { startCarouselTimer() }
@@ -2021,6 +2164,7 @@ private struct WelcomeDetailView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
     }
 
@@ -2050,6 +2194,7 @@ private struct WelcomeDetailView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
         .background(
             LinearGradient(
@@ -2217,6 +2362,7 @@ private struct WelcomeDetailView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
         .onAppear {
             refreshDisplayedFormatAssociationStatus()

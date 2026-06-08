@@ -279,6 +279,90 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func emptySidebarStateOffersImmediateActions() throws {
+        let source = try contentViewSource()
+        let sidebarSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarView: View {",
+            end: "private struct SidebarHeaderCard: View {"
+        ))
+        let emptySection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct EmptySidebarState: View {",
+            end: "private struct EmptySidebarRailState: View {"
+        ))
+        let railSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct EmptySidebarRailState: View {",
+            end: "private struct RecentFileRow: View {"
+        ))
+
+        #expect(sidebarSection.contains("openAction: { model.openDocument() }"))
+        #expect(sidebarSection.contains("tutorialAction: { model.presentTutorialHub() }"))
+        #expect(emptySection.contains("Open File"))
+        #expect(emptySection.contains("打开文件"))
+        #expect(emptySection.contains("Tutorial"))
+        #expect(emptySection.contains("教程"))
+        #expect(railSection.contains("Button(action: openAction)"))
+        #expect(railSection.contains("Open a table"))
+        #expect(railSection.contains("打开一个表格"))
+    }
+
+    @Test
+    func firstRunEmptyStateCreatesClearNextSteps() throws {
+        let source = try contentViewSource()
+        let welcomeSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct WelcomeDetailView: View {",
+            end: "private struct SessionDetailView: View {"
+        ))
+
+        #expect(welcomeSection.contains("private var showsFirstRunEmptyState: Bool"))
+        #expect(welcomeSection.contains("model.recentFiles.isEmpty && model.lastOpenedFile == nil"))
+        #expect(welcomeSection.contains("if showsFirstRunEmptyState { firstRunEmptyStateCard }"))
+        #expect(welcomeSection.contains("Start with a table"))
+        #expect(welcomeSection.contains("先打开一份数据"))
+        #expect(welcomeSection.contains("Open First Table"))
+        #expect(welcomeSection.contains("打开第一份表格"))
+        #expect(welcomeSection.contains("Review Handoff Settings"))
+        #expect(welcomeSection.contains("查看转交设置"))
+    }
+
+    @Test
+    func welcomePanelsUseConsistentFullWidth() throws {
+        let source = try contentViewSource()
+        let firstRunSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var firstRunEmptyStateCard: some View {",
+            end: "@ViewBuilder\n    private func firstRunActionButton"
+        ))
+        let tutorialSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var tutorialEntryCard: some View {",
+            end: "private func startCarouselTimer()"
+        ))
+        let summarySection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var summaryCards: some View {",
+            end: "private var quickTipsCard: some View {"
+        ))
+        let quickTipsSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var quickTipsCard: some View {",
+            end: "@ViewBuilder\n    private func quickTipPreviewRow"
+        ))
+        let formatsSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var formatsCard: some View {",
+            end: "private struct SessionDetailView: View {"
+        ))
+
+        for section in [firstRunSection, tutorialSection, summarySection, quickTipsSection, formatsSection] {
+            #expect(section.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
+        }
+    }
+
+    @Test
     func sidebarTracksExactlyOneHoveredRecentFileAtATime() throws {
         let source = normalizeWhitespace(try contentViewSource())
 
