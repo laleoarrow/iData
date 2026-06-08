@@ -53,8 +53,9 @@ struct PreferencesViewTests {
         #expect(runtimeSection.contains("PreferencesMenuButton(title: isChinese ? \"操作\" : \"Actions\""))
         #expect(runtimeSection.contains("Choose Executable"))
         #expect(runtimeSection.contains("Auto Detect"))
-        #expect(languageSection.contains("PreferencesMenuButton(title: model.appLanguageOptionTitle(model.appLanguagePreference)"))
+        #expect(languageSection.contains("PreferencesMenuButton(title: model.appLanguageOptionTitle(model.appLanguagePreference), animated: motionEnabled)"))
         #expect(languageSection.contains("model.appLanguagePreference = option"))
+        #expect(!languageSection.contains("chevron.up.chevron.down"))
         #expect(!languageSection.contains("Picker("))
         #expect(!source.contains(".pickerStyle(.menu)"))
         #expect(!source.contains(".pickerStyle(.segmented)"))
@@ -122,6 +123,24 @@ struct PreferencesViewTests {
         #expect(cardChromeSection.contains(".foregroundStyle(tint)"))
         #expect(cardChromeSection.contains("tint.opacity(0.16)"))
         #expect(cardChromeSection.contains("RoundedRectangle(cornerRadius: 2"))
+    }
+
+    @Test
+    func preferenceMenuButtonsUseConsistentModernDropdownChrome() throws {
+        let source = try preferencesViewSource()
+        let menuSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct PreferencesMenuButton<Content: View>: View {",
+            end: "private struct PreferencePill: View {"
+        ))
+
+        #expect(menuSection.contains("let icon: String?"))
+        #expect(menuSection.contains("icon: String? = nil"))
+        #expect(menuSection.contains("Image(systemName: \"chevron.down\")"))
+        #expect(menuSection.contains(".frame(width: 150, height: 34, alignment: .leading)"))
+        #expect(menuSection.contains(".buttonStyle(.plain)"))
+        #expect(!menuSection.contains(".buttonStyle(.bordered)"))
+        #expect(!source.contains("chevron.up.chevron.down"))
     }
 }
 

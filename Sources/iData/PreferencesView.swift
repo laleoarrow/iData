@@ -253,7 +253,7 @@ struct PreferencesView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    PreferencesMenuButton(title: model.appLanguageOptionTitle(model.appLanguagePreference), icon: "chevron.up.chevron.down", animated: motionEnabled) {
+                    PreferencesMenuButton(title: model.appLanguageOptionTitle(model.appLanguagePreference), animated: motionEnabled) {
                         ForEach(AppModel.AppLanguagePreference.allCases) { option in
                             Button {
                                 model.appLanguagePreference = option
@@ -427,18 +427,54 @@ private extension PreferencesCard where Accessory == EmptyView {
 
 private struct PreferencesMenuButton<Content: View>: View {
     let title: String
-    let icon: String
+    let icon: String?
     let animated: Bool
     @ViewBuilder let content: Content
+
+    init(
+        title: String,
+        icon: String? = nil,
+        animated: Bool,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.icon = icon
+        self.animated = animated
+        self.content = content()
+    }
 
     var body: some View {
         Menu {
             content
         } label: {
-            Label(title, systemImage: icon)
+            HStack(spacing: 8) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 16, height: 16)
+                }
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 12, height: 12)
+            }
+            .padding(.horizontal, 12)
+            .frame(width: 150, height: 34, alignment: .leading)
+            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            )
         }
-        .buttonStyle(.bordered)
-        .controlSize(.regular)
+        .buttonStyle(.plain)
         .quietInteractiveSurface(enabled: animated)
     }
 }

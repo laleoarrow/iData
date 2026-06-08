@@ -114,20 +114,25 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func recentFileRowUsesFullCardGlowInsteadOfTrailingButtonGlow() throws {
-        let source = normalizeWhitespace(try contentViewSource())
+    func recentFileRowsUseSingleBorderWithoutHoverGlowOverlay() throws {
+        let source = try contentViewSource()
+        let expandedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct RecentFileRow: View {",
+            end: "private struct RecentFileActionButton: View {"
+        ))
+        let collapsedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct CollapsedRecentFileRow: View {",
+            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+        ))
 
-        #expect(source.contains(normalizeWhitespace("""
-        .overlay {
-            SidebarHoverGlow(
-                isVisible: isHovering,
-                style: .rounded(20)
-            )
-        }
-        """)))
-
-        #expect(!source.contains("private var actionBorderGradient: LinearGradient"))
-        #expect(source.contains("private struct RecentFileActionButton: View"))
+        #expect(expandedRow.contains(".strokeBorder(borderColor)"))
+        #expect(expandedRow.contains(".background(backgroundStyle"))
+        #expect(!expandedRow.contains("SidebarHoverGlow("))
+        #expect(collapsedRow.contains(".strokeBorder(borderColor)"))
+        #expect(collapsedRow.contains(".background(backgroundStyle"))
+        #expect(!collapsedRow.contains("SidebarHoverGlow("))
     }
 
     @Test
@@ -294,7 +299,7 @@ struct ContentViewLayoutTests {
         let railSection = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct FloatingSidebarRail<Content: View>: View {",
-            end: "private struct SidebarHeaderCard: View {"
+            end: "private let sidebarRecentFilesCoordinateSpace"
         ))
 
         #expect(normalized.contains(".background(detailBackground.ignoresSafeArea())"))
@@ -332,6 +337,51 @@ struct ContentViewLayoutTests {
         #expect(sessionSection.contains("VStack(alignment: .leading, spacing: 18)"))
         #expect(!welcomeSection.contains(".background(detailBackground.ignoresSafeArea())"))
         #expect(!sessionSection.contains(".background(detailBackground.ignoresSafeArea())"))
+    }
+
+    @Test
+    func sidebarUsesLeftScrollPositionLineInsteadOfNativeRightScroller() throws {
+        let source = try contentViewSource()
+        let sidebarSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarView: View {",
+            end: "private struct SidebarHeaderCard: View {"
+        ))
+        let positionLineSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarScrollPositionLine: View {",
+            end: "private struct HiddenScrollIndicatorsConfigurator: NSViewRepresentable {"
+        ))
+        let scrollBridgeSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct HiddenScrollIndicatorsConfigurator: NSViewRepresentable {",
+            end: "private struct SidebarHeaderCard: View {"
+        ))
+
+        #expect(sidebarSection.contains("@State private var recentFilesScrollMetrics = SidebarScrollMetrics()"))
+        #expect(sidebarSection.contains("@State private var recentFilesFrame: CGRect = .zero"))
+        #expect(sidebarSection.contains("ScrollView(.vertical, showsIndicators: false)"))
+        #expect(sidebarSection.contains("VStack(spacing: model.isSidebarCollapsed ? 12 : 10)"))
+        #expect(!sidebarSection.contains("LazyVStack(spacing: model.isSidebarCollapsed ? 12 : 10)"))
+        #expect(sidebarSection.contains("HiddenScrollIndicatorsConfigurator()"))
+        #expect(sidebarSection.contains("ZStack(alignment: .topLeading)"))
+        #expect(sidebarSection.contains(".coordinateSpace(name: sidebarCoordinateSpace)"))
+        #expect(sidebarSection.contains("SidebarScrollFramePreferenceKey.self"))
+        #expect(sidebarSection.contains("SidebarScrollPositionLine("))
+        #expect(sidebarSection.contains("SidebarScrollMetricsPreferenceKey.self"))
+        #expect(sidebarSection.contains("SidebarScrollViewportHeightPreferenceKey.self"))
+        #expect(!sidebarSection.contains(".overlay(alignment: .trailing) { SidebarScrollPositionLine"))
+        #expect(positionLineSection.contains("Color.accentColor.opacity(0.94)"))
+        #expect(positionLineSection.contains(".frame(width: 4, height: thumbHeight)"))
+        #expect(positionLineSection.contains(".shadow(color: Color.accentColor.opacity(0.48)"))
+        #expect(positionLineSection.contains(".allowsHitTesting(false)"))
+        #expect(scrollBridgeSection.contains("scrollView.hasVerticalScroller = false"))
+        #expect(scrollBridgeSection.contains("scrollView.hasHorizontalScroller = false"))
+        #expect(scrollBridgeSection.contains("scrollView.verticalScroller = nil"))
+        #expect(scrollBridgeSection.contains("scheduleScrollIndicatorHiding(from:"))
+        #expect(scrollBridgeSection.contains("nearestLeftAlignedScrollViewInWindow()"))
+        #expect(scrollBridgeSection.contains("leftSidebarScrollViewsInWindow()"))
+        #expect(scrollBridgeSection.contains("descendantScrollViews()"))
     }
 
     @Test
@@ -504,6 +554,42 @@ struct ContentViewLayoutTests {
         #expect(!collapsedRow.contains("SidebarHoverTrackingRegion"))
         #expect(!collapsedRow.contains(".scaleEffect(motionEnabled && isHovering ? 1.02 : 1)"))
         #expect(!collapsedRow.contains(".offset(y: motionEnabled && isHovering ? -1 : 0)"))
+    }
+
+    @Test
+    func glassAndHoverEffectsStayBehindReadableContent() throws {
+        let source = try contentViewSource()
+        let normalized = normalizeWhitespace(source)
+        let statusCard = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct StatusAndInputCard: View {",
+            end: "private struct OrbButtonStyle: ButtonStyle {"
+        ))
+        let orbButton = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct InputMethodQuickSwitchOrbButton: View {",
+            end: "private struct SessionInfoHintRow: View {"
+        ))
+        let quietSurface = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct QuietInteractiveSurfaceModifier: ViewModifier {",
+            end: "extension View {"
+        ))
+        let sweepShimmer = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct AppSweepShimmer: View {",
+            end: "struct VersionPill: View {"
+        ))
+
+        #expect(normalized.contains(".background { detailBackground.ignoresSafeArea() AppSweepShimmer(active: motionEnabled)"))
+        #expect(!normalized.contains(".overlay { AppSweepShimmer(active: motionEnabled)"))
+        #expect(!sweepShimmer.contains("TimelineView(.animation"))
+        #expect(statusCard.contains(".background { ZStack { cardTint"))
+        #expect(!statusCard.contains(".overlay { RoundedRectangle(cornerRadius: 16, style: .continuous) .inset(by: 1) .fill("))
+        #expect(orbButton.contains(".background( ZStack { Circle() .fill(.ultraThinMaterial)"))
+        #expect(!orbButton.contains(".overlay { Circle() .inset(by: 1) .fill("))
+        #expect(quietSurface.contains(".background { SidebarHoverGlow("))
+        #expect(!quietSurface.contains(".overlay { SidebarHoverGlow("))
     }
 }
 

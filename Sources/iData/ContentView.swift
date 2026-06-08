@@ -44,9 +44,10 @@ struct ContentView: View {
             detailContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(detailBackground.ignoresSafeArea())
-        .overlay {
+        .background {
+            detailBackground.ignoresSafeArea()
             AppSweepShimmer(active: motionEnabled)
+                .ignoresSafeArea()
         }
         .overlay(alignment: .topTrailing) {
             if let notice = model.externalHandoffNotice {
@@ -104,6 +105,9 @@ private struct SidebarView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var hoveredRecentFilePath: String?
+    @State private var recentFilesScrollMetrics = SidebarScrollMetrics()
+    @State private var recentFilesFrame: CGRect = .zero
+    @State private var recentFilesViewportHeight: CGFloat = 0
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
@@ -116,7 +120,7 @@ private struct SidebarView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             Color.clear
 
             FloatingSidebarRail {
@@ -137,8 +141,8 @@ private struct SidebarView: View {
                             )
                         }
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: model.isSidebarCollapsed ? 12 : 10) {
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(spacing: model.isSidebarCollapsed ? 12 : 10) {
                                 ForEach(model.recentFiles, id: \.standardizedFileURL.path) { fileURL in
                                     Group {
                                         if model.isSidebarCollapsed {
@@ -174,9 +178,47 @@ private struct SidebarView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, model.isSidebarCollapsed ? 0 : 2)
                             .padding(.bottom, 6)
+                            .background(
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: SidebarScrollMetricsPreferenceKey.self,
+                                        value: SidebarScrollMetrics(
+                                            contentHeight: proxy.size.height,
+                                            contentMinY: proxy.frame(in: .named(sidebarRecentFilesCoordinateSpace)).minY
+                                        )
+                                    )
+                                }
+                            )
                         }
+                        .coordinateSpace(name: sidebarRecentFilesCoordinateSpace)
                         .scrollIndicators(.hidden)
+                        .background(HiddenScrollIndicatorsConfigurator())
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: SidebarScrollViewportHeightPreferenceKey.self,
+                                    value: proxy.size.height
+                                )
+                            }
+                        )
+                        .background(
+                            GeometryReader { proxy in
+                                Color.clear.preference(
+                                    key: SidebarScrollFramePreferenceKey.self,
+                                    value: proxy.frame(in: .named(sidebarCoordinateSpace))
+                                )
+                            }
+                        )
                         .animation(listAnimation, value: model.recentFiles)
+                        .onPreferenceChange(SidebarScrollMetricsPreferenceKey.self) { metrics in
+                            recentFilesScrollMetrics = metrics
+                        }
+                        .onPreferenceChange(SidebarScrollFramePreferenceKey.self) { frame in
+                            recentFilesFrame = frame
+                        }
+                        .onPreferenceChange(SidebarScrollViewportHeightPreferenceKey.self) { height in
+                            recentFilesViewportHeight = height
+                        }
                         .onHover { hovering in
                             if !hovering {
                                 hoveredRecentFilePath = nil
@@ -198,7 +240,20 @@ private struct SidebarView: View {
             .padding(.vertical, 12)
             .padding(.leading, model.isSidebarCollapsed ? 10 : 14)
             .padding(.trailing, model.isSidebarCollapsed ? 6 : 10)
+
+            if !model.recentFiles.isEmpty {
+                SidebarScrollPositionLine(
+                    metrics: recentFilesScrollMetrics,
+                    viewportHeight: recentFilesViewportHeight,
+                    motionEnabled: motionEnabled
+                )
+                .offset(
+                    x: model.isSidebarCollapsed ? 16 : 22,
+                    y: recentFilesFrame.minY + 5
+                )
+            }
         }
+        .coordinateSpace(name: sidebarCoordinateSpace)
         .clipped()
     }
 
@@ -224,6 +279,199 @@ private struct FloatingSidebarRail<Content: View>: View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Color.clear)
+    }
+}
+
+private let sidebarCoordinateSpace = "iDataSidebar"
+private let sidebarRecentFilesCoordinateSpace = "iDataSidebarRecentFilesScroll"
+
+private struct SidebarScrollMetrics: Equatable {
+    var contentHeight: CGFloat = 0
+    var contentMinY: CGFloat = 0
+}
+
+private struct SidebarScrollMetricsPreferenceKey: PreferenceKey {
+    static let defaultValue = SidebarScrollMetrics()
+
+    static func reduce(value: inout SidebarScrollMetrics, nextValue: () -> SidebarScrollMetrics) {
+        value = nextValue()
+    }
+}
+
+private struct SidebarScrollViewportHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct SidebarScrollFramePreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+private struct SidebarScrollPositionLine: View {
+    let metrics: SidebarScrollMetrics
+    let viewportHeight: CGFloat
+    let motionEnabled: Bool
+
+    private var isScrollable: Bool {
+        metrics.contentHeight > viewportHeight + 2
+    }
+
+    private var trackHeight: CGFloat {
+        max(44, viewportHeight - 10)
+    }
+
+    private var thumbHeight: CGFloat {
+        guard isScrollable else {
+            return trackHeight
+        }
+        let ratio = viewportHeight / max(metrics.contentHeight, 1)
+        return min(trackHeight, max(42, trackHeight * ratio))
+    }
+
+    private var scrollProgress: CGFloat {
+        guard isScrollable else {
+            return 0
+        }
+        let maxOffset = max(metrics.contentHeight - viewportHeight, 1)
+        return min(max(-metrics.contentMinY / maxOffset, 0), 1)
+    }
+
+    private var thumbOffset: CGFloat {
+        (trackHeight - thumbHeight) * scrollProgress
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Capsule()
+                .fill(Color.white.opacity(0.07))
+                .frame(width: 2, height: trackHeight)
+
+            Capsule()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.78),
+                            Color.accentColor.opacity(0.94),
+                            Color.accentColor.opacity(0.58),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 4, height: thumbHeight)
+                .shadow(color: Color.accentColor.opacity(0.48), radius: 9, x: 0, y: 0)
+                .offset(y: thumbOffset)
+        }
+        .frame(width: 10, height: trackHeight)
+        .opacity(isScrollable ? 1 : 0)
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: scrollProgress)
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: thumbHeight)
+        .allowsHitTesting(false)
+    }
+}
+
+private struct HiddenScrollIndicatorsConfigurator: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        scheduleScrollIndicatorHiding(from: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        scheduleScrollIndicatorHiding(from: nsView)
+    }
+
+    private func scheduleScrollIndicatorHiding(from view: NSView) {
+        for delay in [0.0, 0.05, 0.25, 0.75] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                hideScrollIndicators(from: view)
+            }
+        }
+    }
+
+    private func hideScrollIndicators(from view: NSView) {
+        let directScrollView = view.nearestEnclosingScrollView() ?? view.nearestLeftAlignedScrollViewInWindow()
+        let scrollViews = ([directScrollView].compactMap { $0 } + view.leftSidebarScrollViewsInWindow())
+        var hiddenScrollViewIDs = Set<ObjectIdentifier>()
+
+        for scrollView in scrollViews where hiddenScrollViewIDs.insert(ObjectIdentifier(scrollView)).inserted {
+            scrollView.hasVerticalScroller = false
+            scrollView.hasHorizontalScroller = false
+            scrollView.verticalScroller = nil
+            scrollView.horizontalScroller = nil
+            scrollView.autohidesScrollers = true
+            scrollView.scrollerStyle = .overlay
+        }
+    }
+}
+
+private extension NSView {
+    func nearestEnclosingScrollView() -> NSScrollView? {
+        var candidate: NSView? = self
+        while let current = candidate {
+            if let scrollView = current as? NSScrollView {
+                return scrollView
+            }
+            candidate = current.superview
+        }
+        return nil
+    }
+
+    func nearestLeftAlignedScrollViewInWindow() -> NSScrollView? {
+        guard let contentView = window?.contentView else {
+            return nil
+        }
+
+        let sourceRect = convert(bounds, to: nil).insetBy(dx: -4, dy: -4)
+        let scrollViews = contentView.descendantScrollViews()
+        let intersecting = scrollViews.filter { scrollView in
+            scrollView.convert(scrollView.bounds, to: nil).intersects(sourceRect)
+        }
+
+        if let nearestIntersecting = intersecting.min(by: { lhs, rhs in
+            let lhsRect = lhs.convert(lhs.bounds, to: nil)
+            let rhsRect = rhs.convert(rhs.bounds, to: nil)
+            return abs(lhsRect.midX - sourceRect.midX) < abs(rhsRect.midX - sourceRect.midX)
+        }) {
+            return nearestIntersecting
+        }
+
+        return scrollViews
+            .filter { scrollView in
+                scrollView.convert(scrollView.bounds, to: nil).midX < 360
+            }
+            .min { lhs, rhs in
+                lhs.convert(lhs.bounds, to: nil).minX < rhs.convert(rhs.bounds, to: nil).minX
+            }
+    }
+
+    func leftSidebarScrollViewsInWindow() -> [NSScrollView] {
+        guard let contentView = window?.contentView else {
+            return []
+        }
+
+        return contentView.descendantScrollViews().filter { scrollView in
+            let frame = scrollView.convert(scrollView.bounds, to: nil)
+            return frame.minX < 320 && frame.maxX < 340 && frame.height > 80
+        }
+    }
+
+    func descendantScrollViews() -> [NSScrollView] {
+        var result: [NSScrollView] = []
+        if let scrollView = self as? NSScrollView {
+            result.append(scrollView)
+        }
+        for subview in subviews {
+            result.append(contentsOf: subview.descendantScrollViews())
+        }
+        return result
     }
 }
 
@@ -581,12 +829,6 @@ private struct RecentFileRow: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(borderColor)
         )
-        .overlay {
-            SidebarHoverGlow(
-                isVisible: isHovering,
-                style: .rounded(20)
-            )
-        }
         .overlay(alignment: .trailing) {
             HStack(spacing: 8) {
                 RecentFileActionButton(
@@ -740,12 +982,6 @@ private struct CollapsedRecentFileRow: View {
             Circle()
                 .strokeBorder(borderColor)
         )
-        .overlay {
-            SidebarHoverGlow(
-                isVisible: isHovering,
-                style: .circle
-            )
-        }
         .frame(maxWidth: .infinity)
         .contentShape(Circle())
         .onHover { hovering in
@@ -851,7 +1087,7 @@ private struct SidebarCollapseToggleButton: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.10))
                 )
-                .overlay {
+                .background {
                     SidebarHoverGlow(
                         isVisible: isHovering,
                         style: .rounded(10)
@@ -1095,34 +1331,22 @@ private struct AppSweepShimmer: View {
 
     var body: some View {
         GeometryReader { proxy in
-            if active {
-                TimelineView(.animation(minimumInterval: 1 / 60, paused: !active)) { context in
-                    let width = max(proxy.size.width, 1)
-                    let bandWidth = max(180, width * 0.22)
-                    let startX = -bandWidth * 1.35
-                    let endX = width + bandWidth * 1.35
-                    let period = 24.0
-                    let phase = context.date.timeIntervalSinceReferenceDate
-                        .truncatingRemainder(dividingBy: period) / period
-                    let x = startX + (endX - startX) * phase
-
-                    LinearGradient(
-                        colors: [
-                            .clear,
-                            Color.white.opacity(0.06),
-                            Color.accentColor.opacity(0.10),
-                            .clear,
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(width: bandWidth)
-                    .rotationEffect(.degrees(20))
-                    .blur(radius: 16)
-                    .offset(x: x, y: -proxy.size.height * 0.18)
-                    .blendMode(.plusLighter)
-                }
-            }
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Color.white.opacity(0.045),
+                    Color.accentColor.opacity(0.075),
+                    .clear,
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(width: max(180, proxy.size.width * 0.22))
+            .rotationEffect(.degrees(20))
+            .blur(radius: 16)
+            .offset(x: proxy.size.width * 0.34, y: -proxy.size.height * 0.18)
+            .blendMode(.plusLighter)
+            .opacity(active ? 1 : 0)
         }
         .allowsHitTesting(false)
     }
@@ -2711,6 +2935,21 @@ private struct StatusAndInputCard: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .inset(by: 1)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.12),
+                                Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.10),
+                                Color.white.opacity(0.06),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .opacity(isHovering ? 1 : 0)
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
@@ -2718,23 +2957,6 @@ private struct StatusAndInputCard: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.10))
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .inset(by: 1)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.12),
-                            Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.10),
-                            Color.white.opacity(0.06),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .opacity(isHovering ? 1 : 0)
-                .allowsHitTesting(false)
-        }
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .inset(by: 1)
@@ -2751,7 +2973,7 @@ private struct StatusAndInputCard: View {
 private struct OrbButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .overlay {
+            .background {
                 Circle()
                     .fill(Color.white.opacity(configuration.isPressed ? 0.25 : 0))
             }
@@ -2789,6 +3011,20 @@ private struct InputMethodQuickSwitchOrbButton: View {
                                     endPoint: .bottomTrailing
                                 )
                             )
+
+                        Circle()
+                            .inset(by: 1)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.18),
+                                        Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.16),
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .opacity(isHovering ? 1 : 0)
                     }
                 )
                 .overlay(
@@ -2805,21 +3041,6 @@ private struct InputMethodQuickSwitchOrbButton: View {
                             lineWidth: 1
                         )
                 )
-                .overlay {
-                    Circle()
-                        .inset(by: 1)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 1.0, green: 0.86, blue: 0.26).opacity(0.18),
-                                    Color(red: 0.23, green: 0.58, blue: 1.0).opacity(0.16),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .opacity(isHovering ? 1 : 0)
-                }
                 .overlay {
                     Circle()
                         .inset(by: 1)
@@ -3302,7 +3523,7 @@ private struct QuietInteractiveSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay {
+            .background {
                 SidebarHoverGlow(
                     isVisible: enabled && isHovering,
                     style: glowStyle

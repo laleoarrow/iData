@@ -80,4 +80,41 @@ struct AppDelegateTests {
         #expect(receivedURLs == [fileURL])
         #expect(activationCount == 1)
     }
+
+    @Test
+    func mainSceneCreatesStartupWindowWithoutOfferingNewWindowCommand() throws {
+        let source = normalizeWhitespace(try iDataAppSource())
+
+        #expect(!source.contains("WindowGroup(\"iData\")"))
+        #expect(source.contains("Settings { PreferencesView(model: appDelegate.model, updater: appDelegate.updater) }"))
+        #expect(!source.contains("Window(\"iData\", id: \"main\")"))
+        #expect(source.contains("CommandGroup(replacing: .newItem) {}"))
+        #expect(source.contains("private var mainWindow: NSWindow?"))
+        #expect(source.contains("func applicationShouldHandleReopen("))
+        #expect(source.contains("private func showMainWindow()"))
+        #expect(source.contains("NSHostingController(rootView: ContentView(model: model, updater: updater))"))
+        #expect(source.contains("window.makeKeyAndOrderFront(nil)"))
+        #expect(source.contains("private var collapseDuplicateWindowsTask: DispatchWorkItem?"))
+        #expect(source.contains("scheduleDuplicateWindowCollapse()"))
+        #expect(source.contains("private extension NSApplication"))
+        #expect(source.contains("func collapseDuplicateMainWindows()"))
+        #expect(source.contains("guard let primaryWindow = mainWindows.last"))
+        #expect(source.contains("for duplicateWindow in mainWindows.dropLast()"))
+    }
+}
+
+private func iDataAppSource(filePath: StaticString = #filePath) throws -> String {
+    let fileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = fileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let appURL = repositoryRoot.appendingPathComponent("Sources/iData/iDataApp.swift")
+    return try String(contentsOf: appURL, encoding: .utf8)
+}
+
+private func normalizeWhitespace(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }
