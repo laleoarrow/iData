@@ -181,10 +181,14 @@ struct ContentViewLayoutTests {
 
         #expect(helperSection.contains("case \"gearshape.fill\", \"gearshape\": return .gearSpin"))
         #expect(helperSection.contains("case \"globe\": return .globeSpin"))
+        #expect(helperSection.contains("case \"questionmark.circle\", \"questionmark.circle.fill\": return .helpBounce"))
         #expect(helperSection.contains("return Double(spinCycle) * 360"))
         #expect(helperSection.contains(".rotation3DEffect( .degrees(depthRotationDegrees), axis: (x: 0, y: 1, z: 0), perspective: motionKind == .globeSpin ? 0.44 : 0 )"))
-        #expect(helperSection.contains("guard hovering && motionEnabled && motionKind.usesSpin else"))
+        #expect(helperSection.contains("return motionKind == .helpBounce ? 1.1 : 1.06"))
+        #expect(helperSection.contains(".symbolEffect(.bounce, value: feedbackCycle)"))
+        #expect(helperSection.contains("guard hovering && motionEnabled else"))
         #expect(helperSection.contains("spinCycle += 1"))
+        #expect(helperSection.contains("feedbackCycle += 1"))
         #expect(helperSection.contains(".animation(motionEnabled ? .spring(response: 0.22"))
 
         #expect(inputOrb.contains("HoverAnimatedCircleSymbol( symbol: \"globe\""))

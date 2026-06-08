@@ -1148,7 +1148,7 @@ private struct SidebarFooterActionIcon: View {
 private enum HoverAnimatedCircleSymbolKind: Equatable {
     case gearSpin
     case globeSpin
-    case tiltLeft
+    case helpBounce
     case tiltRight
     case none
 
@@ -1158,8 +1158,8 @@ private enum HoverAnimatedCircleSymbolKind: Equatable {
             return .gearSpin
         case "globe":
             return .globeSpin
-        case "questionmark.circle":
-            return .tiltLeft
+        case "questionmark.circle", "questionmark.circle.fill":
+            return .helpBounce
         case "graduationcap.fill":
             return .tiltRight
         default:
@@ -1179,6 +1179,7 @@ private struct HoverAnimatedCircleSymbol: View {
     let isHovering: Bool
 
     @State private var spinCycle = 0
+    @State private var feedbackCycle = 0
 
     private var motionKind: HoverAnimatedCircleSymbolKind {
         HoverAnimatedCircleSymbolKind.forSymbol(symbol)
@@ -1192,8 +1193,8 @@ private struct HoverAnimatedCircleSymbol: View {
         switch motionKind {
         case .gearSpin:
             return Double(spinCycle) * 360
-        case .tiltLeft:
-            return isHovering ? -8 : 0
+        case .helpBounce:
+            return isHovering ? -6 : 0
         case .tiltRight:
             return isHovering ? 7 : 0
         case .globeSpin, .none:
@@ -1218,9 +1219,16 @@ private struct HoverAnimatedCircleSymbol: View {
             return .easeInOut(duration: 0.58)
         case .globeSpin:
             return .easeInOut(duration: 0.72)
-        case .tiltLeft, .tiltRight, .none:
+        case .helpBounce, .tiltRight, .none:
             return nil
         }
+    }
+
+    private var hoverScale: CGFloat {
+        guard motionEnabled, isHovering else {
+            return 1
+        }
+        return motionKind == .helpBounce ? 1.1 : 1.06
     }
 
     var body: some View {
@@ -1232,14 +1240,20 @@ private struct HoverAnimatedCircleSymbol: View {
                 axis: (x: 0, y: 1, z: 0),
                 perspective: motionKind == .globeSpin ? 0.44 : 0
             )
-            .scaleEffect(motionEnabled && isHovering ? 1.06 : 1)
+            .scaleEffect(hoverScale)
+            .symbolEffect(.bounce, value: feedbackCycle)
             .animation(motionEnabled ? .spring(response: 0.22, dampingFraction: 0.72, blendDuration: 0.06) : nil, value: isHovering)
             .animation(spinAnimation, value: spinCycle)
             .onChange(of: isHovering) { _, hovering in
-                guard hovering && motionEnabled && motionKind.usesSpin else {
+                guard hovering && motionEnabled else {
                     return
                 }
-                spinCycle += 1
+                if motionKind.usesSpin {
+                    spinCycle += 1
+                }
+                if motionKind == .helpBounce {
+                    feedbackCycle += 1
+                }
             }
     }
 }
