@@ -188,7 +188,7 @@ struct ContentViewLayoutTests {
         let inputOrb = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct InputMethodQuickSwitchOrbButton: View {",
-            end: "private struct SessionInfoHintRow: View {"
+            end: "private struct SessionInfoHintPanel: View {"
         ))
 
         #expect(helperSection.contains("case \"gearshape.fill\", \"gearshape\": return .gearSpin"))
@@ -275,7 +275,7 @@ struct ContentViewLayoutTests {
         let normalizedOrb = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct InputMethodQuickSwitchOrbButton: View {",
-            end: "private struct SessionInfoHintRow: View {"
+            end: "private struct SessionInfoHintPanel: View {"
         ))
 
         #expect(normalizedCard.contains(".strokeBorder(Color.white.opacity(isHovering ? 0.16 : 0.10), lineWidth: 1)"))
@@ -349,7 +349,7 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func sessionHeaderKeepsTipInlineWithFileMetadata() throws {
+    func sessionInfoHintUsesFloatingDismissibleNotice() throws {
         let source = try contentViewSource()
         let sessionSection = normalizeWhitespace(try extractSection(
             from: source,
@@ -358,19 +358,35 @@ struct ContentViewLayoutTests {
         ))
         let hintSection = normalizeWhitespace(try extractSection(
             from: source,
-            start: "private struct SessionInfoHintRow: View {",
+            start: "private struct SessionInfoHintPanel: View {",
             end: "private struct TutorialCoachOverlay: View {"
         ))
 
         #expect(sessionSection.contains("private var sessionHeader: some View"))
-        #expect(sessionSection.contains("ViewThatFits(in: .horizontal)"))
         #expect(sessionSection.contains("sessionPathLabel"))
-        #expect(sessionSection.contains("sessionHint"))
+        #expect(sessionSection.contains("SessionInfoHintPanel("))
+        #expect(sessionSection.contains("canCycle: sessionInfoHints.count > 1"))
+        #expect(sessionSection.contains("onPrevious: { moveSessionHint(by: -1) }"))
+        #expect(sessionSection.contains("onNext: { moveSessionHint(by: 1) }"))
+        #expect(sessionSection.contains("onDismiss: { isSessionInfoHintDismissed = true }"))
+        #expect(sessionSection.contains(".transition(.move(edge: .top).combined(with: .opacity))"))
+        #expect(!sessionSection.contains("private var sessionHint"))
         #expect(!sessionSection.contains(".frame(maxWidth: 560, alignment: .leading)"))
-        #expect(hintSection.contains("Capsule(style: .continuous)"))
-        #expect(hintSection.contains(".font(.caption.weight(.semibold))"))
-        #expect(!hintSection.contains(".ultraThinMaterial"))
-        #expect(!hintSection.contains("LinearGradient("))
+        #expect(hintSection.contains("keyboard.fill"))
+        #expect(hintSection.contains("VisiData shortcut tip"))
+        #expect(hintSection.contains("VisiData 快捷键提示"))
+        #expect(hintSection.contains("Color.clear.background(.ultraThinMaterial)"))
+        #expect(hintSection.contains("LinearGradient("))
+        #expect(hintSection.contains("RoundedRectangle(cornerRadius: 16, style: .continuous)"))
+        #expect(hintSection.contains("SessionHintControlButton("))
+        #expect(hintSection.contains("systemImage: \"chevron.up\""))
+        #expect(hintSection.contains("systemImage: \"chevron.down\""))
+        #expect(hintSection.contains("systemImage: \"xmark\""))
+        #expect(hintSection.contains("hoverTint: Color.red.opacity(0.72)"))
+        #expect(hintSection.contains(".disabled(!canCycle)"))
+        #expect(hintSection.contains(".shadow(color: hoverTint.opacity(isHovering && isEnabled ? 0.32 : 0), radius: 10, y: 0)"))
+        #expect(hintSection.contains(".scaleEffect(isHovering && isEnabled ? 1.06 : 1)"))
+        #expect(hintSection.contains("action: onDismiss"))
     }
 
     @Test
@@ -714,7 +730,7 @@ struct ContentViewLayoutTests {
         let orbButton = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct InputMethodQuickSwitchOrbButton: View {",
-            end: "private struct SessionInfoHintRow: View {"
+            end: "private struct SessionInfoHintPanel: View {"
         ))
         let quietSurface = normalizeWhitespace(try extractSection(
             from: source,

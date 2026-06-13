@@ -2609,7 +2609,8 @@ private struct SessionDetailView: View {
     @ObservedObject var session: VisiDataSessionController
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @StateObject private var inputSourceMonitor = InputSourceMonitor()
-    @State private var sessionInfoHint = ""
+    @State private var sessionInfoHintIndex = 0
+    @State private var isSessionInfoHintDismissed = false
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
@@ -2620,7 +2621,18 @@ private struct SessionDetailView: View {
     }
 
     private var shouldShowSessionInfoHint: Bool {
-        !model.isTutorialActive && session.currentFileURL != nil && !sessionInfoHint.isEmpty
+        !model.isTutorialActive
+            && session.currentFileURL != nil
+            && !sessionInfoHint.isEmpty
+            && !isSessionInfoHintDismissed
+    }
+
+    private var sessionInfoHint: String {
+        let pool = sessionInfoHints
+        guard !pool.isEmpty else {
+            return ""
+        }
+        return pool[wrappedSessionInfoHintIndex(in: pool)]
     }
 
     private var sessionInfoHints: [String] {
@@ -2660,6 +2672,21 @@ private struct SessionDetailView: View {
                     )
                     .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
 
+                if shouldShowSessionInfoHint {
+                    SessionInfoHintPanel(
+                        isChinese: isChinese,
+                        message: sessionInfoHint,
+                        motionEnabled: motionEnabled,
+                        canCycle: sessionInfoHints.count > 1,
+                        onPrevious: { moveSessionHint(by: -1) },
+                        onNext: { moveSessionHint(by: 1) },
+                        onDismiss: { isSessionInfoHintDismissed = true }
+                    )
+                    .padding(.top, 16)
+                    .padding(.trailing, 16)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 if model.isTutorialActive, model.tutorialCurrentStep != nil {
                     TutorialCoachOverlay(model: model)
                         .padding(.top, 62)
@@ -2668,6 +2695,7 @@ private struct SessionDetailView: View {
                 }
             }
             .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.86, blendDuration: 0.12) : nil, value: model.isTutorialActive)
+            .animation(motionEnabled ? .spring(response: 0.32, dampingFraction: 0.88, blendDuration: 0.12) : nil, value: shouldShowSessionInfoHint)
 
             if let errorMessage = model.errorMessage {
                 MessageCard(
@@ -2700,35 +2728,59 @@ private struct SessionDetailView: View {
         .padding(.bottom, 20)
         .ignoresSafeArea(.container, edges: .top)
         .onAppear {
-            pickRandomSessionHint()
+            refreshSessionHint()
         }
         .onChange(of: session.currentFileURL?.path) { _, _ in
-            pickRandomSessionHint()
+            refreshSessionHint()
         }
         .onChange(of: isChinese) { _, _ in
-            pickRandomSessionHint()
+            refreshSessionHint()
         }
+    }
+
+    private func refreshSessionHint() {
+        isSessionInfoHintDismissed = false
+        pickRandomSessionHint()
     }
 
     private func pickRandomSessionHint() {
         let pool = sessionInfoHints
         guard !pool.isEmpty else {
-            sessionInfoHint = ""
+            sessionInfoHintIndex = 0
             return
         }
 
         if pool.count == 1 {
-            sessionInfoHint = pool[0]
+            sessionInfoHintIndex = 0
             return
         }
 
-        let current = sessionInfoHint
-        let next = pool.randomElement() ?? pool[0]
-        if next == current, let alternative = pool.first(where: { $0 != current }) {
-            sessionInfoHint = alternative
+        let currentIndex = wrappedSessionInfoHintIndex(in: pool)
+        let nextIndex = pool.indices.randomElement() ?? 0
+        if nextIndex == currentIndex, let alternativeIndex = pool.indices.first(where: { $0 != currentIndex }) {
+            sessionInfoHintIndex = alternativeIndex
         } else {
-            sessionInfoHint = next
+            sessionInfoHintIndex = nextIndex
         }
+    }
+
+    private func moveSessionHint(by offset: Int) {
+        let pool = sessionInfoHints
+        guard !pool.isEmpty else {
+            sessionInfoHintIndex = 0
+            return
+        }
+
+        let currentIndex = wrappedSessionInfoHintIndex(in: pool)
+        sessionInfoHintIndex = (currentIndex + offset + pool.count) % pool.count
+        isSessionInfoHintDismissed = false
+    }
+
+    private func wrappedSessionInfoHintIndex(in pool: [String]) -> Int {
+        guard !pool.isEmpty else {
+            return 0
+        }
+        return ((sessionInfoHintIndex % pool.count) + pool.count) % pool.count
     }
 
     private var sessionHeader: some View {
@@ -2756,18 +2808,7 @@ private struct SessionDetailView: View {
                 }
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 10) {
-                    sessionPathLabel
-                    Spacer(minLength: 12)
-                    sessionHint
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    sessionPathLabel
-                    sessionHint
-                }
-            }
+            sessionPathLabel
         }
     }
 
@@ -2779,16 +2820,6 @@ private struct SessionDetailView: View {
             .textSelection(.enabled)
     }
 
-    @ViewBuilder
-    private var sessionHint: some View {
-        if shouldShowSessionInfoHint {
-            SessionInfoHintRow(
-                isChinese: isChinese,
-                message: sessionInfoHint
-            )
-            .transition(AnyTransition.opacity.combined(with: .scale(scale: 0.98)))
-        }
-    }
 }
 
 private struct SessionHeaderActions: View {
@@ -3234,34 +3265,128 @@ private struct InputMethodQuickSwitchOrbButton: View {
     }
 }
 
-private struct SessionInfoHintRow: View {
+private struct SessionInfoHintPanel: View {
     let isChinese: Bool
     let message: String
+    let motionEnabled: Bool
+    let canCycle: Bool
+    let onPrevious: () -> Void
+    let onNext: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var isHovering = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 11, weight: .semibold))
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "keyboard.fill")
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
+                .frame(width: 34, height: 34)
+                .background(Color.accentColor.opacity(0.16), in: Circle())
 
-            Text(message)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(localizedText(isChinese, english: "VisiData shortcut tip", chinese: "VisiData 快捷键提示"))
+                    .font(.headline)
+                    .lineLimit(1)
+
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                SessionHintControlButton(
+                    systemImage: "chevron.up",
+                    helpText: localizedText(isChinese, english: "Previous tip", chinese: "上一条提示"),
+                    motionEnabled: motionEnabled,
+                    action: onPrevious
+                )
+                .disabled(!canCycle)
+
+                SessionHintControlButton(
+                    systemImage: "chevron.down",
+                    helpText: localizedText(isChinese, english: "Next tip", chinese: "下一条提示"),
+                    motionEnabled: motionEnabled,
+                    action: onNext
+                )
+                .disabled(!canCycle)
+            }
+
+            SessionHintControlButton(
+                systemImage: "xmark",
+                helpText: localizedText(isChinese, english: "Dismiss", chinese: "关闭提示"),
+                motionEnabled: motionEnabled,
+                hoverTint: Color.red.opacity(0.72),
+                action: onDismiss
+            )
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(
-            Capsule(style: .continuous)
-                .fill(Color.white.opacity(0.06))
-        )
+        .padding(12)
+        .frame(width: 440, alignment: .leading)
+        .background {
+            ZStack {
+                Color.clear.background(.ultraThinMaterial)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.10),
+                        Color.accentColor.opacity(0.12),
+                        Color.black.opacity(0.04),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
         .overlay(
-            Capsule(style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.white.opacity(isHovering ? 0.22 : 0.12), lineWidth: 1)
         )
+        .shadow(color: .black.opacity(0.22), radius: 20, y: 8)
+        .shadow(color: Color.accentColor.opacity(isHovering ? 0.16 : 0.06), radius: 24, y: 0)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
         .help(isChinese ? "随机提示" : "Random tip")
+    }
+}
+
+private struct SessionHintControlButton: View {
+    let systemImage: String
+    let helpText: String
+    let motionEnabled: Bool
+    var hoverTint: Color = Color.accentColor
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(isEnabled ? Color.white.opacity(0.92) : Color.secondary.opacity(0.55))
+                .frame(width: 28, height: 28)
+                .background {
+                    Circle()
+                        .fill(Color.white.opacity(isHovering && isEnabled ? 0.14 : 0.08))
+                }
+                .overlay(
+                    Circle()
+                        .strokeBorder(isHovering && isEnabled ? hoverTint.opacity(0.38) : Color.white.opacity(0.10), lineWidth: 1)
+                )
+                .shadow(color: hoverTint.opacity(isHovering && isEnabled ? 0.32 : 0), radius: 10, y: 0)
+                .scaleEffect(isHovering && isEnabled ? 1.06 : 1)
+        }
+        .buttonStyle(.plain)
+        .help(helpText)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .animation(motionEnabled ? .easeOut(duration: 0.16) : nil, value: isHovering)
     }
 }
 
