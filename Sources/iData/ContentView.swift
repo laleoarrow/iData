@@ -486,6 +486,17 @@ private struct SidebarHeaderCard: View {
             : nil
     }
 
+    private var expandedDetailsTransition: AnyTransition {
+        guard motionEnabled else {
+            return .identity
+        }
+
+        return .asymmetric(
+            insertion: .opacity.animation(.easeOut(duration: 0.12).delay(0.20)),
+            removal: .identity
+        )
+    }
+
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
     }
@@ -501,7 +512,7 @@ private struct SidebarHeaderCard: View {
 
                 expandedDetails
                     .padding(.leading, 60)
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
+                    .transition(expandedDetailsTransition)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)

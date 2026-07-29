@@ -3,33 +3,20 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.5</title>
-            <pubDate>Wed, 29 Jul 2026 12:58:55 +0800</pubDate>
+            <title>0.2.6</title>
+            <pubDate>Wed, 29 Jul 2026 14:53:14 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>25</sparkle:version>
-            <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
+            <sparkle:version>26</sparkle:version>
+            <sparkle:shortVersionString>0.2.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.5
+            <description sparkle:format="markdown"><![CDATA[## v0.2.6
 
-### Sidebar and Navigation
-- Added smoother, coordinated transitions when expanding or collapsing the sidebar.
-- Centered the collapsed App icon as the single expand target and removed the overlapping chevron control.
-- Made collapsed recent-file behavior predictable: clicking always opens the file, while Open, Pin, and Remove remain available from the context menu.
-- Stabilized the sidebar footer and header controls across narrow and expanded layouts.
-
-### Interface and Commands
-- Replaced the nested runtime and update cards with one quieter, responsive System Status section that matches the rest of the welcome screen.
-- Added native Open, Reopen, Session, Finder, Copy Path, Tutorial, and handoff commands with consistent keyboard shortcuts.
-- Improved the Open dialog so it remembers the last useful folder and handles supported selections consistently.
-
-### Reliability
-- Improved terminal launch and redraw coordination to prevent blank or stale VisiData content after first open, focus changes, and rapid file switching.
-- Expanded regression coverage for sidebar interactions, app commands, Open-dialog state, terminal measurement, and forced redraw behavior.
-
-### Distribution
-- Removed Finder metadata from ZIP archives, made checksum entries portable, and moved package/appcast staging files out of the repository.
+### Sidebar Responsiveness
+- Removed the title block's sideways motion during sidebar collapse so it no longer competes with the width transition.
+- Kept expansion clear and calm with a short delayed fade after the sidebar is nearly open.
+- Added regression coverage to prevent the sliding collapse animation from returning.
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.5/iData-v0.2.5-macos-universal.zip" length="4346635" type="application/octet-stream" sparkle:edSignature="vpFusSaxEB1sshJS+zgHHWkgERQX9ZQkw66ShEclBqia4j3g7ddto61VcmTxzA/It5bRrc1i7AMS/AlqnoftAQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.6/iData-v0.2.6-macos-universal.zip" length="4347016" type="application/octet-stream" sparkle:edSignature="qpPS0qoMc5tdJpev/r3P0/c0+7aP3TLrfy+TbwQK4Hg6dOCccoFR1xqA3b20whoY9x8hKoSyM35GCc7rXKhuAg=="/>
         </item>
     </channel>
 </rss>

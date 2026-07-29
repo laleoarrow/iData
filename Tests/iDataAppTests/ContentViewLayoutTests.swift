@@ -791,6 +791,22 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func sidebarHeaderDetailsDoNotSlideDuringCollapse() throws {
+        let source = try contentViewSource()
+        let headerSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarHeaderCard: View {",
+            end: "private struct SidebarFooter: View {"
+        ))
+
+        #expect(headerSection.contains("private var expandedDetailsTransition: AnyTransition"))
+        #expect(headerSection.contains("insertion: .opacity.animation("))
+        #expect(headerSection.contains("removal: .identity"))
+        #expect(headerSection.contains(".transition(expandedDetailsTransition)"))
+        #expect(!headerSection.contains(".move(edge: .leading)"))
+    }
+
+    @Test
     func glassAndHoverEffectsStayBehindReadableContent() throws {
         let source = try contentViewSource()
         let normalized = normalizeWhitespace(source)
