@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		A00000000000000000000021 /* iDataApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* iDataApp.swift */; };
 		A00000000000000000000022 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* ContentView.swift */; };
+		A00000000000000000000049 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000047 /* AppCommands.swift */; };
+		A0000000000000000000004A /* ContentViewSharedUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000048 /* ContentViewSharedUI.swift */; };
 		A00000000000000000000023 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000033 /* AppModel.swift */; };
 		A00000000000000000000024 /* PreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000034 /* PreferencesView.swift */; };
 		A00000000000000000000025 /* VisiDataLauncher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000035 /* VisiDataLauncher.swift */; };
@@ -28,6 +30,8 @@
 /* Begin PBXFileReference section */
 		A00000000000000000000031 /* iDataApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/iDataApp.swift; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000032 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/ContentView.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000047 /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/AppCommands.swift; sourceTree = SOURCE_ROOT; };
+		A00000000000000000000048 /* ContentViewSharedUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/ContentViewSharedUI.swift; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000033 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/AppModel.swift; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000034 /* PreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/PreferencesView.swift; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000035 /* VisiDataLauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/iData/VisiDataLauncher.swift; sourceTree = SOURCE_ROOT; };
@@ -72,6 +76,8 @@
 			children = (
 				A00000000000000000000031 /* iDataApp.swift */,
 				A00000000000000000000032 /* ContentView.swift */,
+				A00000000000000000000047 /* AppCommands.swift */,
+				A00000000000000000000048 /* ContentViewSharedUI.swift */,
 				A00000000000000000000033 /* AppModel.swift */,
 				A00000000000000000000034 /* PreferencesView.swift */,
 				A00000000000000000000035 /* VisiDataLauncher.swift */,
@@ -190,6 +196,8 @@
 			files = (
 				A00000000000000000000021 /* iDataApp.swift in Sources */,
 				A00000000000000000000022 /* ContentView.swift in Sources */,
+				A00000000000000000000049 /* AppCommands.swift in Sources */,
+				A0000000000000000000004A /* ContentViewSharedUI.swift in Sources */,
 				A00000000000000000000023 /* AppModel.swift in Sources */,
 				A00000000000000000000024 /* PreferencesView.swift in Sources */,
 				A00000000000000000000025 /* VisiDataLauncher.swift in Sources */,

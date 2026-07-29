@@ -304,6 +304,7 @@ struct EmbeddedTerminalViewTests {
         #expect(resizeMessages.count == 1)
         #expect(resizeMessages.first?.cols != nil)
         #expect(resizeMessages.first?.rows != nil)
+        #expect(resizeMessages.first?.force == true)
     }
 
     @Test
@@ -432,6 +433,7 @@ private struct TerminalMessage: Decodable {
     let type: String
     let cols: Int?
     let rows: Int?
+    let force: Bool?
 }
 
 @MainActor

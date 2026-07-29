@@ -138,14 +138,14 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             markSessionDisplayReadyIfPossible()
         }
 
-        func handleTerminalResize(cols: Int, rows: Int) {
+        func handleTerminalResize(cols: Int, rows: Int, force: Bool = false) {
             guard cols > 0, rows > 0 else {
                 return
             }
 
             didReceiveTerminalResize = true
-            terminalDebugTrace("terminal.resize cols=\(cols) rows=\(rows)")
-            session?.resize(cols: cols, rows: rows)
+            terminalDebugTrace("terminal.resize cols=\(cols) rows=\(rows) force=\(force)")
+            session?.resize(cols: cols, rows: rows, force: force)
             markSessionDisplayReadyIfPossible()
         }
 
@@ -197,7 +197,8 @@ struct EmbeddedTerminalView: NSViewRepresentable {
                     let cols = body["cols"] as? Int,
                     let rows = body["rows"] as? Int
                 {
-                    handleTerminalResize(cols: cols, rows: rows)
+                    let force = body["force"] as? Bool ?? false
+                    handleTerminalResize(cols: cols, rows: rows, force: force)
                 }
             case "debug":
                 if let message = body["message"] as? String {

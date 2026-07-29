@@ -221,6 +221,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var hasPresentedDisplay = false
     private var transcript = TerminalTranscript()
     private var requiresDisplayReset = true
+    private var needsRedrawAfterDisplayReady = false
     private var pendingOpenRequest: PendingOpenRequest?
     private var pendingLaunchTask: Task<Void, Never>?
     private var hasMeasuredDisplaySize = false
@@ -291,6 +292,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
         hasPresentedDisplay = true
         displaySink?.focusTerminalDisplay()
+        launchPendingOpenAfterDisplayReadyIfPossible()
     }
 
     @MainActor
@@ -330,6 +332,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         )
         transcript.reset()
         requiresDisplayReset = true
+        needsRedrawAfterDisplayReady = false
         outputGeneration &+= 1
         logger.info("session=\(String(describing: ObjectIdentifier(self)), privacy: .public) open file=\(fileURL.lastPathComponent, privacy: .public) generation=\(self.outputGeneration, privacy: .public) displayReady=\(self.isDisplayReady, privacy: .public)")
         terminalDebugTrace("session.open session=\(ObjectIdentifier(self)) file=\(fileURL.lastPathComponent) generation=\(self.outputGeneration) displayReady=\(self.isDisplayReady)")
@@ -342,10 +345,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             displaySink?.resetTerminalDisplay()
             hasMeasuredDisplaySize = false
         }
-        let shouldAwaitDisplayMeasurement = hasBoundDisplaySink
+        let canLaunchWithExistingMeasurement = hasMeasuredDisplaySize
 
         do {
-            if !shouldAwaitDisplayMeasurement {
+            if canLaunchWithExistingMeasurement {
                 try launchPendingOpenIfPossible()
             } else {
                 pendingLaunchTask = Task.detached(priority: .userInitiated) { [weak self] in
@@ -391,7 +394,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor
-    func resize(cols: Int, rows: Int) {
+    func resize(cols: Int, rows: Int, force: Bool = false) {
         guard cols > 0, rows > 0 else {
             return
         }
@@ -402,47 +405,46 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         let requestedSize = (normalizedCols, normalizedRows)
         let sizeChanged = requestedSize != lastKnownSize
         lastKnownSize = (normalizedCols, normalizedRows)
-        terminalDebugTrace("session.resize session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows) sizeChanged=\(sizeChanged)")
-
-        if pendingOpenRequest != nil, childPID == 0 {
-            pendingLaunchTask?.cancel()
-            pendingLaunchTask = nil
-            try? launchPendingOpenIfPossible()
-        }
+        terminalDebugTrace("session.resize session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows) sizeChanged=\(sizeChanged) force=\(force)")
 
         guard masterFileDescriptor >= 0 else {
             return
         }
 
-        if childPID > 0, launchedBeforeMeasuredDisplaySize {
+        let shouldForceRedrawAfterMeasuredResize = childPID > 0 && launchedBeforeMeasuredDisplaySize
+        if shouldForceRedrawAfterMeasuredResize {
             // The process was launched with a default size before the real
             // terminal measurement arrived. Discard any output that VisiData
             // painted for the stale default dimensions so that
             // presentInitialTranscript() does not replay misaligned frames.
-            // The ioctl + SIGWINCH below will tell VisiData the real size, but
-            // ncurses might only send a diff, leaving the table area blank.
-            // We enqueue a Ctrl+L (\u{0C}) to force a full redraw bypassing diffs.
             launchedBeforeMeasuredDisplaySize = false
             transcript.reset()
-            enqueuePTYWrite(Data("\u{0C}".utf8))
+            needsRedrawAfterDisplayReady = true
+        }
+
+        let shouldApplyWindowSize = sizeChanged || (force && needsRedrawAfterDisplayReady)
+
+        if shouldApplyWindowSize {
+            var windowSize = winsize(
+                ws_row: normalizedRows,
+                ws_col: normalizedCols,
+                ws_xpixel: 0,
+                ws_ypixel: 0
+            )
+
+            _ = ioctl(masterFileDescriptor, TIOCSWINSZ, &windowSize)
+
+            if childPID > 0 {
+                _ = signalSender(childPID, SIGWINCH)
+            }
+        }
+
+        if shouldForceRedrawAfterMeasuredResize {
             terminalDebugTrace("session.resize settleAfterFallbackLaunch session=\(ObjectIdentifier(self)) cols=\(normalizedCols) rows=\(normalizedRows)")
         }
 
-        guard sizeChanged else {
-            return
-        }
-
-        var windowSize = winsize(
-            ws_row: normalizedRows,
-            ws_col: normalizedCols,
-            ws_xpixel: 0,
-            ws_ypixel: 0
-        )
-
-        _ = ioctl(masterFileDescriptor, TIOCSWINSZ, &windowSize)
-
-        if childPID > 0 {
-            _ = signalSender(childPID, SIGWINCH)
+        if shouldApplyWindowSize {
+            sendPendingMeasuredDisplayRedrawIfReady()
         }
     }
 
@@ -716,6 +718,28 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
     }
 
+    @MainActor
+    private func launchPendingOpenAfterDisplayReadyIfPossible() {
+        guard pendingOpenRequest != nil, childPID == 0, hasMeasuredDisplaySize, isDisplayReady else {
+            return
+        }
+
+        pendingLaunchTask?.cancel()
+        pendingLaunchTask = nil
+        try? launchPendingOpenIfPossible()
+    }
+
+    @MainActor
+    private func sendPendingMeasuredDisplayRedrawIfReady() {
+        guard isDisplayReady, needsRedrawAfterDisplayReady, childPID > 0, masterFileDescriptor >= 0 else {
+            return
+        }
+
+        needsRedrawAfterDisplayReady = false
+        enqueuePTYWrite(Data("\u{0C}".utf8))
+        terminalDebugTrace("session.redrawAfterDisplayReady session=\(ObjectIdentifier(self))")
+    }
+
     private func handleProcessExit(pid: pid_t, generation: UInt64) {
         var exitStatus: Int32 = 0
         let exitedPID = waitpid(pid, &exitStatus, 0)
@@ -830,6 +854,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         let pid = childPID
         outputGeneration &+= 1
         launchedBeforeMeasuredDisplaySize = false
+        needsRedrawAfterDisplayReady = false
 
         if pid > 0 {
             processSource?.cancel()

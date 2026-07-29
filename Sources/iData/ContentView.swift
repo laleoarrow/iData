@@ -1,12 +1,11 @@
 import AppKit
-import Carbon.HIToolbox
 import SwiftUI
 
-private func localizedText(_ isChinese: Bool, english: String, chinese: String) -> String {
+func localizedText(_ isChinese: Bool, english: String, chinese: String) -> String {
     isChinese ? chinese : english
 }
 
-private func appShellLanguage() -> AppModel.AppResolvedLanguage {
+func appShellLanguage() -> AppModel.AppResolvedLanguage {
     AppModel.resolvedLanguage(defaults: .standard, preferredLanguagesProvider: { Locale.preferredLanguages })
 }
 
@@ -106,6 +105,10 @@ private struct SidebarView: View {
             : nil
     }
 
+    private var sidebarModeTransition: AnyTransition {
+        .opacity.combined(with: .scale(scale: 0.96, anchor: .leading))
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.clear
@@ -120,12 +123,14 @@ private struct SidebarView: View {
                                 isChinese: model.effectiveLanguage == .chinese,
                                 openAction: { model.openDocument() }
                             )
+                            .transition(sidebarModeTransition)
                         } else {
                             EmptySidebarState(
                                 isChinese: model.effectiveLanguage == .chinese,
                                 openAction: { model.openDocument() },
                                 tutorialAction: { model.presentTutorialHub() }
                             )
+                            .transition(sidebarModeTransition)
                         }
                     } else {
                         ScrollView(.vertical, showsIndicators: false) {
@@ -136,11 +141,15 @@ private struct SidebarView: View {
                                             CollapsedRecentFileRow(
                                                 fileURL: fileURL,
                                                 isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                                isPinned: model.isPinnedRecentFile(fileURL),
                                                 isHovering: recentFileHoverBinding(for: fileURL),
                                                 isChinese: model.effectiveLanguage == .chinese,
                                                 openAction: { model.openExternalFile(fileURL) },
+                                                togglePinAction: { model.togglePinnedRecentFile(fileURL) },
                                                 removeAction: { model.removeRecentFile(fileURL) }
                                             )
+                                            .id("collapsed-\(fileURL.standardizedFileURL.path)")
+                                            .transition(sidebarModeTransition)
                                         } else {
                                             RecentFileRow(
                                                 fileURL: fileURL,
@@ -152,14 +161,10 @@ private struct SidebarView: View {
                                                 togglePinAction: { model.togglePinnedRecentFile(fileURL) },
                                                 removeAction: { model.removeRecentFile(fileURL) }
                                             )
+                                            .id("expanded-\(fileURL.standardizedFileURL.path)")
+                                            .transition(sidebarModeTransition)
                                         }
                                     }
-                                    .transition(
-                                        .asymmetric(
-                                            insertion: .opacity.combined(with: .scale(scale: 0.96, anchor: .top)),
-                                            removal: .scale(scale: 0.96).combined(with: .opacity)
-                                        )
-                                    )
                                 }
                             }
                             .frame(maxWidth: .infinity)
@@ -242,6 +247,10 @@ private struct SidebarView: View {
         }
         .coordinateSpace(name: sidebarCoordinateSpace)
         .clipped()
+        .animation(listAnimation, value: model.isSidebarCollapsed)
+        .onChange(of: model.isSidebarCollapsed) { _, _ in
+            hoveredRecentFilePath = nil
+        }
     }
 
     private func recentFileHoverBinding(for fileURL: URL) -> Binding<Bool> {
@@ -465,18 +474,16 @@ private extension NSView {
 private struct SidebarHeaderCard: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @StateObject private var commandMonitor = CommandKeyMonitor()
     @State private var isHoveringCollapsedIcon = false
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
-    private var collapsedHeaderAction: AppModel.CollapsedSidebarHeaderAction {
-        AppModel.collapsedSidebarHeaderAction(
-            hasRecentFiles: !model.recentFiles.isEmpty,
-            isCommandPressed: commandMonitor.isCommandPressed
-        )
+    private var layoutAnimation: Animation? {
+        motionEnabled
+            ? .spring(response: 0.38, dampingFraction: 0.88, blendDuration: 0.14)
+            : nil
     }
 
     private var isChinese: Bool {
@@ -484,83 +491,88 @@ private struct SidebarHeaderCard: View {
     }
 
     var body: some View {
-        if model.isSidebarCollapsed {
-            collapsedBody
-        } else {
-            expandedBody
-                .padding(.horizontal, 2)
-                .padding(.vertical, 4)
-        }
-    }
-
-    private var expandedBody: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
+        ZStack(alignment: .topLeading) {
+            if model.isSidebarCollapsed {
+                collapsedExpandButton
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .transition(.opacity)
+            } else {
                 appIcon
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text("iData")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-
-                        Spacer(minLength: 0)
-
-                        if !model.recentFiles.isEmpty {
-                            Button(localizedText(isChinese, english: "Clear All", chinese: "清空全部")) {
-                                model.clearRecentFiles()
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                            .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
-                            .help(localizedText(isChinese, english: "Clear all recent file records", chinese: "清除所有最近文件记录"))
-                        }
-
-                        SidebarCollapseToggleButton(
-                            isCollapsed: false,
-                            isChinese: isChinese,
-                            motionEnabled: motionEnabled,
-                            action: { model.toggleSidebarCollapsed() }
-                        )
-                    }
-
-                    Text(localizedText(
-                        isChinese,
-                        english: "Native shell for large-table workflows with VisiData",
-                        chinese: "在原生 macOS 中轻松查看超大表格"
-                    ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                expandedDetails
+                    .padding(.leading, 60)
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
             }
+        }
+        .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
+        .padding(.horizontal, model.isSidebarCollapsed ? 0 : 2)
+        .padding(.vertical, model.isSidebarCollapsed ? 0 : 4)
+        .animation(layoutAnimation, value: model.isSidebarCollapsed)
+    }
+
+    private var expandedDetails: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text("iData")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+
+                Spacer(minLength: 0)
+
+                if !model.recentFiles.isEmpty {
+                    Button(localizedText(isChinese, english: "Clear All", chinese: "清空全部")) {
+                        model.clearRecentFiles()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
+                    .help(localizedText(isChinese, english: "Clear all recent file records", chinese: "清除所有最近文件记录"))
+                }
+
+                SidebarCollapseToggleButton(
+                    isChinese: isChinese,
+                    motionEnabled: motionEnabled,
+                    action: { model.setSidebarCollapsed(true) }
+                )
+            }
+
+            Text(localizedText(
+                isChinese,
+                english: "Native shell for large-table workflows with VisiData",
+                chinese: "在原生 macOS 中轻松查看超大表格"
+            ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var collapsedBody: some View {
-        HStack {
-            Spacer(minLength: 0)
+    private var collapsedExpandButton: some View {
+        Button {
+            model.setSidebarCollapsed(false)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(isHoveringCollapsedIcon ? 0.08 : 0))
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                Color.white.opacity(isHoveringCollapsedIcon ? 0.14 : 0),
+                                lineWidth: 1
+                            )
+                    )
 
-            Button {
-                if collapsedHeaderAction == .clearAll {
-                    model.clearRecentFiles()
-                } else {
-                    model.setSidebarCollapsed(false)
-                }
-            } label: {
-                CollapsedSidebarHeaderIconButton(
-                    isHovering: isHoveringCollapsedIcon,
-                    showsClearGlyph: commandMonitor.isCommandPressed && !model.recentFiles.isEmpty
-                ) {
-                    appIcon
-                }
+                appIcon
             }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                isHoveringCollapsedIcon = hovering
-            }
-
-            Spacer(minLength: 0)
+            .frame(width: 54, height: 54)
+            .contentShape(Circle())
         }
+        .buttonStyle(.plain)
+        .help(localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏"))
+        .accessibilityLabel(localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏"))
+        .onHover { hovering in
+            isHoveringCollapsedIcon = hovering
+        }
+        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHoveringCollapsedIcon)
     }
 
     private var appIcon: some View {
@@ -569,41 +581,7 @@ private struct SidebarHeaderCard: View {
             .aspectRatio(contentMode: .fit)
             .frame(width: 48, height: 48)
             .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
-    }
-}
-
-private struct CollapsedSidebarHeaderIconButton<Content: View>: View {
-    let isHovering: Bool
-    let showsClearGlyph: Bool
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        ZStack {
-            if isHovering {
-                Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                    )
-                    .transition(.opacity)
-            }
-
-            content
-                .opacity(showsClearGlyph ? 0 : 1)
-
-            if showsClearGlyph {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 42, height: 42)
-                    .background(Color.white.opacity(0.10), in: Circle())
-            }
-        }
-        .frame(width: 54, height: 54)
-        .contentShape(Circle())
-        .animation(.easeOut(duration: 0.18), value: isHovering)
-        .animation(.easeOut(duration: 0.18), value: showsClearGlyph)
+            .allowsHitTesting(false)
     }
 }
 
@@ -615,66 +593,53 @@ private struct SidebarFooter: View {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
+    private var layoutAnimation: Animation? {
+        motionEnabled
+            ? .spring(response: 0.38, dampingFraction: 0.88, blendDuration: 0.14)
+            : nil
+    }
+
+    private var footerLayout: AnyLayout {
+        if model.isSidebarCollapsed {
+            return AnyLayout(VStackLayout(spacing: 18))
+        }
+        return AnyLayout(HStackLayout(spacing: 18))
+    }
+
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
     }
 
     var body: some View {
-        Group {
-            if model.isSidebarCollapsed {
-                VStack(spacing: 18) {
-                    SettingsLink {
-                        SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
-
-                    Button {
-                        model.isHelpPresented = true
-                    } label: {
-                        SidebarFooterActionIcon(symbol: "questionmark.circle", motionEnabled: motionEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
-
-                    Button {
-                        model.presentTutorialHub()
-                    } label: {
-                        SidebarFooterActionIcon(symbol: "graduationcap.fill", motionEnabled: motionEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                HStack(spacing: 18) {
-                    SettingsLink {
-                        SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
-
-                    Button {
-                        model.isHelpPresented = true
-                    } label: {
-                        SidebarFooterActionIcon(symbol: "questionmark.circle", motionEnabled: motionEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
-
-                    Button {
-                        model.presentTutorialHub()
-                    } label: {
-                        SidebarFooterActionIcon(symbol: "graduationcap.fill", motionEnabled: motionEnabled)
-                    }
-                    .buttonStyle(.plain)
-                    .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
-
-                    Spacer(minLength: 0)
-                }
+        footerLayout {
+            SettingsLink {
+                SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
             }
+            .buttonStyle(.plain)
+            .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
+
+            Button {
+                model.isHelpPresented = true
+            } label: {
+                SidebarFooterActionIcon(symbol: "questionmark.circle", motionEnabled: motionEnabled)
+            }
+            .buttonStyle(.plain)
+            .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
+
+            Button {
+                model.presentTutorialHub()
+            } label: {
+                SidebarFooterActionIcon(symbol: "graduationcap.fill", motionEnabled: motionEnabled)
+            }
+            .buttonStyle(.plain)
+            .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
         }
+        .frame(
+            maxWidth: .infinity,
+            alignment: model.isSidebarCollapsed ? .center : .leading
+        )
         .foregroundStyle(.secondary)
+        .animation(layoutAnimation, value: model.isSidebarCollapsed)
     }
 }
 
@@ -841,6 +806,32 @@ private struct RecentFileRow: View {
             .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
         }
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contextMenu {
+            Button {
+                openAction()
+            } label: {
+                Label(localizedText(isChinese, english: "Open", chinese: "打开"), systemImage: "arrow.right.circle")
+            }
+
+            Button {
+                togglePinAction()
+            } label: {
+                Label(
+                    isPinned
+                        ? localizedText(isChinese, english: "Unpin", chinese: "取消置顶")
+                        : localizedText(isChinese, english: "Pin to Top", chinese: "置顶"),
+                    systemImage: isPinned ? "pin.slash" : "pin"
+                )
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                removeAction()
+            } label: {
+                Label(localizedText(isChinese, english: "Remove from Recents", chinese: "从最近文件中移除"), systemImage: "trash")
+            }
+        }
         .onHover { hovering in
             isHovering = hovering
         }
@@ -930,51 +921,70 @@ private struct RecentFileActionButton: View {
 private struct CollapsedRecentFileRow: View {
     let fileURL: URL
     let isActive: Bool
+    let isPinned: Bool
     @Binding var isHovering: Bool
     let isChinese: Bool
     let openAction: () -> Void
+    let togglePinAction: () -> Void
     let removeAction: () -> Void
 
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @StateObject private var commandMonitor = CommandKeyMonitor()
 
     private var motionEnabled: Bool {
         idataAnimationsEnabled && !accessibilityReduceMotion
-    }
-
-    private var isCommandHovering: Bool {
-        isHovering && commandMonitor.isCommandPressed
     }
 
     var body: some View {
         HStack {
             Spacer(minLength: 0)
 
-            Button(action: primaryAction) {
-                ZStack {
-                    Text(AppModel.collapsedRecentFileBadgeText(for: fileURL))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-                        .opacity(isCommandHovering ? 0 : 1)
-
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .opacity(isCommandHovering ? 1 : 0)
-                }
+            Button(action: openAction) {
+                Text(AppModel.collapsedRecentFileBadgeText(for: fileURL))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.primary)
                 .frame(width: 46, height: 46)
                 .frame(width: 54, height: 54)
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
-            .help(primaryHelpText)
+            .help(localizedText(
+                isChinese,
+                english: "Open \(fileURL.lastPathComponent) — right-click for more actions",
+                chinese: "打开 \(fileURL.lastPathComponent)；右键查看更多操作"
+            ))
             .background(backgroundStyle, in: Circle())
             .overlay(
                 Circle()
                     .strokeBorder(borderColor)
             )
             .contentShape(Circle())
+            .contextMenu {
+                Button {
+                    openAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Open", chinese: "打开"), systemImage: "arrow.right.circle")
+                }
+
+                Button {
+                    togglePinAction()
+                } label: {
+                    Label(
+                        isPinned
+                            ? localizedText(isChinese, english: "Unpin", chinese: "取消置顶")
+                            : localizedText(isChinese, english: "Pin to Top", chinese: "置顶"),
+                        systemImage: isPinned ? "pin.slash" : "pin"
+                    )
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    removeAction()
+                } label: {
+                    Label(localizedText(isChinese, english: "Remove from Recents", chinese: "从最近文件中移除"), systemImage: "trash")
+                }
+            }
             .onHover { hovering in
                 isHovering = hovering
             }
@@ -983,30 +993,6 @@ private struct CollapsedRecentFileRow: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private var primaryHelpText: String {
-        if isCommandHovering {
-            return localizedText(
-                isChinese,
-                english: "Remove \(fileURL.lastPathComponent) from recent files",
-                chinese: "从最近文件中移除 \(fileURL.lastPathComponent)"
-            )
-        }
-        return localizedText(
-            isChinese,
-            english: "Open \(fileURL.lastPathComponent)",
-            chinese: "打开 \(fileURL.lastPathComponent)"
-        )
-    }
-
-    private func primaryAction() {
-        switch collapsedRecentFilePrimaryAction(isCommandHovering: isCommandHovering) {
-        case .open:
-            openAction()
-        case .remove:
-            removeAction()
-        }
     }
 
     private var backgroundStyle: some ShapeStyle {
@@ -1039,17 +1025,7 @@ private struct CollapsedRecentFileRow: View {
     }
 }
 
-enum CollapsedRecentFilePrimaryAction: Equatable {
-    case open
-    case remove
-}
-
-func collapsedRecentFilePrimaryAction(isCommandHovering: Bool) -> CollapsedRecentFilePrimaryAction {
-    isCommandHovering ? .remove : .open
-}
-
 private struct SidebarCollapseToggleButton: View {
-    let isCollapsed: Bool
     let isChinese: Bool
     let motionEnabled: Bool
     let action: () -> Void
@@ -1057,7 +1033,7 @@ private struct SidebarCollapseToggleButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: isCollapsed ? "chevron.right" : "chevron.left")
+            Image(systemName: "chevron.left")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.secondary)
                 .frame(width: 30, height: 30)
@@ -1090,9 +1066,7 @@ private struct SidebarCollapseToggleButton: View {
                 }
         }
         .buttonStyle(.plain)
-        .help(isCollapsed
-            ? localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏")
-            : localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
+        .help(localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
         .onHover { hovering in
             isHovering = hovering
         }
@@ -1259,7 +1233,7 @@ enum SidebarHoverGlowStyle: Equatable {
     case circle
 }
 
-private struct SidebarHoverGlow: View {
+struct SidebarHoverGlow: View {
     let isVisible: Bool
     let style: SidebarHoverGlowStyle
 
@@ -1489,10 +1463,8 @@ private struct SessionStageView: View {
         Group {
             if isSessionReady {
                 SessionDetailView(model: model, session: session)
-                    .transition(.opacity)
             } else {
                 WelcomeDetailView(model: model, updater: updater)
-                    .transition(.opacity)
             }
         }
         .animation(motionEnabled ? .easeInOut(duration: 0.22) : nil, value: isSessionReady)
@@ -1974,7 +1946,7 @@ private struct WelcomeDetailView: View {
                 }
                 quickTipsCard
                 tutorialEntryCard
-                summaryCards
+                systemStatusSection
                 formatsCard
 
                 if let errorMessage = model.errorMessage {
@@ -2369,28 +2341,79 @@ private struct WelcomeDetailView: View {
         }
     }
 
-    private var summaryCards: some View {
-        HStack(alignment: .top, spacing: 14) {
-            SummaryCard(
-                title: localizedText(isChinese, english: "Runtime", chinese: "运行环境"),
-                icon: "waveform.path.ecg.rectangle",
-                detail: localizedText(
-                    isChinese,
-                    english: "\(model.visiDataDependencySummary) Automatic format detection enabled. Compressed .gz/.bgz streams are natively supported.",
-                    chinese: "\(model.visiDataDependencySummary) 格式自动识别已启用，且原生支持读取 .gz / .bgz 等各类压缩数据流。"
-                )
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    private var systemStatusSection: some View {
+        let runtimeDetail = localizedText(
+            isChinese,
+            english: "\(model.visiDataDependencySummary) Automatic format detection enabled. Compressed .gz/.bgz streams are natively supported.",
+            chinese: "\(model.visiDataDependencySummary) 格式自动识别已启用，且原生支持读取 .gz / .bgz 等各类压缩数据流。"
+        )
 
-            SummaryCard(
-                title: localizedText(isChinese, english: "Updates", chinese: "更新"),
-                icon: "square.and.arrow.down",
-                detail: updater.statusMessage
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        return VStack(alignment: .leading, spacing: 20) {
+            Text(localizedText(isChinese, english: "System Status", chinese: "系统状态"))
+                .font(.title3.weight(.semibold))
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 36) {
+                    systemStatusItem(
+                        title: localizedText(isChinese, english: "Runtime", chinese: "运行环境"),
+                        icon: "terminal",
+                        detail: runtimeDetail
+                    )
+
+                    Divider()
+                        .padding(.vertical, 6)
+
+                    systemStatusItem(
+                        title: localizedText(isChinese, english: "Updates", chinese: "更新"),
+                        icon: "arrow.triangle.2.circlepath",
+                        detail: updater.statusMessage
+                    )
+                }
+                .frame(minHeight: 104, alignment: .top)
+
+                VStack(alignment: .leading, spacing: 18) {
+                    systemStatusItem(
+                        title: localizedText(isChinese, english: "Runtime", chinese: "运行环境"),
+                        icon: "terminal",
+                        detail: runtimeDetail
+                    )
+
+                    Divider()
+
+                    systemStatusItem(
+                        title: localizedText(isChinese, english: "Updates", chinese: "更新"),
+                        icon: "arrow.triangle.2.circlepath",
+                        detail: updater.statusMessage
+                    )
+                }
+            }
         }
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
+    }
+
+    private func systemStatusItem(title: String, icon: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 30, alignment: .center)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+
+                Text(detail)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var quickTipsCard: some View {
@@ -3578,469 +3601,3 @@ private let detailBackground = LinearGradient(
     startPoint: .topLeading,
     endPoint: .bottomTrailing
 )
-
-struct GlassCardModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    func body(content: Content) -> some View {
-        content
-            .padding(24)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.4), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 16, x: 0, y: 8)
-    }
-}
-
-extension View {
-    func glassCard() -> some View {
-        self.modifier(GlassCardModifier())
-    }
-}
-
-struct IDataAnimationsEnabledKey: EnvironmentKey {
-    static let defaultValue = true
-}
-
-extension EnvironmentValues {
-    var idataAnimationsEnabled: Bool {
-        get { self[IDataAnimationsEnabledKey.self] }
-        set { self[IDataAnimationsEnabledKey.self] = newValue }
-    }
-}
-
-final class CommandKeyMonitor: ObservableObject {
-    @Published var isCommandPressed = NSEvent.modifierFlags.contains(.command)
-
-    private var localMonitor: Any?
-
-    init() {
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.isCommandPressed = event.modifierFlags.contains(.command)
-            return event
-        }
-    }
-
-    deinit {
-        if let localMonitor {
-            NSEvent.removeMonitor(localMonitor)
-        }
-    }
-}
-
-final class InputSourceMonitor: NSObject, ObservableObject {
-    @Published private(set) var displayName = localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
-    @Published private(set) var isLikelyEnglish = false
-
-    private let notificationName = Notification.Name(rawValue: kTISNotifySelectedKeyboardInputSourceChanged as String)
-
-    override init() {
-        super.init()
-        refreshCurrentInputSource()
-
-        DistributedNotificationCenter.default().addObserver(
-            self,
-            selector: #selector(handleInputSourceDidChange),
-            name: notificationName,
-            object: nil
-        )
-    }
-
-    deinit {
-        DistributedNotificationCenter.default().removeObserver(self, name: notificationName, object: nil)
-    }
-
-    @objc
-    private func handleInputSourceDidChange(_: Notification) {
-        refreshCurrentInputSource()
-    }
-
-    @objc
-    private func refreshCurrentInputSourceOnMainThread() {
-        refreshCurrentInputSource()
-    }
-
-    private func refreshCurrentInputSource() {
-        if !Thread.isMainThread {
-            performSelector(onMainThread: #selector(refreshCurrentInputSourceOnMainThread), with: nil, waitUntilDone: false)
-            return
-        }
-
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else {
-            displayName = localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
-            isLikelyEnglish = false
-            return
-        }
-
-        let localizedName = Self.readInputSourceString(source: source, key: kTISPropertyLocalizedName) ?? localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
-        let sourceID = Self.readInputSourceString(source: source, key: kTISPropertyInputSourceID) ?? ""
-        let inputModeID = Self.readInputSourceString(source: source, key: kTISPropertyInputModeID) ?? ""
-
-        displayName = localizedName
-        isLikelyEnglish = Self.looksEnglish(sourceID: sourceID, inputModeID: inputModeID, localizedName: localizedName)
-    }
-
-    private static func readInputSourceString(source: TISInputSource, key: CFString) -> String? {
-        guard let rawValue = TISGetInputSourceProperty(source, key) else {
-            return nil
-        }
-
-        let value = Unmanaged<CFTypeRef>.fromOpaque(rawValue).takeUnretainedValue()
-        guard CFGetTypeID(value) == CFStringGetTypeID() else {
-            return nil
-        }
-
-        return value as? String
-    }
-
-    static func looksEnglish(sourceID: String, inputModeID: String, localizedName: String) -> Bool {
-        let source = sourceID.lowercased()
-        let mode = inputModeID.lowercased()
-        let name = localizedName.lowercased()
-
-        if source.contains("com.apple.keylayout.abc") || source.contains("com.apple.keylayout.us") {
-            return true
-        }
-
-        if source.hasSuffix(".abc") || source.hasSuffix(".u.s") || source.hasSuffix(".us") {
-            return true
-        }
-
-        if mode.contains("roman") || mode.contains("ascii") || mode.contains("latin") || mode.contains("english") {
-            return true
-        }
-
-        return name == "abc" || name == "u.s." || name == "us" || name.contains("english")
-    }
-
-    @discardableResult
-    func switchToEnglishInputSource() -> Bool {
-        let sources = TISCreateInputSourceList(nil, false).takeRetainedValue() as NSArray
-        var bestCandidate: TISInputSource?
-        var bestScore = Int.min
-
-        for rawSource in sources {
-            let source = rawSource as! TISInputSource
-            guard Self.isSelectCapable(source: source) else {
-                continue
-            }
-
-            let sourceID = Self.readInputSourceString(source: source, key: kTISPropertyInputSourceID) ?? ""
-            let inputModeID = Self.readInputSourceString(source: source, key: kTISPropertyInputModeID) ?? ""
-            let localizedName = Self.readInputSourceString(source: source, key: kTISPropertyLocalizedName) ?? ""
-            let score = Self.englishInputSourceScore(sourceID: sourceID, inputModeID: inputModeID, localizedName: localizedName)
-            guard score > bestScore else {
-                continue
-            }
-            bestScore = score
-            bestCandidate = source
-        }
-
-        guard let bestCandidate, Self.shouldSelectEnglishCandidate(score: bestScore) else {
-            return false
-        }
-
-        let status = TISSelectInputSource(bestCandidate)
-        if status == noErr {
-            refreshCurrentInputSource()
-            return true
-        }
-
-        return false
-    }
-
-    static func englishInputSourceScore(sourceID: String, inputModeID: String, localizedName: String) -> Int {
-        let source = sourceID.lowercased()
-        let mode = inputModeID.lowercased()
-        let name = localizedName.lowercased()
-
-        if source.contains("com.apple.keylayout.abc") {
-            return 500
-        }
-        if source.contains("com.apple.keylayout.us") {
-            return 450
-        }
-        if source.contains("abc") {
-            return 420
-        }
-        if source.hasSuffix(".u.s") || source.hasSuffix(".us") {
-            return 390
-        }
-        if mode.contains("roman") || mode.contains("ascii") || mode.contains("latin") || mode.contains("english") {
-            return 320
-        }
-        if name == "abc" || name == "u.s." || name == "us" || name.contains("english") {
-            return 260
-        }
-        return -1000
-    }
-
-    static func shouldSelectEnglishCandidate(score: Int) -> Bool {
-        score > 0
-    }
-
-    private static func isSelectCapable(source: TISInputSource) -> Bool {
-        guard let rawValue = TISGetInputSourceProperty(source, kTISPropertyInputSourceIsSelectCapable) else {
-            return false
-        }
-
-        let value = Unmanaged<CFTypeRef>.fromOpaque(rawValue).takeUnretainedValue()
-        guard CFGetTypeID(value) == CFBooleanGetTypeID() else {
-            return false
-        }
-
-        return CFBooleanGetValue((value as! CFBoolean))
-    }
-}
-
-private struct QuietInteractiveSurfaceModifier: ViewModifier {
-    let enabled: Bool
-    let hoverScale: CGFloat
-    let hoverYOffset: CGFloat
-    let shadowOpacity: Double
-    let shadowRadius: CGFloat
-    let glowStyle: SidebarHoverGlowStyle
-
-    @State private var isHovering = false
-
-    func body(content: Content) -> some View {
-        content
-            .background {
-                SidebarHoverGlow(
-                    isVisible: enabled && isHovering,
-                    style: glowStyle
-                )
-            }
-            .scaleEffect(enabled && isHovering ? hoverScale : 1)
-            .offset(y: enabled && isHovering ? hoverYOffset : 0)
-            .shadow(
-                color: .black.opacity(enabled && isHovering ? shadowOpacity : 0),
-                radius: enabled && isHovering ? shadowRadius : 0,
-                y: enabled && isHovering ? max(2, shadowRadius * 0.35) : 0
-            )
-            .animation(enabled ? .easeOut(duration: 0.24) : nil, value: isHovering)
-            .onHover { hovering in
-                isHovering = enabled && hovering
-            }
-    }
-}
-
-extension View {
-    func quietInteractiveSurface(
-        enabled: Bool,
-        hoverScale: CGFloat = 1.01,
-        hoverYOffset: CGFloat = -1.5,
-        shadowOpacity: Double = 0.14,
-        shadowRadius: CGFloat = 16,
-        glowStyle: SidebarHoverGlowStyle = .none
-    ) -> some View {
-        modifier(
-            QuietInteractiveSurfaceModifier(
-                enabled: enabled,
-                hoverScale: hoverScale,
-                hoverYOffset: hoverYOffset,
-                shadowOpacity: shadowOpacity,
-                shadowRadius: shadowRadius,
-                glowStyle: glowStyle
-            )
-        )
-    }
-}
-
-struct VersionPill: View {
-    @ObservedObject var model: AppModel
-    let tint: Color
-    var icon: String? = "shippingbox"
-
-    var body: some View {
-        HStack(spacing: 7) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-            }
-
-            Text(model.appVersionSummary)
-                .font(.subheadline.weight(.semibold))
-        }
-        .lineLimit(1)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(tint, in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.white.opacity(0.04))
-        )
-        .quietInteractiveSurface(enabled: false)
-    }
-}
-
-private struct StatusPill: View {
-    let title: String
-    let tint: Color
-    var icon: String? = nil
-    @Environment(\EnvironmentValues.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-            }
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(tint, in: Capsule())
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.012,
-            hoverYOffset: -0.5,
-            shadowOpacity: 0.08,
-            shadowRadius: 8
-        )
-    }
-}
-
-private struct SummaryCard: View {
-    let title: String
-    let icon: String
-    let detail: String
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: icon)
-                .font(.headline)
-
-            Text(detail)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .glassCard()
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.008,
-            hoverYOffset: -1,
-            shadowOpacity: 0.08,
-            shadowRadius: 12
-        )
-    }
-}
-
-private struct FormatChip: View {
-    let title: String
-    let extensionText: String
-    let isDefault: Bool
-    let isLoading: Bool
-    let isChinese: Bool
-    let onTap: () -> Void
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
-    private var statusRow: some View {
-        HStack(spacing: 4) {
-            if isLoading {
-                ProgressView()
-                    .scaleEffect(0.5)
-                    .frame(width: 12, height: 12)
-                Text(localizedText(isChinese, english: "Setting...", chinese: "正在设置..."))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            } else {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 6, height: 6)
-                    .opacity(isDefault ? 1 : 0)
-                Text(localizedText(isChinese, english: "Default", chinese: "默认"))
-                    .font(.caption2)
-                    .foregroundStyle(.green)
-                    .opacity(isDefault ? 1 : 0)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 14, alignment: .leading)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-            Text(".\(extensionText)")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-            statusRow
-        }
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(isDefault ? Color.green.opacity(0.3) : Color.white.opacity(0.06))
-        )
-        .overlay(alignment: .bottom) {
-            if isDefault && !isLoading {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.green)
-                    .frame(height: 3)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if !isLoading {
-                onTap()
-            }
-        }
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.012,
-            hoverYOffset: -1,
-            shadowOpacity: 0.06,
-            shadowRadius: 8
-        )
-        .animation(.easeInOut(duration: 0.2), value: isDefault)
-    }
-}
-
-private struct QuickTip: Identifiable {
-    let id = UUID()
-    let keys: String
-    let title: String
-    let detail: String
-}
-
-private struct MessageCard: View {
-    let title: String
-    let message: String
-    let color: Color
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(message)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        .glassCard()
-        .background(color.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.006,
-            hoverYOffset: -0.5,
-            shadowOpacity: 0.05,
-            shadowRadius: 8
-        )
-    }
-}

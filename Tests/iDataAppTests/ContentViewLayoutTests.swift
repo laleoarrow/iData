@@ -111,11 +111,11 @@ struct ContentViewLayoutTests {
         let source = try contentViewSource()
         let glowSection = normalizeWhitespace(try extractSection(
             from: source,
-            start: "private struct SidebarHoverGlow: View {",
+            start: "struct SidebarHoverGlow: View {",
             end: "private struct SidebarHoverTrackingRegion: NSViewRepresentable {"
         ))
 
-        #expect(source.contains("private struct SidebarHoverGlow"))
+        #expect(source.contains("struct SidebarHoverGlow"))
         #expect(glowSection.contains("Color(red: 1.0, green: 0.86, blue: 0.26)"))
         #expect(glowSection.contains("Color(red: 0.23, green: 0.58, blue: 1.0)"))
         #expect(!glowSection.contains(".scaleEffect(1.08)"))
@@ -136,7 +136,7 @@ struct ContentViewLayoutTests {
         let collapsedRow = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct CollapsedRecentFileRow: View {",
-            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+            end: "private struct SidebarCollapseToggleButton: View {"
         ))
 
         #expect(expandedRow.contains(".strokeBorder(borderColor)"))
@@ -226,17 +226,12 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func collapsedSidebarHeaderHoverStaysInsideSidebarBounds() throws {
+    func collapsedSidebarHeaderUsesCenteredIconButtonWithoutChevron() throws {
         let source = try contentViewSource()
         let normalized = normalizeWhitespace(source)
         let sidebarHeaderSection = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct SidebarHeaderCard: View {",
-            end: "private struct CollapsedSidebarHeaderIconButton<Content: View>: View {"
-        ))
-        let collapsedHeaderSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private struct CollapsedSidebarHeaderIconButton<Content: View>: View {",
             end: "private struct SidebarFooter: View {"
         ))
 
@@ -246,22 +241,21 @@ struct ContentViewLayoutTests {
             .frame(maxHeight: .infinity)
         """)))
         #expect(normalized.contains(".clipped()"))
-        #expect(normalized.contains("private struct CollapsedSidebarHeaderIconButton<Content: View>: View"))
         #expect(sidebarHeaderSection.contains(normalizeWhitespace("""
         if model.isSidebarCollapsed {
-            collapsedBody
-        } else {
-            expandedBody
-                .padding(.horizontal, 2)
-                .padding(.vertical, 4)
+            collapsedExpandButton
+                .frame(maxWidth: .infinity, alignment: .center)
+                .transition(.opacity)
         """)))
-        #expect(collapsedHeaderSection.contains("Circle()"))
-        #expect(collapsedHeaderSection.contains("if isHovering { Circle()"))
-        #expect(collapsedHeaderSection.contains(".frame(width: 54, height: 54)"))
-        #expect(!collapsedHeaderSection.contains("Color.white.opacity(0.04)"))
-        #expect(!collapsedHeaderSection.contains("Color.white.opacity(0.02)"))
-        #expect(!collapsedHeaderSection.contains("RoundedRectangle(cornerRadius: 14"))
-        #expect(!collapsedHeaderSection.contains("SidebarHoverTrackingRegion"))
+        #expect(sidebarHeaderSection.contains("ZStack { Circle()"))
+        #expect(sidebarHeaderSection.contains("appIcon"))
+        #expect(sidebarHeaderSection.contains(".frame(width: 54, height: 54)"))
+        #expect(sidebarHeaderSection.contains("model.setSidebarCollapsed(false)"))
+        #expect(!sidebarHeaderSection.contains("Image(systemName: \"chevron.right\")"))
+        #expect(!sidebarHeaderSection.contains(".offset(x: 3)"))
+        #expect(!sidebarHeaderSection.contains("CommandKeyMonitor"))
+        #expect(!sidebarHeaderSection.contains("model.clearRecentFiles() } else"))
+        #expect(!sidebarHeaderSection.contains("SidebarHoverTrackingRegion"))
     }
 
     @Test
@@ -607,9 +601,9 @@ struct ContentViewLayoutTests {
             start: "private var tutorialEntryCard: some View {",
             end: "private func startCarouselTimer()"
         ))
-        let summarySection = normalizeWhitespace(try extractSection(
+        let statusSection = normalizeWhitespace(try extractSection(
             from: source,
-            start: "private var summaryCards: some View {",
+            start: "private var systemStatusSection: some View {",
             end: "private var quickTipsCard: some View {"
         ))
         let quickTipsSection = normalizeWhitespace(try extractSection(
@@ -623,9 +617,33 @@ struct ContentViewLayoutTests {
             end: "private struct SessionDetailView: View {"
         ))
 
-        for section in [firstRunSection, tutorialSection, summarySection, quickTipsSection, formatsSection] {
+        for section in [firstRunSection, tutorialSection, statusSection, quickTipsSection, formatsSection] {
             #expect(section.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
         }
+    }
+
+    @Test
+    func systemStatusUsesASingleLayerReadOnlyCard() throws {
+        let source = try contentViewSource()
+        let statusSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private var systemStatusSection: some View {",
+            end: "private var quickTipsCard: some View {"
+        ))
+
+        #expect(statusSection.contains("System Status"))
+        #expect(statusSection.contains("系统状态"))
+        #expect(statusSection.contains("ViewThatFits(in: .horizontal)"))
+        #expect(statusSection.contains("Divider()"))
+        #expect(statusSection.contains("private func systemStatusItem"))
+        #expect(statusSection.contains("icon: \"terminal\""))
+        #expect(statusSection.contains("icon: \"arrow.triangle.2.circlepath\""))
+        #expect(statusSection.contains(".font(.title3.weight(.semibold))"))
+        #expect(statusSection.contains(".font(.body)"))
+        #expect(statusSection.contains(".frame(minHeight: 104, alignment: .top)"))
+        #expect(statusSection.components(separatedBy: ".glassCard()").count == 2)
+        #expect(!statusSection.contains(".quietInteractiveSurface("))
+        #expect(!statusSection.contains("RoundedRectangle("))
     }
 
     @Test
@@ -669,7 +687,7 @@ struct ContentViewLayoutTests {
         let collapsedRow = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct CollapsedRecentFileRow: View {",
-            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+            end: "private struct SidebarCollapseToggleButton: View {"
         ))
 
         #expect(!expandedRow.contains(".shadow("))
@@ -687,7 +705,7 @@ struct ContentViewLayoutTests {
         let collapsedRow = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct CollapsedRecentFileRow: View {",
-            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+            end: "private struct SidebarCollapseToggleButton: View {"
         ))
 
         #expect(expandedRow.contains(".onHover { hovering in"))
@@ -707,15 +725,69 @@ struct ContentViewLayoutTests {
         let collapsedRow = normalizeWhitespace(try extractSection(
             from: source,
             start: "private struct CollapsedRecentFileRow: View {",
-            end: "enum CollapsedRecentFilePrimaryAction: Equatable {"
+            end: "private struct SidebarCollapseToggleButton: View {"
         ))
 
-        #expect(collapsedRow.contains("HStack { Spacer(minLength: 0) Button(action: primaryAction) {"))
+        #expect(collapsedRow.contains("HStack { Spacer(minLength: 0) Button(action: openAction) {"))
         #expect(collapsedRow.contains(".frame(width: 46, height: 46) .frame(width: 54, height: 54) .contentShape(Circle())"))
         #expect(collapsedRow.contains(".buttonStyle(.plain)"))
         #expect(collapsedRow.contains(".background(backgroundStyle, in: Circle())"))
         #expect(collapsedRow.contains(".frame(maxWidth: .infinity)"))
         #expect(!collapsedRow.contains(".frame(maxWidth: .infinity) .contentShape(Circle())"))
+    }
+
+    @Test
+    func collapsedSidebarButtonsKeepStableActions() throws {
+        let source = try contentViewSource()
+        let sidebarHeaderSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarHeaderCard: View {",
+            end: "private struct SidebarFooter: View {"
+        ))
+        let collapsedRow = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct CollapsedRecentFileRow: View {",
+            end: "private struct SidebarCollapseToggleButton: View {"
+        ))
+
+        #expect(sidebarHeaderSection.contains("private var collapsedExpandButton: some View"))
+        #expect(sidebarHeaderSection.contains("model.setSidebarCollapsed(false)"))
+        #expect(!sidebarHeaderSection.contains("CommandKeyMonitor"))
+        #expect(collapsedRow.contains("Button(action: openAction)"))
+        #expect(collapsedRow.contains(".contextMenu {"))
+        #expect(collapsedRow.contains("Button(role: .destructive)"))
+        #expect(collapsedRow.contains("togglePinAction()"))
+        #expect(!collapsedRow.contains("CommandKeyMonitor"))
+        #expect(!source.contains("collapsedRecentFilePrimaryAction"))
+    }
+
+    @Test
+    func sidebarModeChangesAnimateWidthContentAndFooterLayout() throws {
+        let source = try contentViewSource()
+        let normalized = normalizeWhitespace(source)
+        let sidebarSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarView: View {",
+            end: "private struct SidebarHeaderCard: View {"
+        ))
+        let headerSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarHeaderCard: View {",
+            end: "private struct SidebarFooter: View {"
+        ))
+        let footerSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct SidebarFooter: View {",
+            end: "private struct EmptySidebarState: View {"
+        ))
+
+        #expect(normalized.contains(".animation(sidebarLayoutAnimation, value: model.isSidebarCollapsed)"))
+        #expect(sidebarSection.contains(".animation(listAnimation, value: model.isSidebarCollapsed)"))
+        #expect(sidebarSection.contains(".transition(sidebarModeTransition)"))
+        #expect(headerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
+        #expect(footerSection.contains("AnyLayout(VStackLayout(spacing: 18))"))
+        #expect(footerSection.contains("AnyLayout(HStackLayout(spacing: 18))"))
+        #expect(footerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
     }
 
     @Test
@@ -761,8 +833,15 @@ private func contentViewSource(filePath: StaticString = #filePath) throws -> Str
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let contentViewURL = repositoryRoot.appendingPathComponent("Sources/iData/ContentView.swift")
-    return try String(contentsOf: contentViewURL, encoding: .utf8)
+    return try [
+        "Sources/iData/ContentView.swift",
+        "Sources/iData/ContentViewSharedUI.swift",
+    ]
+    .map { relativePath in
+        let sourceURL = repositoryRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: sourceURL, encoding: .utf8)
+    }
+    .joined(separator: "\n")
 }
 
 private func normalizeWhitespace(_ value: String) -> String {

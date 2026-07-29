@@ -6,7 +6,7 @@ VERSION=${1:-0.2.1}
 APP_DIR="$ROOT_DIR/dist/iData.app"
 PKG_NAME="iData-v${VERSION}-macos-universal.pkg"
 FINAL_PKG="$ROOT_DIR/dist/$PKG_NAME"
-PKG_WORK_DIR="$ROOT_DIR/dist/pkg"
+PKG_WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/idata-pkg.XXXXXX")
 PKG_ROOT="$PKG_WORK_DIR/root"
 COMPONENT_PKG="$PKG_WORK_DIR/iData-app-component.pkg"
 PRODUCT_ID="io.github.leoarrow.idata.installer"
@@ -16,13 +16,17 @@ INSTALLER_IDENTITY=${IDATA_DEVELOPER_ID_INSTALLER:-}
 
 export COPYFILE_DISABLE=1
 
+cleanup() {
+  rm -rf "$PKG_WORK_DIR"
+}
+trap cleanup EXIT
+
 if [[ ! -d "$APP_DIR" ]]; then
   echo "missing app bundle: $APP_DIR" >&2
   echo "build the release app first with ./scripts/build_app.sh" >&2
   exit 1
 fi
 
-rm -rf "$PKG_WORK_DIR"
 mkdir -p "$PKG_ROOT/Applications"
 
 ditto --noextattr --noqtn "$APP_DIR" "$PKG_ROOT/Applications/iData.app"

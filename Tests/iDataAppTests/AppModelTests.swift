@@ -33,6 +33,33 @@ struct AppModelTests {
     }
 
     @Test
+    func openPanelStartDirectoryPrefersStoredDirectoryThenLastFileParent() {
+        let storedPath = "/tmp/idata-open-stored"
+        let lastFile = URL(fileURLWithPath: "/tmp/idata-open-last/sample.tsv")
+
+        let storedDirectory = AppModel.openPanelDirectoryURL(
+            storedPath: storedPath,
+            lastOpenedFile: lastFile,
+            directoryExists: { $0 == storedPath || $0 == "/tmp/idata-open-last" }
+        )
+        #expect(storedDirectory?.path == storedPath)
+
+        let fallbackDirectory = AppModel.openPanelDirectoryURL(
+            storedPath: "/tmp/missing",
+            lastOpenedFile: lastFile,
+            directoryExists: { $0 == "/tmp/idata-open-last" }
+        )
+        #expect(fallbackDirectory?.path == "/tmp/idata-open-last")
+
+        let missingDirectory = AppModel.openPanelDirectoryURL(
+            storedPath: "/tmp/missing",
+            lastOpenedFile: lastFile,
+            directoryExists: { _ in false }
+        )
+        #expect(missingDirectory == nil)
+    }
+
+    @Test
     func smallSupportedFileForwardsToAlternateApplication() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1232,13 +1259,6 @@ struct AppModelTests {
     }
 
     @Test
-    func collapsedSidebarHeaderActionRequiresCommandForClearAll() {
-        #expect(AppModel.collapsedSidebarHeaderAction(hasRecentFiles: true, isCommandPressed: false) == .expand)
-        #expect(AppModel.collapsedSidebarHeaderAction(hasRecentFiles: true, isCommandPressed: true) == .clearAll)
-        #expect(AppModel.collapsedSidebarHeaderAction(hasRecentFiles: false, isCommandPressed: true) == .expand)
-    }
-
-    @Test
     func tutorialStepsCoverCoreBeginnerWorkflow() {
         let model = AppModel(preferredLanguagesProvider: { ["en-US"] })
         let chapterTitles = model.tutorialChapters.map(\.title)
@@ -1310,12 +1330,6 @@ struct AppModelTests {
         #expect(statusPanelUsesRunningTint(for: "Running VisiData for sample.tsv."))
         #expect(statusPanelUsesRunningTint(for: "正在用 VisiData 查看 sample.tsv。"))
         #expect(!statusPanelUsesRunningTint(for: "Ready to open a file"))
-    }
-
-    @Test
-    func collapsedRecentFilePrimaryActionMatchesVisibleState() {
-        #expect(collapsedRecentFilePrimaryAction(isCommandHovering: true) == .remove)
-        #expect(collapsedRecentFilePrimaryAction(isCommandHovering: false) == .open)
     }
 
     @Test

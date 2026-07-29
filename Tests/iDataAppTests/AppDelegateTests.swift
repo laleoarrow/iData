@@ -88,7 +88,7 @@ struct AppDelegateTests {
         #expect(!source.contains("WindowGroup(\"iData\")"))
         #expect(source.contains("Settings { PreferencesView(model: appDelegate.model, updater: appDelegate.updater) }"))
         #expect(!source.contains("Window(\"iData\", id: \"main\")"))
-        #expect(source.contains("CommandGroup(replacing: .newItem) {}"))
+        #expect(source.contains("IDataAppCommands(model: appDelegate.model, updater: appDelegate.updater)"))
         #expect(source.contains("private var mainWindow: NSWindow?"))
         #expect(source.contains("func applicationShouldHandleReopen("))
         #expect(source.contains("private func showMainWindow()"))
@@ -101,6 +101,25 @@ struct AppDelegateTests {
         #expect(source.contains("guard let primaryWindow = mainWindows.last"))
         #expect(source.contains("for duplicateWindow in mainWindows.dropLast()"))
     }
+
+    @Test
+    func commandMenuExposesHighFrequencyActions() throws {
+        let source = normalizeWhitespace(try iDataAppSource())
+
+        #expect(source.contains("struct IDataAppCommands: Commands"))
+        #expect(source.contains("CommandGroup(replacing: .newItem)"))
+        #expect(source.contains("model.openDocument()"))
+        #expect(source.contains("model.reopenLastFile()"))
+        #expect(source.contains(".keyboardShortcut(\"o\")"))
+        #expect(source.contains(".keyboardShortcut(\"r\", modifiers: [.command, .shift])"))
+        #expect(source.contains("CommandMenu(\"Session\")"))
+        #expect(source.contains("model.toggleSidebarCollapsed()"))
+        #expect(source.contains("model.revealCurrentFileInFinder()"))
+        #expect(source.contains("model.copyCurrentFilePathToPasteboard()"))
+        #expect(source.contains("model.presentTutorialHub()"))
+        #expect(source.contains("model.returnExternalHandoffToIData()"))
+        #expect(source.contains(".disabled(model.externalHandoffNotice == nil)"))
+    }
 }
 
 private func iDataAppSource(filePath: StaticString = #filePath) throws -> String {
@@ -109,8 +128,15 @@ private func iDataAppSource(filePath: StaticString = #filePath) throws -> String
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let appURL = repositoryRoot.appendingPathComponent("Sources/iData/iDataApp.swift")
-    return try String(contentsOf: appURL, encoding: .utf8)
+    return try [
+        "Sources/iData/iDataApp.swift",
+        "Sources/iData/AppCommands.swift",
+    ]
+    .map { relativePath in
+        let sourceURL = repositoryRoot.appendingPathComponent(relativePath)
+        return try String(contentsOf: sourceURL, encoding: .utf8)
+    }
+    .joined(separator: "\n")
 }
 
 private func normalizeWhitespace(_ value: String) -> String {

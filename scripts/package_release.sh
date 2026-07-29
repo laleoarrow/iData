@@ -8,7 +8,7 @@ ZIP_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.zip"
 DMG_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.dmg"
 PKG_PATH="$ROOT_DIR/dist/iData-v${VERSION}-macos-universal.pkg"
 SHA_PATH="$ROOT_DIR/dist/SHA256SUMS.txt"
-APPCAST_STAGING_DIR="$ROOT_DIR/dist/appcast"
+APPCAST_STAGING_DIR=$(mktemp -d "${TMPDIR:-/tmp}/idata-appcast.XXXXXX")
 APPCAST_PATH="$ROOT_DIR/docs/appcast.xml"
 RELEASE_NOTES_SOURCE="$ROOT_DIR/docs/releases/v${VERSION}.md"
 RELEASE_NOTES_STAGING="$APPCAST_STAGING_DIR/iData-v${VERSION}-macos-universal.md"
@@ -19,6 +19,11 @@ INSTALLER_SIGN_IDENTITY=${IDATA_DEVELOPER_ID_INSTALLER:-}
 NOTARY_PROFILE=${IDATA_NOTARY_KEYCHAIN_PROFILE:-}
 NOTARY_KEY_PATH=${IDATA_NOTARY_KEY_PATH:-}
 NOTARY_KEY_ID=${IDATA_NOTARY_KEY_ID:-}
+
+cleanup() {
+  rm -rf "$APPCAST_STAGING_DIR"
+}
+trap cleanup EXIT
 
 notarization_configured() {
   [[ -n "$NOTARY_PROFILE" ]] || [[ -n "$NOTARY_KEY_PATH" && -n "$NOTARY_KEY_ID" ]]
@@ -32,7 +37,7 @@ if [[ -n "$APP_SIGN_IDENTITY" ]]; then
   if notarization_configured; then
     APP_NOTARY_ZIP="$ROOT_DIR/dist/.iData-v${VERSION}-notary.zip"
     rm -f "$APP_NOTARY_ZIP"
-    ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$APP_NOTARY_ZIP"
+    ditto -c -k --norsrc --noextattr --keepParent "$APP_DIR" "$APP_NOTARY_ZIP"
     "$ROOT_DIR/scripts/notarize_path.sh" "$APP_NOTARY_ZIP" --no-staple
     rm -f "$APP_NOTARY_ZIP"
     xcrun stapler staple -v "$APP_DIR"
@@ -48,7 +53,7 @@ fi
 "$ROOT_DIR/scripts/create_pkg.sh" "$VERSION"
 
 rm -f "$ZIP_PATH"
-ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$ZIP_PATH"
+ditto -c -k --norsrc --noextattr --keepParent "$APP_DIR" "$ZIP_PATH"
 
 if notarization_configured; then
   if [[ -n "$APP_SIGN_IDENTITY" ]]; then
@@ -66,15 +71,14 @@ else
   echo "Skipping release archive notarization: notarization credentials are not configured"
 fi
 
-{
-  shasum -a 256 "$ZIP_PATH"
-  shasum -a 256 "$DMG_PATH"
-  shasum -a 256 "$PKG_PATH"
-} > "$SHA_PATH"
+(
+  cd "$ROOT_DIR/dist"
+  shasum -a 256 "$(basename "$ZIP_PATH")"
+  shasum -a 256 "$(basename "$DMG_PATH")"
+  shasum -a 256 "$(basename "$PKG_PATH")"
+) > "$SHA_PATH"
 
 if [[ -x "$GENERATE_APPCAST" ]]; then
-  rm -rf "$APPCAST_STAGING_DIR"
-  mkdir -p "$APPCAST_STAGING_DIR"
   cp "$ZIP_PATH" "$APPCAST_STAGING_DIR/"
 
   if [[ -f "$RELEASE_NOTES_SOURCE" ]]; then

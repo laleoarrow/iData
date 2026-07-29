@@ -106,8 +106,12 @@ struct VisiDataSessionControllerTests {
         try makeSleepLauncher(at: launcher, sleepSeconds: 120)
 
         let signalSpy = SignalSenderSpy()
+        let sink = TerminalDisplaySinkBuffer()
         let session = VisiDataSessionController(signalSender: signalSpy.send)
+        session.bind(displaySink: sink)
         try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        session.resize(cols: 120, rows: 32)
+        session.markDisplayReady()
         defer {
             session.terminate()
         }
@@ -145,6 +149,7 @@ struct VisiDataSessionControllerTests {
         #expect(observer.isEmpty())
         #expect(sink.resetCount == 1)
         session.resize(cols: 195, rows: 41)
+        session.markDisplayReady()
         defer {
             session.terminate()
         }
@@ -154,7 +159,7 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
-    func openUsesDefaultSizeImmediatelyWhenNoDisplayIsBound() async throws {
+    func openUsesDefaultSizeAfterFallbackDelayWhenNoDisplayIsBound() async throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-session-launch-fallback-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
@@ -169,13 +174,17 @@ struct VisiDataSessionControllerTests {
         let launcher = tempRoot.appendingPathComponent("fake-vd-size-fallback.zsh")
         try makeSleepLauncher(at: launcher, sleepSeconds: 5)
 
-        let session = VisiDataSessionController(launchObserver: observer.record(cols:rows:))
+        let session = VisiDataSessionController(
+            launchObserver: observer.record(cols:rows:),
+            displayMeasurementFallbackDelay: .milliseconds(20)
+        )
         try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        #expect(observer.isEmpty())
         defer {
             session.terminate()
         }
 
-        let launchedSize = try await waitForLaunchRecord(observer, timeout: 1.0)
+        let launchedSize = try await waitForLaunchRecord(observer, timeout: 5.0)
         #expect(launchedSize == (120, 32))
     }
 
@@ -230,12 +239,51 @@ struct VisiDataSessionControllerTests {
         session.appendOutputForTesting(Data("STALE\n".utf8))
         session.resize(cols: 180, rows: 40)
 
+        session.markDisplayReady()
+        session.resize(cols: 180, rows: 40, force: true)
+
         try await waitForCondition(timeout: 2.0) {
             recorder.recordedData.contains(Data("\u{0C}".utf8))
         }
 
-        session.markDisplayReady()
         #expect(sink.writes.isEmpty)
+    }
+
+    @Test
+    func fallbackRedrawRunsAfterMeasuredResizeSignal() async throws {
+        let eventRecorder = TerminalResizeEventRecorder()
+        let driver = PTYWriteDriver(
+            writeCall: eventRecorder.write(fileDescriptor:buffer:count:),
+            sleepCall: { _ in }
+        )
+        let session = VisiDataSessionController(
+            ptyWriteDriver: driver,
+            signalSender: eventRecorder.send(pid:signal:)
+        )
+        session.bind(displaySink: TerminalDisplaySinkBuffer())
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: open("/dev/null", O_RDONLY))
+        defer {
+            session.terminate()
+        }
+
+        session.resize(cols: 180, rows: 40)
+
+        #expect(eventRecorder.events == [
+            .signal(SIGWINCH)
+        ])
+
+        session.markDisplayReady()
+        session.resize(cols: 180, rows: 40, force: true)
+
+        try await waitForCondition(timeout: 2.0) {
+            eventRecorder.events.contains(.write(Data("\u{0C}".utf8)))
+        }
+
+        #expect(eventRecorder.events == [
+            .signal(SIGWINCH),
+            .signal(SIGWINCH),
+            .write(Data("\u{0C}".utf8))
+        ])
     }
 
     @Test
@@ -412,6 +460,38 @@ private final class PTYWriteRecorder: @unchecked Sendable {
         chunks.append(data)
         lock.unlock()
         return count
+    }
+}
+
+private enum TerminalResizeEvent: Equatable {
+    case signal(Int32)
+    case write(Data)
+}
+
+private final class TerminalResizeEventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedEvents: [TerminalResizeEvent] = []
+
+    var events: [TerminalResizeEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedEvents
+    }
+
+    func send(pid _: pid_t, signal: Int32) -> Int32 {
+        append(.signal(signal))
+        return 0
+    }
+
+    func write(fileDescriptor _: Int32, buffer: UnsafeRawPointer, count: Int) -> Int {
+        append(.write(Data(bytes: buffer, count: count)))
+        return count
+    }
+
+    private func append(_ event: TerminalResizeEvent) {
+        lock.lock()
+        recordedEvents.append(event)
+        lock.unlock()
     }
 }
 

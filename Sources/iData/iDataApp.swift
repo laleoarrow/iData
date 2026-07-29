@@ -184,21 +184,7 @@ struct IDataApp: App {
             PreferencesView(model: appDelegate.model, updater: appDelegate.updater)
         }
         .commands {
-            CommandGroup(replacing: .newItem) {}
-
-            CommandGroup(after: .appInfo) {
-                Button("Check for Updates…") {
-                    appDelegate.updater.checkForUpdates()
-                }
-                .disabled(!appDelegate.updater.canCheckForUpdates)
-            }
-
-            CommandGroup(replacing: .help) {
-                Button("iData Help") {
-                    appDelegate.model.isHelpPresented = true
-                }
-                .keyboardShortcut("?", modifiers: [.command, .shift])
-            }
+            IDataAppCommands(model: appDelegate.model, updater: appDelegate.updater)
         }
     }
 }

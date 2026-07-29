@@ -69,11 +69,6 @@ final class AppModel: ObservableObject {
         case chinese
     }
 
-    enum CollapsedSidebarHeaderAction: Equatable {
-        case expand
-        case clearAll
-    }
-
     struct TutorialChapter: Identifiable, Equatable {
         let id: String
         let title: String
@@ -191,6 +186,7 @@ final class AppModel: ObservableObject {
     nonisolated static let reduceAnimationsKey = "reduceAnimations"
     nonisolated static let isSidebarCollapsedKey = "isSidebarCollapsed"
     nonisolated static let appLanguagePreferenceKey = "appLanguagePreference"
+    nonisolated static let lastOpenDirectoryKey = "lastOpenDirectory"
     nonisolated static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
     nonisolated static let preferredSmallFileApplicationKey = "preferredSmallFileApplication"
     nonisolated static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
@@ -518,6 +514,14 @@ final class AppModel: ObservableObject {
         return activeSession
     }
 
+    var currentSessionFileURL: URL? {
+        activeSession?.currentFileURL
+    }
+
+    var canActOnCurrentSessionFile: Bool {
+        currentSessionFileURL != nil
+    }
+
     nonisolated static func shouldDisplaySessionDetail(
         hasCurrentFile: Bool,
         isRunning: Bool,
@@ -806,11 +810,50 @@ final class AppModel: ObservableObject {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
+        panel.resolvesAliases = true
+        panel.prompt = localized(english: "Open", chinese: "打开")
+        panel.message = localized(
+            english: "Choose one or more table-like files. iData opens the first supported selection.",
+            chinese: "选择一个或多个表格类文件。iData 会打开第一个支持的文件。"
+        )
+        panel.directoryURL = Self.openPanelDirectoryURL(
+            storedPath: defaults.string(forKey: Self.lastOpenDirectoryKey),
+            lastOpenedFile: lastOpenedFile
+        )
 
-        if panel.runModal() == .OK, let url = panel.url {
-            openExternalFile(url)
+        if panel.runModal() == .OK {
+            let urls = panel.urls
+            if let openedURL = Self.firstSupportedFile(in: urls) {
+                defaults.set(openedURL.deletingLastPathComponent().path, forKey: Self.lastOpenDirectoryKey)
+            }
+            openExternalFiles(urls)
         }
+    }
+
+    nonisolated static func openPanelDirectoryURL(
+        storedPath: String?,
+        lastOpenedFile: URL?,
+        directoryExists: (String) -> Bool = { path in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+                && isDirectory.boolValue
+        }
+    ) -> URL? {
+        if let storedPath, !storedPath.isEmpty, directoryExists(storedPath) {
+            return URL(fileURLWithPath: storedPath, isDirectory: true)
+        }
+
+        guard let lastOpenedFile else {
+            return nil
+        }
+
+        let fallbackDirectory = lastOpenedFile.deletingLastPathComponent()
+        guard directoryExists(fallbackDirectory.path) else {
+            return nil
+        }
+
+        return fallbackDirectory
     }
 
     func setPreferredSmallFileApplication(_ handler: DefaultApplicationHandler?) {
@@ -1267,8 +1310,24 @@ final class AppModel: ObservableObject {
         errorMessage = nil
     }
 
+    func copyCurrentFilePathToPasteboard() {
+        guard let currentSessionFileURL else {
+            return
+        }
+
+        copyPathToPasteboard(currentSessionFileURL)
+    }
+
     func revealInFinder(_ url: URL) {
         NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func revealCurrentFileInFinder() {
+        guard let currentSessionFileURL else {
+            return
+        }
+
+        revealInFinder(currentSessionFileURL)
     }
 
     func removeRecentFile(_ url: URL) {
@@ -1747,16 +1806,6 @@ final class AppModel: ObservableObject {
         echo "  If iData does not detect vd, use Auto Detect in Preferences."
         read '?Press Return to close this installer...'
         """
-    }
-
-    static func collapsedSidebarHeaderAction(
-        hasRecentFiles: Bool,
-        isCommandPressed: Bool
-    ) -> CollapsedSidebarHeaderAction {
-        if hasRecentFiles && isCommandPressed {
-            return .clearAll
-        }
-        return .expand
     }
 
     static func associationExtension(for fileExtension: String) -> String {

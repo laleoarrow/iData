@@ -373,7 +373,7 @@
       }
 
       if (sizeChanged || terminalNeedsResize) {
-        post({ type: 'resize', cols, rows });
+        post({ type: 'resize', cols, rows, force });
       }
 
       return true;
@@ -465,6 +465,7 @@
     };
     window.iDataFocusTerminal = function() {
       debug('focusTerminal');
+      lastSentSize = null;
       term?.focus();
       scheduleTerminalLayoutPasses({ forceResize: true });
     };
