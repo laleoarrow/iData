@@ -100,6 +100,8 @@ struct AppDelegateTests {
         #expect(source.contains("func collapseDuplicateMainWindows()"))
         #expect(source.contains("guard let primaryWindow = mainWindows.last"))
         #expect(source.contains("for duplicateWindow in mainWindows.dropLast()"))
+        #expect(source.contains("contentRect: NSRect(x: 0, y: 0, width: 960, height: 620)"))
+        #expect(source.contains("window.minSize = NSSize(width: 680, height: 460)"))
     }
 
     @Test

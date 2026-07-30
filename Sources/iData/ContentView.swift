@@ -54,7 +54,7 @@ struct ContentView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .frame(minWidth: 860, minHeight: 580)
+        .frame(minWidth: 680, minHeight: 460)
         .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.88, blendDuration: 0.12) : nil, value: model.externalHandoffNotice)
         .dropDestination(for: URL.self) { items, _ in
             model.handleDroppedFiles(items)
@@ -2139,14 +2139,19 @@ private struct WelcomeDetailView: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(alignment: .top, spacing: 24) {
-                quickTipColumn(Array(quickTips.prefix(2)), keyWidth: 94)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 24) {
+                    quickTipColumn(Array(quickTips.prefix(2)), keyWidth: 94)
 
-                Divider()
+                    Divider()
 
-                quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)
+                    quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)
+                }
+                .frame(minWidth: 560)
+                .fixedSize(horizontal: false, vertical: true)
+
+                quickTipColumn(Array(quickTips.prefix(4)), keyWidth: 94)
             }
-            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

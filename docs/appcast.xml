@@ -3,20 +3,21 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.10</title>
-            <pubDate>Thu, 30 Jul 2026 17:55:02 +0800</pubDate>
+            <title>0.2.11</title>
+            <pubDate>Thu, 30 Jul 2026 18:22:08 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>30</sparkle:version>
-            <sparkle:shortVersionString>0.2.10</sparkle:shortVersionString>
+            <sparkle:version>31</sparkle:version>
+            <sparkle:shortVersionString>0.2.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.10
+            <description sparkle:format="markdown"><![CDATA[## v0.2.11
 
-这次更新修正欢迎页布局：
+这次更新优化窗口尺寸：
 
-- 移除快捷键区下方的多余空白。
-- 中间分隔线仅保留在快捷键区域。
+- 默认窗口更紧凑。
+- 支持继续缩小窗口。
+- 窄窗口下快捷键自动切换为单栏。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.10/iData-v0.2.10-macos-universal.zip" length="3938602" type="application/octet-stream" sparkle:edSignature="sg1c2zrPkzP92T6DCKJs5QSLJOUgEg/fV73vCOiMv02MceyAcgusofPlcLhz95zVV9/99Dt8ar38u4aAaSxZDw=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.11/iData-v0.2.11-macos-universal.zip" length="3941967" type="application/octet-stream" sparkle:edSignature="fYMo3RornqPl2L8PwzQBb/yDJpnydL1ZjKbdF2aaTPBKIxkQG3aV+/kHl5txiJl4RnxyD9iabnAmvE44uRbZCA=="/>
         </item>
     </channel>
 </rss>

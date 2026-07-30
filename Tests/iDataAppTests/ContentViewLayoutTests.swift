@@ -8,6 +8,7 @@ struct ContentViewLayoutTests {
         let root = try extractSection(from: source, start: "struct ContentView: View {", end: "private struct SidebarView: View {")
 
         #expect(root.contains(".frame(width: sidebarWidth)"))
+        #expect(root.contains(".frame(minWidth: 680, minHeight: 460)"))
         #expect(!root.contains("value: model.isSidebarCollapsed"))
         #expect(!root.contains("AppSweepShimmer("))
     }
@@ -64,6 +65,9 @@ struct ContentViewLayoutTests {
         #expect(welcome.contains(".buttonStyle(.bordered)"))
         #expect(welcome.contains("quickTipColumn(Array(quickTips.prefix(2)), keyWidth: 94)"))
         #expect(welcome.contains("quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)"))
+        #expect(welcome.contains("ViewThatFits(in: .horizontal)"))
+        #expect(welcome.contains(".frame(minWidth: 560)"))
+        #expect(welcome.contains("quickTipColumn(Array(quickTips.prefix(4)), keyWidth: 94)"))
         #expect(welcome.contains(".minimumScaleFactor(0.72)"))
         #expect(welcome.contains(".fixedSize(horizontal: false, vertical: true)"))
         #expect(!welcome.contains("GeometryReader"))
