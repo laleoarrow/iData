@@ -3,27 +3,24 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.7</title>
-            <pubDate>Thu, 30 Jul 2026 11:45:57 +0800</pubDate>
+            <title>0.2.8</title>
+            <pubDate>Thu, 30 Jul 2026 13:39:12 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>27</sparkle:version>
-            <sparkle:shortVersionString>0.2.7</sparkle:shortVersionString>
+            <sparkle:version>28</sparkle:version>
+            <sparkle:shortVersionString>0.2.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.7
+            <description sparkle:format="markdown"><![CDATA[## v0.2.8
 
-### Performance and responsiveness
+这次更新重新梳理了整套 macOS 界面：
 
-- Made sidebar collapse and expansion immediate by removing window-wide layout and sidebar-mode transition animations.
-- Reduced unnecessary welcome-screen updates by isolating tutorial carousel state, keeping stable view identities, and publishing format-association state only when it changes.
-- Coalesced PTY output into ordered batches of up to 64 KiB and simplified the Base64 terminal bridge, reducing native-to-WebKit handoffs during sustained output.
-- Removed temporary-file probes from file-type lookup and stopped delimiter scanning after the first eight non-empty, non-comment lines.
-
-### Reliability
-
-- Added regression coverage for bounded, ordered terminal output; byte-safe bridge writes; file-type mapping; sidebar and welcome-screen recomputation safeguards; and delimiter detection.
-- Updated install, file-handoff, compressed-input, and contributor performance-check documentation.
+- 欢迎页聚焦打开数据，移除重复入口和格式卡片。
+- 设置改为通用、文件、VisiData、更新四个原生标签页。
+- 帮助和教程采用侧栏导航，内容更短、更易查找。
+- 会话提示不再遮挡表格，工具栏和状态栏更紧凑。
+- 侧栏改用轻量列表，收起与展开不再执行高开销动画。
+- 全面精简中文文案，并补齐菜单本地化。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.7/iData-v0.2.7-macos-universal.zip" length="4339777" type="application/octet-stream" sparkle:edSignature="UHriw+jIxbbXDXq6SnkK6AaYrTP9DsmNxA97supWQ1OzKppS7y5A/EZa8C7dwXeluu8Zt7BsJ/dI7lfulrUYBw=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.8/iData-v0.2.8-macos-universal.zip" length="3917691" type="application/octet-stream" sparkle:edSignature="qtK0Fsa2MnAUzvesdZgcvz2EJpS9nYu/WqRgPdF7MXK+LR0RC4E/DiZKtNUZH4zBta1br4mExWxOknPR0cYeBA=="/>
         </item>
     </channel>
 </rss>

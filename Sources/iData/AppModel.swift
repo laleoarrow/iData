@@ -609,7 +609,7 @@ final class AppModel: ObservableObject {
         }
         return localized(
             english: "\(chapter.title) · Step \(tutorialStepIndex + 1) of \(chapter.steps.count)",
-            chinese: "\(chapter.title) · 第 \(tutorialStepIndex + 1) 步 / 共 \(chapter.steps.count) 步"
+            chinese: "\(chapter.title) · 第 \(tutorialStepIndex + 1)/\(chapter.steps.count) 步"
         )
     }
 
@@ -625,7 +625,7 @@ final class AppModel: ObservableObject {
         case .english:
             return "App interface currently shown in English."
         case .chinese:
-            return "当前界面语言：中文。"
+            return "当前：中文"
         }
     }
 
@@ -634,7 +634,7 @@ final class AppModel: ObservableObject {
         case .english:
             return "Language: English"
         case .chinese:
-            return "语言：中文"
+            return "中文"
         }
     }
 
@@ -705,7 +705,7 @@ final class AppModel: ObservableObject {
         case .english:
             return "Use iData's one-click setup, or install with `pipx install visidata` and `pipx inject visidata openpyxl`. `brew install visidata` also works. You can set the executable path in Preferences."
         case .chinese:
-            return "可先使用 iData 的一键配置，或执行 `pipx install visidata` 和 `pipx inject visidata openpyxl`。`brew install visidata` 也可用；你也可以在偏好设置中指定可执行文件路径。"
+            return "点“安装 VisiData”，或运行 `pipx install visidata`；Excel 还需 `pipx inject visidata openpyxl`。也可用 `brew install visidata`，并在设置中指定 vd。"
         }
     }
 
@@ -803,12 +803,12 @@ final class AppModel: ObservableObject {
         case let .available(path):
             return localized(
                 english: "VisiData detected at \(path)",
-                chinese: "已检测到 VisiData：\(path)"
+                chinese: "路径：\(path)"
             )
         case .missing:
             return localized(
                 english: "VisiData not found. \(Self.visiDataInstallGuidance(.english))",
-                chinese: "未找到 VisiData。\(Self.visiDataInstallGuidance(.chinese))"
+                chinese: "未安装 VisiData。\(Self.visiDataInstallGuidance(.chinese))"
             )
         }
     }
@@ -822,7 +822,7 @@ final class AppModel: ObservableObject {
         panel.prompt = localized(english: "Open", chinese: "打开")
         panel.message = localized(
             english: "Choose one or more table-like files. iData opens the first supported selection.",
-            chinese: "选择一个或多个表格类文件。iData 会打开第一个支持的文件。"
+            chinese: "可选择多个表格；iData 会打开首个支持的文件。"
         )
         panel.directoryURL = Self.openPanelDirectoryURL(
             storedPath: defaults.string(forKey: Self.lastOpenDirectoryKey),
@@ -988,7 +988,7 @@ final class AppModel: ObservableObject {
                 if errorMessage == nil {
                     errorMessage = localized(
                         english: "Could not start tutorial because the sample table failed to open. Check VisiData path in Preferences.",
-                        chinese: "无法启动教程，因为示例表格未能打开。请在偏好设置中检查 VisiData 路径。"
+                        chinese: "示例表格无法打开。请在设置中检查 VisiData 路径。"
                     )
                 }
                 return
@@ -998,7 +998,7 @@ final class AppModel: ObservableObject {
             isTutorialHubPresented = false
             statusMessage = localized(
                 english: "Tutorial started with \(sampleURL.lastPathComponent). Follow the floating coach in the session.",
-                chinese: "教程已打开：\(sampleURL.lastPathComponent)。跟着浮动引导操作即可。"
+                chinese: "教程已开始，请按引导操作。"
             )
             errorMessage = nil
         } catch {
@@ -1006,7 +1006,7 @@ final class AppModel: ObservableObject {
             statusMessage = nil
             errorMessage = localized(
                 english: "Could not prepare tutorial sample data: \(error.localizedDescription)",
-                chinese: "无法准备教程示例数据：\(error.localizedDescription)"
+                chinese: "无法创建教程数据：\(error.localizedDescription)"
             )
         }
     }
@@ -1068,7 +1068,7 @@ final class AppModel: ObservableObject {
         finishTutorial()
         statusMessage = localized(
             english: "Tutorial completed. Open any file to continue exploring with VisiData.",
-            chinese: "教程已完成。打开任意文件即可继续探索 VisiData。"
+            chinese: "教程完成。现在可以打开自己的文件了。"
         )
         errorMessage = nil
     }

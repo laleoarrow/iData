@@ -112,7 +112,7 @@ struct AppDelegateTests {
         #expect(source.contains("model.reopenLastFile()"))
         #expect(source.contains(".keyboardShortcut(\"o\")"))
         #expect(source.contains(".keyboardShortcut(\"r\", modifiers: [.command, .shift])"))
-        #expect(source.contains("CommandMenu(\"Session\")"))
+        #expect(source.contains("CommandMenu(model.localized(english: \"Session\", chinese: \"会话\"))"))
         #expect(source.contains("model.toggleSidebarCollapsed()"))
         #expect(source.contains("model.revealCurrentFileInFinder()"))
         #expect(source.contains("model.copyCurrentFilePathToPasteboard()"))

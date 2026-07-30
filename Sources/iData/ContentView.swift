@@ -39,8 +39,6 @@ struct ContentView: View {
         }
         .background {
             detailBackground.ignoresSafeArea()
-            AppSweepShimmer(active: motionEnabled)
-                .ignoresSafeArea()
         }
         .overlay(alignment: .topTrailing) {
             if let notice = model.externalHandoffNotice {
@@ -99,138 +97,61 @@ private struct SidebarView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            Color.clear
+        VStack(alignment: .leading, spacing: 14) {
+            SidebarHeaderCard(model: model)
 
-            FloatingSidebarRail {
-                VStack(alignment: .leading, spacing: model.isSidebarCollapsed ? 14 : 16) {
-                    SidebarHeaderCard(model: model)
-
-                    if model.recentFiles.isEmpty {
-                        if model.isSidebarCollapsed {
-                            EmptySidebarRailState(
-                                isChinese: model.effectiveLanguage == .chinese,
-                                openAction: { model.openDocument() }
-                            )
-                        } else {
-                            EmptySidebarState(
-                                isChinese: model.effectiveLanguage == .chinese,
-                                openAction: { model.openDocument() },
-                                tutorialAction: { model.presentTutorialHub() }
-                            )
-                        }
-                    } else {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            VStack(spacing: model.isSidebarCollapsed ? 12 : 10) {
-                                ForEach(model.recentFiles, id: \.standardizedFileURL.path) { fileURL in
-                                    Group {
-                                        if model.isSidebarCollapsed {
-                                            CollapsedRecentFileRow(
-                                                fileURL: fileURL,
-                                                isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
-                                                isPinned: model.isPinnedRecentFile(fileURL),
-                                                isHovering: recentFileHoverBinding(for: fileURL),
-                                                isChinese: model.effectiveLanguage == .chinese,
-                                                openAction: { model.openExternalFile(fileURL) },
-                                                togglePinAction: { model.togglePinnedRecentFile(fileURL) },
-                                                removeAction: { model.removeRecentFile(fileURL) }
-                                            )
-                                            .id("collapsed-\(fileURL.standardizedFileURL.path)")
-                                        } else {
-                                            RecentFileRow(
-                                                fileURL: fileURL,
-                                                isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
-                                                isPinned: model.isPinnedRecentFile(fileURL),
-                                                isHovering: recentFileHoverBinding(for: fileURL),
-                                                isChinese: model.effectiveLanguage == .chinese,
-                                                openAction: { model.openExternalFile(fileURL) },
-                                                togglePinAction: { model.togglePinnedRecentFile(fileURL) },
-                                                removeAction: { model.removeRecentFile(fileURL) }
-                                            )
-                                            .id("expanded-\(fileURL.standardizedFileURL.path)")
-                                        }
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, model.isSidebarCollapsed ? 0 : 2)
-                            .padding(.bottom, 6)
-                            .background(
-                                GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: SidebarScrollMetricsPreferenceKey.self,
-                                        value: SidebarScrollMetrics(
-                                            contentHeight: proxy.size.height,
-                                            contentMinY: proxy.frame(in: .named(sidebarRecentFilesCoordinateSpace)).minY
-                                        )
-                                    )
-                                }
-                            )
-                        }
-                        .coordinateSpace(name: sidebarRecentFilesCoordinateSpace)
-                        .scrollIndicators(.hidden)
-                        .background(HiddenScrollIndicatorsConfigurator())
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: SidebarScrollViewportHeightPreferenceKey.self,
-                                    value: proxy.size.height
+            if model.recentFiles.isEmpty {
+                if model.isSidebarCollapsed {
+                    EmptySidebarRailState(
+                        isChinese: model.effectiveLanguage == .chinese,
+                        openAction: { model.openDocument() }
+                    )
+                } else {
+                    EmptySidebarState(isChinese: model.effectiveLanguage == .chinese)
+                }
+            } else {
+                ScrollView(.vertical) {
+                    VStack(spacing: 4) {
+                        ForEach(model.recentFiles, id: \.standardizedFileURL.path) { fileURL in
+                            if model.isSidebarCollapsed {
+                                CollapsedRecentFileRow(
+                                    fileURL: fileURL,
+                                    isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                    isPinned: model.isPinnedRecentFile(fileURL),
+                                    isHovering: recentFileHoverBinding(for: fileURL),
+                                    isChinese: model.effectiveLanguage == .chinese,
+                                    openAction: { model.openExternalFile(fileURL) },
+                                    togglePinAction: { model.togglePinnedRecentFile(fileURL) },
+                                    removeAction: { model.removeRecentFile(fileURL) }
+                                )
+                            } else {
+                                RecentFileRow(
+                                    fileURL: fileURL,
+                                    isActive: model.activeSession?.currentFileURL?.standardizedFileURL == fileURL.standardizedFileURL,
+                                    isPinned: model.isPinnedRecentFile(fileURL),
+                                    isHovering: recentFileHoverBinding(for: fileURL),
+                                    isChinese: model.effectiveLanguage == .chinese,
+                                    openAction: { model.openExternalFile(fileURL) },
+                                    togglePinAction: { model.togglePinnedRecentFile(fileURL) },
+                                    removeAction: { model.removeRecentFile(fileURL) }
                                 )
                             }
-                        )
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: SidebarScrollMinYPreferenceKey.self,
-                                    value: proxy.frame(in: .named(sidebarCoordinateSpace)).minY
-                                )
-                            }
-                        )
-                        .animation(listAnimation, value: model.recentFiles)
-                        .onPreferenceChange(SidebarScrollMetricsPreferenceKey.self) { metrics in
-                            recentFilesScrollMetrics = metrics
-                        }
-                        .onPreferenceChange(SidebarScrollMinYPreferenceKey.self) { minY in
-                            recentFilesMinY = minY
-                        }
-                        .onPreferenceChange(SidebarScrollViewportHeightPreferenceKey.self) { height in
-                            recentFilesViewportHeight = height
-                        }
-                        .onHover { hovering in
-                            if !hovering {
-                                hoveredRecentFilePath = nil
-                            }
-                        }
-                        .onChange(of: model.recentFiles.map { $0.standardizedFileURL.path }) { _, _ in
-                            hoveredRecentFilePath = nil
                         }
                     }
-
-                    Spacer(minLength: 0)
-
-                    SidebarFooter(model: model)
                 }
-                .padding(model.isSidebarCollapsed
-                    ? EdgeInsets(top: 14, leading: 8, bottom: 14, trailing: 8)
-                    : EdgeInsets(top: 16, leading: 14, bottom: 16, trailing: 14))
+                .scrollIndicators(.automatic)
+                .onHover { hovering in
+                    if !hovering {
+                        hoveredRecentFilePath = nil
+                    }
+                }
             }
-            .padding(.vertical, 12)
-            .padding(.leading, model.isSidebarCollapsed ? 10 : 14)
-            .padding(.trailing, model.isSidebarCollapsed ? 6 : 10)
 
-            if !model.recentFiles.isEmpty {
-                SidebarScrollPositionLine(
-                    metrics: recentFilesScrollMetrics,
-                    viewportHeight: recentFilesViewportHeight,
-                    motionEnabled: motionEnabled
-                )
-                .offset(
-                    x: model.isSidebarCollapsed ? 16 : 22,
-                    y: recentFilesMinY + 5
-                )
-            }
+            Spacer(minLength: 0)
+            SidebarFooter(model: model)
         }
-        .coordinateSpace(name: sidebarCoordinateSpace)
+        .padding(model.isSidebarCollapsed ? 12 : 16)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
         .clipped()
         .onChange(of: model.isSidebarCollapsed) { _, _ in
             hoveredRecentFilePath = nil
@@ -531,13 +452,13 @@ private struct SidebarHeaderCard: View {
                 Spacer(minLength: 0)
 
                 if !model.recentFiles.isEmpty {
-                    Button(localizedText(isChinese, english: "Clear All", chinese: "清空全部")) {
+                    Button(localizedText(isChinese, english: "Clear All", chinese: "清空")) {
                         model.clearRecentFiles()
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
-                    .help(localizedText(isChinese, english: "Clear all recent file records", chinese: "清除所有最近文件记录"))
+                    .help(localizedText(isChinese, english: "Clear all recent file records", chinese: "清空最近文件"))
                 }
 
                 SidebarCollapseToggleButton(
@@ -550,7 +471,7 @@ private struct SidebarHeaderCard: View {
             Text(localizedText(
                 isChinese,
                 english: "Native shell for large-table workflows with VisiData",
-                chinese: "在原生 macOS 中轻松查看超大表格"
+                chinese: "原生查看大型表格"
             ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -622,6 +543,7 @@ private struct SidebarFooter: View {
                 SidebarFooterActionIcon(symbol: "gearshape.fill", motionEnabled: motionEnabled)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(localizedText(isChinese, english: "Settings", chinese: "设置"))
             .help(localizedText(isChinese, english: "Settings", chinese: "设置"))
 
             Button {
@@ -630,6 +552,7 @@ private struct SidebarFooter: View {
                 SidebarFooterActionIcon(symbol: "questionmark.circle", motionEnabled: motionEnabled)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(localizedText(isChinese, english: "Help", chinese: "帮助"))
             .help(localizedText(isChinese, english: "Help", chinese: "帮助"))
 
             Button {
@@ -638,6 +561,7 @@ private struct SidebarFooter: View {
                 SidebarFooterActionIcon(symbol: "graduationcap.fill", motionEnabled: motionEnabled)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
             .help(localizedText(isChinese, english: "Tutorial", chinese: "教程"))
         }
         .frame(
@@ -650,57 +574,24 @@ private struct SidebarFooter: View {
 
 private struct EmptySidebarState: View {
     let isChinese: Bool
-    let openAction: () -> Void
-    let tutorialAction: () -> Void
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             Label(localizedText(isChinese, english: "No recent files yet", chinese: "暂无最近文件"), systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                 .font(.headline)
 
             Text(localizedText(
                 isChinese,
-                english: "Open a table or drag one into the window. Recent items stay here for one-click reopening.",
-                chinese: "打开一个表格，或直接把文件拖进窗口。最近文件会保留在这里，方便一键重新打开。"
+                english: "Files you open will appear here.",
+                chinese: "打开过的文件会显示在这里。"
             ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                Button {
-                    openAction()
-                } label: {
-                    Label(localizedText(isChinese, english: "Open File", chinese: "打开文件"), systemImage: "tablecells")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-
-                Button {
-                    tutorialAction()
-                } label: {
-                    Label(localizedText(isChinese, english: "Tutorial", chinese: "教程"), systemImage: "graduationcap.fill")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
-        )
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.008,
-            hoverYOffset: -1,
-            shadowOpacity: 0.08,
-            shadowRadius: 12
-        )
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
     }
 }
 
@@ -712,7 +603,7 @@ private struct EmptySidebarRailState: View {
 
     var body: some View {
         Button(action: openAction) {
-            VStack(spacing: 12) {
+            VStack {
                 Image(systemName: "plus")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color.accentColor)
@@ -724,18 +615,12 @@ private struct EmptySidebarRailState: View {
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help(localizedText(isChinese, english: "Open a table", chinese: "打开一个表格"))
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityLabel(localizedText(isChinese, english: "Open File", chinese: "打开文件"))
+        .help(localizedText(isChinese, english: "Open a table", chinese: "打开表格"))
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
-        )
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.008,
-            hoverYOffset: -1,
-            shadowOpacity: 0.08,
-            shadowRadius: 12
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08))
         )
     }
 }
@@ -758,59 +643,44 @@ private struct RecentFileRow: View {
     }
 
     var body: some View {
-        Button(action: openAction) {
-            HStack(spacing: 12) {
+        HStack(spacing: 8) {
+            Button(action: openAction) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(fileURL.lastPathComponent)
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
 
-                    Text(fileURL.path)
+                    Text(fileURL.deletingLastPathComponent().path)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                Spacer(minLength: 0)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .padding(.trailing, 70)
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .buttonStyle(.plain)
+
+            Menu {
+                Button(action: togglePinAction) {
+                    Label(isPinned ? (isChinese ? "取消置顶" : "Unpin") : (isChinese ? "置顶" : "Pin"), systemImage: isPinned ? "pin.slash" : "pin")
+                }
+                Button(role: .destructive, action: removeAction) {
+                    Label(isChinese ? "移除" : "Remove", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: isPinned ? "pin.fill" : "ellipsis")
+                    .foregroundStyle(isPinned ? Color.accentColor : Color.secondary)
+                    .frame(width: 22, height: 22)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
         }
-        .buttonStyle(.plain)
-        .background(backgroundStyle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(borderColor)
-        )
-        .overlay(alignment: .trailing) {
-            RecentFileActionButton(
-                symbol: isPinned ? "pin.fill" : "pin",
-                foregroundStyle: isPinned ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary),
-                backgroundFill: isPinned ? Color.accentColor.opacity(0.16) : Color.white.opacity(0.08),
-                isVisible: isHovering,
-                action: togglePinAction
-            )
-            .offset(x: -46)
-            .help(isPinned
-                ? localizedText(isChinese, english: "Unpin from top", chinese: "取消置顶")
-                : localizedText(isChinese, english: "Pin to top", chinese: "置顶"))
-        }
-        .overlay(alignment: .trailing) {
-            RecentFileActionButton(
-                symbol: "xmark",
-                foregroundStyle: AnyShapeStyle(.secondary),
-                backgroundFill: Color.white.opacity(0.08),
-                isVisible: isHovering,
-                action: removeAction
-            )
-            .offset(x: -14)
-            .help(localizedText(isChinese, english: "Remove from recent files", chinese: "从最近文件中移除"))
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(isActive ? Color.accentColor.opacity(0.14) : (isHovering ? Color.primary.opacity(0.06) : Color.clear), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contextMenu {
             Button {
                 openAction()
@@ -840,7 +710,6 @@ private struct RecentFileRow: View {
         .onHover { hovering in
             isHovering = hovering
         }
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 
     private var backgroundStyle: some ShapeStyle {
@@ -958,10 +827,10 @@ private struct CollapsedRecentFileRow: View {
                 english: "Open \(fileURL.lastPathComponent) — right-click for more actions",
                 chinese: "打开 \(fileURL.lastPathComponent)；右键查看更多操作"
             ))
-            .background(backgroundStyle, in: Circle())
+            .background(isActive ? Color.accentColor.opacity(0.14) : Color.primary.opacity(isHovering ? 0.08 : 0.04), in: Circle())
             .overlay(
                 Circle()
-                    .strokeBorder(borderColor)
+                    .strokeBorder(isActive ? Color.accentColor.opacity(0.30) : Color.primary.opacity(0.08))
             )
             .contentShape(Circle())
             .contextMenu {
@@ -993,7 +862,6 @@ private struct CollapsedRecentFileRow: View {
             .onHover { hovering in
                 isHovering = hovering
             }
-            .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
 
             Spacer(minLength: 0)
         }
@@ -1042,40 +910,18 @@ private struct SidebarCollapseToggleButton: View {
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(.secondary)
                 .frame(width: 30, height: 30)
-                .background(
-                    LinearGradient(
-                        colors: isHovering
-                            ? [
-                                Color.white.opacity(0.16),
-                                Color.accentColor.opacity(0.14),
-                                Color.white.opacity(0.05),
-                            ]
-                            : [
-                                Color.white.opacity(0.10),
-                                Color.accentColor.opacity(0.10),
-                            ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
+                .background(Color.primary.opacity(isHovering ? 0.10 : 0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.10))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.08))
                 )
-                .background {
-                    SidebarHoverGlow(
-                        isVisible: isHovering,
-                        style: .rounded(10)
-                    )
-                }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
         .help(localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
         .onHover { hovering in
             isHovering = hovering
         }
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
     }
 }
 
@@ -1103,16 +949,12 @@ private struct SidebarFooterActionIcon: View {
     @State private var isHovering = false
 
     var body: some View {
-        SidebarFooterIcon(symbol: symbol, isHovering: isHovering, motionEnabled: motionEnabled)
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(isHovering ? Color.accentColor : Color.secondary)
             .frame(width: 36, height: 36)
-            .background(Color.white.opacity(isHovering ? 0.12 : 0.05), in: Circle())
-            .overlay(
-                Circle()
-                    .strokeBorder(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 1)
-            )
+            .background(Color.primary.opacity(isHovering ? 0.09 : 0.04), in: Circle())
             .contentShape(Circle())
-            .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
             .onHover { hovering in
                 isHovering = hovering
             }
@@ -1480,6 +1322,7 @@ private struct HelpView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var selectedTopic = HelpTopic.iData
 
     private var motionEnabled: Bool {
         !accessibilityReduceMotion
@@ -1492,21 +1335,21 @@ private struct HelpView: View {
     private var onboardingTips: [QuickTip] {
         [
             QuickTip(
-                keys: localizedText(isChinese, english: "Open… / Drag File", chinese: "打开… / 拖拽文件"),
+                keys: localizedText(isChinese, english: "Open… / Drag File", chinese: "打开… / 拖入文件"),
                 title: localizedText(isChinese, english: "Open Data", chinese: "打开数据"),
                 detail: localizedText(
                     isChinese,
                     english: "Use the toolbar or drag a file into the main window. iData forwards the real file into embedded VisiData.",
-                    chinese: "用工具栏打开文件，或直接拖入窗口。iData 会将文件交由内嵌的 VisiData 处理。"
+                    chinese: "点按“打开…”或将文件拖入窗口。"
                 )
             ),
             QuickTip(
-                keys: localizedText(isChinese, english: "Recent + Pin", chinese: "最近文件 + 置顶"),
-                title: localizedText(isChinese, english: "Keep Key Files", chinese: "保留关键文件"),
+                keys: localizedText(isChinese, english: "Recent + Pin", chinese: "最近文件 / 置顶"),
+                title: localizedText(isChinese, english: "Keep Key Files", chinese: "常用文件"),
                 detail: localizedText(
                     isChinese,
                     english: "Click a recent item to reopen it. Pin important files so they stay fixed at the top of the sidebar.",
-                    chinese: "点击最近文件即可重新打开。把重要文件置顶后，它们会固定显示在侧边栏顶部。"
+                    chinese: "点按即可重新打开；置顶后会固定在侧栏顶部。"
                 )
             ),
             QuickTip(
@@ -1515,7 +1358,7 @@ private struct HelpView: View {
                 detail: localizedText(
                     isChinese,
                     english: "Adjust the `vd` path, automatic update behavior, or run a manual update check.",
-                    chinese: "可以调整 `vd` 路径、自动更新行为，或手动检查更新。"
+                    chinese: "设置 vd 路径和自动更新，也可手动检查更新。"
                 )
             ),
         ]
@@ -1529,25 +1372,25 @@ private struct HelpView: View {
                 detail: localizedText(
                     isChinese,
                     english: "Most regular text-like table files open directly, including unusual bioinformatics suffixes such as `.ma`.",
-                    chinese: "大多数常规文本类表格文件都能直接打开，包括 `.ma` 这类生信里常见但不标准的后缀。"
+                    chinese: "常见表格可直接打开，也支持 .ma 等非标准扩展名。"
                 )
             ),
             QuickTip(
                 keys: ".gz / .bgz",
-                title: localizedText(isChinese, english: "Stream Compression", chinese: "流式解压"),
+                title: localizedText(isChinese, english: "Stream Compression", chinese: "压缩文件"),
                 detail: localizedText(
                     isChinese,
                     english: "Compressed files are streamed into VisiData without extracting them to disk first.",
-                    chinese: "压缩文件无需先解压，直接流式送入 VisiData 处理。"
+                    chinese: ".gz / .bgz 无需预先解压。"
                 )
             ),
             QuickTip(
                 keys: "Excel",
-                title: localizedText(isChinese, english: "About `.xlsx`", chinese: "关于 `.xlsx`"),
+                title: localizedText(isChinese, english: "About `.xlsx`", chinese: "Excel 文件"),
                 detail: localizedText(
                     isChinese,
                     english: "VisiData can read Excel, but that depends on the Python environment having the required loader installed. If Excel fails, install the missing VisiData dependency in the same Python environment as `vd`.",
-                    chinese: "VisiData 支持 Excel，但需要 `vd` 所在 Python 环境中安装相应依赖。若 Excel 打不开，请在该环境中补装缺失依赖。"
+                    chinese: "VisiData 读取 Excel 需要额外依赖；若打开失败，请在 vd 所在环境补装。"
                 )
             ),
         ]
@@ -1555,34 +1398,65 @@ private struct HelpView: View {
 
     private var visiDataTips: [QuickTip] {
         [
-            QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "不离开键盘也能在单元格和列之间快速移动。")),
-            QuickTip(keys: "/ ? n N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward, then jump through matches.", chinese: "支持向前或向后搜索，并在匹配结果间跳转。")),
-            QuickTip(keys: "[ ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "对当前列执行升序或降序排序。")),
-            QuickTip(keys: "s t u", title: localizedText(isChinese, english: "Select", chinese: "选择"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows for later commands.", chinese: "选择、切换或取消选择行，供后续命令使用。")),
-            QuickTip(keys: "z?", title: localizedText(isChinese, english: "Command Help", chinese: "命令帮助"), detail: localizedText(isChinese, english: "Discover sheet-specific commands and see what VisiData can do on the current data.", chinese: "查看当前数据表可用的专属命令，快速了解 VisiData 还能做什么。")),
-            QuickTip(keys: "q", title: localizedText(isChinese, english: "Back / Quit Sheet", chinese: "返回 / 退出表"), detail: localizedText(isChinese, english: "Go back from a derived sheet or quit the session when you are done.", chinese: "从派生表返回上一层，或在完成后退出当前会话。")),
+            QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "在行列间移动。")),
+            QuickTip(keys: "/ ? n N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward, then jump through matches.", chinese: "向前或向后搜索，并跳转匹配项。")),
+            QuickTip(keys: "[ ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "按当前列升序或降序。")),
+            QuickTip(keys: "s t u", title: localizedText(isChinese, english: "Select", chinese: "选择"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows for later commands.", chinese: "选择、切换或取消选择行。")),
+            QuickTip(keys: "z?", title: localizedText(isChinese, english: "Command Help", chinese: "命令帮助"), detail: localizedText(isChinese, english: "Discover sheet-specific commands and see what VisiData can do on the current data.", chinese: "查看当前表格的可用命令。")),
+            QuickTip(keys: "q", title: localizedText(isChinese, english: "Back / Quit Sheet", chinese: "返回 / 退出表"), detail: localizedText(isChinese, english: "Go back from a derived sheet or quit the session when you are done.", chinese: "返回上层表格，或退出会话。")),
         ]
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                helpHero
-                helpSection(title: localizedText(isChinese, english: "Using iData", chinese: "如何使用 iData"), tips: onboardingTips)
-                helpSection(title: localizedText(isChinese, english: "File Loading Notes", chinese: "文件加载说明"), tips: softwareTips)
-                helpSection(title: localizedText(isChinese, english: "Common VisiData Shortcuts", chinese: "常用 VisiData 快捷键"), tips: visiDataTips)
+        NavigationSplitView {
+            List(HelpTopic.allCases, selection: $selectedTopic) { topic in
+                Label(topic.title(isChinese: isChinese), systemImage: topic.icon)
+                    .tag(topic)
             }
-            .padding(28)
+            .navigationTitle(isChinese ? "帮助" : "Help")
+            .safeAreaInset(edge: .bottom) {
+                Button(isChinese ? "关闭" : "Close") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                .padding()
+            }
+        } detail: {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(selectedTopic.title(isChinese: isChinese))
+                        .font(.largeTitle.bold())
+
+                    Text(selectedTopic.summary(isChinese: isChinese))
+                        .foregroundStyle(.secondary)
+
+                    helpSection(title: "", tips: selectedTips)
+                }
+                .padding(28)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
-        .frame(width: 700, height: 620)
-        .background(detailBackground.ignoresSafeArea())
+        .frame(width: 720, height: 540)
+    }
+
+    private var selectedTips: [QuickTip] {
+        switch selectedTopic {
+        case .iData:
+            onboardingTips
+        case .files:
+            softwareTips
+        case .shortcuts:
+            visiDataTips
+        }
     }
 
     @ViewBuilder
     private func helpSection(title: String, tips: [QuickTip]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
+            if !title.isEmpty {
+                Text(title)
+                    .font(.headline)
+            }
 
             ForEach(tips) { tip in
                 HStack(alignment: .top, spacing: 14) {
@@ -1605,12 +1479,7 @@ private struct HelpView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08))
-        )
+        .padding(.vertical, 4)
     }
 
     private var helpHero: some View {
@@ -1652,15 +1521,15 @@ private struct HelpView: View {
                     Text(localizedText(
                         isChinese,
                         english: "iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.",
-                        chinese: "iData 是 VisiData 的原生 macOS 封装。外层负责文件管理、历史记录、更新与设置；主表格区域运行的是真正的 VisiData，你熟悉的所有命令依然有效。"
+                        chinese: "iData 负责文件与设置，表格操作由 VisiData 提供；所有 VisiData 命令均可使用。"
                     ))
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 10) {
-                        StatusPill(title: localizedText(isChinese, english: "Native macOS shell", chinese: "原生 macOS 界面"), tint: .white.opacity(0.12), icon: "macwindow")
-                        StatusPill(title: localizedText(isChinese, english: "Real VisiData core", chinese: "VisiData 驱动"), tint: Color.accentColor.opacity(0.20), icon: "terminal")
+                        StatusPill(title: localizedText(isChinese, english: "Native macOS shell", chinese: "macOS 原生界面"), tint: .white.opacity(0.12), icon: "macwindow")
+                        StatusPill(title: localizedText(isChinese, english: "Real VisiData core", chinese: "VisiData 核心"), tint: Color.accentColor.opacity(0.20), icon: "terminal")
                     }
                 }
             }
@@ -1685,10 +1554,46 @@ private struct HelpView: View {
     }
 }
 
+private enum HelpTopic: String, CaseIterable, Identifiable {
+    case iData
+    case files
+    case shortcuts
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .iData: "macwindow"
+        case .files: "doc"
+        case .shortcuts: "keyboard"
+        }
+    }
+
+    func title(isChinese: Bool) -> String {
+        switch self {
+        case .iData: localizedText(isChinese, english: "Using iData", chinese: "使用 iData")
+        case .files: localizedText(isChinese, english: "Opening Files", chinese: "打开文件")
+        case .shortcuts: localizedText(isChinese, english: "Shortcuts", chinese: "快捷键")
+        }
+    }
+
+    func summary(isChinese: Bool) -> String {
+        switch self {
+        case .iData:
+            localizedText(isChinese, english: "Open files, revisit recent work, and adjust the app.", chinese: "打开文件、查看最近项目和调整应用设置。")
+        case .files:
+            localizedText(isChinese, english: "What iData opens directly and what needs an extra loader.", chinese: "了解直接支持的格式和额外依赖。")
+        case .shortcuts:
+            localizedText(isChinese, english: "The essential commands for working inside VisiData.", chinese: "在 VisiData 中常用的基础命令。")
+        }
+    }
+}
+
 private struct TutorialHubView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var selectedChapterID: String?
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
@@ -1699,41 +1604,101 @@ private struct TutorialHubView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                ForEach(model.tutorialChapters, id: \.id) { chapter in
-                    chapterCard(chapter)
+        NavigationSplitView {
+            List(model.tutorialChapters, selection: $selectedChapterID) { chapter in
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(chapter.title)
+                        Text("\(chapter.completedStepCount)/\(chapter.steps.count)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: chapter.isCompleted ? "checkmark.circle.fill" : chapter.icon)
+                        .foregroundStyle(chapter.isCompleted ? .green : Color.accentColor)
                 }
+                .tag(chapter.id)
             }
-            .padding(28)
-        }
-        .frame(width: 760, height: 640)
-        .background(
-            ZStack {
-                detailBackground
-                RadialGradient(
-                    colors: [
-                        Color.accentColor.opacity(0.22),
-                        Color.clear,
-                    ],
-                    center: .topTrailing,
-                    startRadius: 20,
-                    endRadius: 380
+            .navigationTitle(isChinese ? "教程" : "Tutorial")
+            .safeAreaInset(edge: .bottom) {
+                Button(isChinese ? "关闭" : "Close") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                .padding()
+            }
+        } detail: {
+            if let chapter = selectedChapter {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(chapter.title)
+                                    .font(.largeTitle.bold())
+                                Text(chapter.subtitle)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button(chapter.isCompleted ? (isChinese ? "重新练习" : "Practice Again") : (isChinese ? "开始练习" : "Start")) {
+                                model.startTutorial(chapterID: chapter.id)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+
+                        Divider()
+
+                        ForEach(chapter.steps, id: \.id) { step in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: step.index < chapter.completedStepCount ? "checkmark.circle.fill" : "\(step.index + 1).circle")
+                                    .foregroundStyle(step.index < chapter.completedStepCount ? .green : Color.secondary)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(step.title)
+                                        .font(.headline)
+                                    Text(step.command)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    Text(step.instruction)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .padding(28)
+                }
+            } else {
+                ContentUnavailableView(
+                    isChinese ? "选择章节" : "Choose a Chapter",
+                    systemImage: "graduationcap",
+                    description: Text(isChinese ? "从左侧选择教程。" : "Select a tutorial from the sidebar.")
                 )
             }
-            .ignoresSafeArea()
-        )
+        }
+        .frame(width: 760, height: 560)
+        .onAppear {
+            if selectedChapterID == nil {
+                selectedChapterID = model.tutorialChapters.first?.id
+            }
+        }
+    }
+
+    private var selectedChapter: AppModel.TutorialChapter? {
+        model.tutorialChapters.first { $0.id == selectedChapterID }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(isChinese ? "教程清单" : "Tutorial Checklist")
+                    Text(isChinese ? "教程" : "Tutorial Checklist")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text(isChinese ? "选择一个章节开始练习。每次开始都会从第 1 步进入，完成的章节会自动打勾。" : "Choose a chapter to practice. Each launch starts from Step 1, and completed chapters remain checked.")
+                    Text(isChinese ? "选择章节开始练习；完成后会自动标记。" : "Choose a chapter to practice. Each launch starts from Step 1, and completed chapters remain checked.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1759,7 +1724,7 @@ private struct TutorialHubView: View {
 
             HStack(spacing: 10) {
                 StatusPill(
-                    title: isChinese ? "示例数据驱动" : "Sample-data driven",
+                    title: isChinese ? "示例数据" : "Sample-data driven",
                     tint: .white.opacity(0.12),
                     icon: "tablecells"
                 )
@@ -1811,7 +1776,7 @@ private struct TutorialHubView: View {
 
                 Spacer(minLength: 0)
 
-                Button(chapter.isCompleted ? (isChinese ? "再练一遍" : "Practice Again") : (isChinese ? "开始" : "Start")) {
+                Button(chapter.isCompleted ? (isChinese ? "重新练习" : "Practice Again") : (isChinese ? "开始" : "Start")) {
                     model.startTutorial(chapterID: chapter.id)
                 }
                 .buttonStyle(.borderedProminent)
@@ -1862,17 +1827,13 @@ private struct WelcomeDetailView: View {
         model.effectiveLanguage == .chinese
     }
 
-    private var showsFirstRunEmptyState: Bool {
-        model.recentFiles.isEmpty && model.lastOpenedFile == nil
-    }
-
     private var quickTips: [QuickTip] {
         [
-            QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate rows and columns quickly without leaving the keyboard.", chinese: "不离开键盘也能快速移动行和列。")),
-            QuickTip(keys: "/ ? n N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward in the current sheet, then jump to next or previous match.", chinese: "在当前工作表中向前或向后搜索，然后跳到下一个或上一个匹配项。")),
-            QuickTip(keys: "s t u", title: localizedText(isChinese, english: "Select Rows", chinese: "选择行"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows before profiling or exporting.", chinese: "在统计分析或导出之前，先选择、切换或取消选择行。")),
-            QuickTip(keys: "[ ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "对当前列执行升序或降序排序。")),
-            QuickTip(keys: "Ctrl + H", title: localizedText(isChinese, english: "Help", chinese: "帮助"), detail: localizedText(isChinese, english: "Open the command and help menu to discover any VisiData action.", chinese: "打开命令与帮助菜单，查看 VisiData 的可用操作。"))
+            QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Move quickly across rows and columns.", chinese: "在行列间移动。")),
+            QuickTip(keys: "/ ? n N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search and move between matches.", chinese: "搜索并切换匹配项。")),
+            QuickTip(keys: "s t u", title: localizedText(isChinese, english: "Select Rows", chinese: "选择行"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows.", chinese: "选择、切换或取消选择行。")),
+            QuickTip(keys: "[ ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column up or down.", chinese: "按当前列升序或降序。")),
+            QuickTip(keys: "Ctrl + H", title: localizedText(isChinese, english: "Help", chinese: "帮助"), detail: localizedText(isChinese, english: "View commands and help.", chinese: "查看命令与帮助。"))
         ]
     }
 
@@ -1901,9 +1862,9 @@ private struct WelcomeDetailView: View {
 
     private var customAssociationActionTitle: String {
         if isCustomAssociationDefault {
-            return localizedText(isChinese, english: "Restore Previous Default", chinese: "恢复之前默认应用")
+            return localizedText(isChinese, english: "Restore Previous Default", chinese: "恢复原应用")
         }
-        return localizedText(isChinese, english: "Set Default to iData", chinese: "设为 iData 默认打开")
+        return localizedText(isChinese, english: "Set Default to iData", chinese: "设为 iData")
     }
 
     private var customAssociationActionIcon: String {
@@ -1932,15 +1893,11 @@ private struct WelcomeDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 20) {
                 heroCard
-                if showsFirstRunEmptyState {
-                    firstRunEmptyStateCard
-                }
+                Divider()
                 quickTipsCard
-                tutorialEntryCard
                 systemStatusSection
-                formatsCard
 
                 if let errorMessage = model.errorMessage {
                     MessageCard(
@@ -1956,236 +1913,119 @@ private struct WelcomeDetailView: View {
                     )
                 }
             }
-            .padding(28)
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 36)
+            .frame(maxWidth: .infinity)
         }
     }
 
     private var heroCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 16) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 88, height: 88)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .shadow(color: .black.opacity(0.14), radius: 18, y: 8)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .center, spacing: 10) {
-                        Text("iData")
-                            .font(.title2)
-                            .fontWeight(.semibold)
+                    Text(isChinese ? "打开数据" : "Open Data")
+                        .font(.largeTitle.bold())
 
-                        VersionPill(model: model, tint: .white.opacity(0.14), icon: "shippingbox")
-
-                        if showsReadyDependencyPillInTitleRow {
-                            dependencyPill
-                        }
-                    }
-
-                    Text(isChinese ? "以原生体验极速打开超大表格，完美保留 VisiData 的行为、快捷键与处理能力。" : "Open large tables with a native macOS experience while keeping full VisiData behavior, shortcuts, and speed.")
-                        .font(.title3)
+                    Text(isChinese ? "选择表格，直接进入 VisiData。" : "Choose a table and go straight to VisiData.")
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if showsHeroMetadataRow {
-                        HStack(spacing: 10) {
-                            if case .missing = model.visiDataDependencyState {
-                                dependencyPill
-                            }
-
-                            if let lastOpenedFile = model.lastOpenedFile {
-                                StatusPill(title: isChinese ? "最近打开: \(lastOpenedFile.lastPathComponent)" : "Last: \(lastOpenedFile.lastPathComponent)", tint: .white.opacity(0.10))
-                            }
-                        }
-                    }
                 }
             }
 
-            HStack(spacing: 12) {
-                Button {
-                    model.openDocument()
-                } label: {
-                    Label(isChinese ? "打开文件" : "Open File", systemImage: "tablecells")
-                }
-                .buttonStyle(.borderedProminent)
-                .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
+            heroActions
 
-                if case .missing = model.visiDataDependencyState {
-                    Button {
-                        model.runVisiDataOneClickSetup()
-                    } label: {
-                        Label(isChinese ? "安装 VisiData" : "Install VisiData", systemImage: "shippingbox")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1.5)
-                }
+            Text(isChinese ? "支持常见表格与 .gz / .bgz 压缩文件。" : "Supports common tables and .gz / .bgz compressed files.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
+    private var heroActions: some View {
+        HStack(spacing: 10) {
+            heroPrimaryActions
+
+            Menu {
                 Button {
                     model.presentTutorialHub()
                 } label: {
-                    Label(isChinese ? "开始教程" : "Start Tutorial", systemImage: "graduationcap.fill")
+                    Label(isChinese ? "教程" : "Tutorial", systemImage: "graduationcap")
                 }
-                .buttonStyle(.bordered)
-                .quietInteractiveSurface(enabled: motionEnabled)
+
+                SettingsLink {
+                    Label(isChinese ? "设置" : "Settings", systemImage: "gearshape")
+                }
+
+                Divider()
 
                 Button {
                     updater.checkForUpdates()
                 } label: {
-                    Label(isChinese ? "检查更新" : "Check for Updates", systemImage: "arrow.trianglehead.clockwise")
-                }
-                .buttonStyle(.bordered)
-                .quietInteractiveSurface(enabled: motionEnabled)
-
-                SettingsLink {
-                    Label(isChinese ? "偏好设置" : "Preferences", systemImage: "gearshape")
-                }
-                .buttonStyle(.bordered)
-                .quietInteractiveSurface(enabled: motionEnabled)
-
-                if let fileURL = model.lastOpenedFile {
-                    Button {
-                        model.revealInFinder(fileURL)
-                    } label: {
-                        Label(isChinese ? "所在位置" : "Show Last File", systemImage: "finder")
-                    }
-                    .buttonStyle(.bordered)
-                    .quietInteractiveSurface(enabled: motionEnabled)
+                    Label(isChinese ? "检查更新" : "Check for Updates", systemImage: "arrow.clockwise")
                 }
 
                 Link(destination: repositoryURL) {
                     Label("GitHub", systemImage: "link")
                 }
-                .buttonStyle(.bordered)
-                .quietInteractiveSurface(enabled: motionEnabled)
-                .help(isChinese ? "如果你喜欢 iData 就给个 Star 吧 ✨" : "Give a star if you like iData ✨")
+            } label: {
+                Label(isChinese ? "更多" : "More", systemImage: "ellipsis.circle")
             }
-
-            Text(isChinese ? "提示: 拖拽支持的表格文件到此窗口可直接打开。" : "Tip: drag a supported table file into this window to open it directly.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Text(isChinese ? "大多数数据文件会交由引擎直接处理。原生支持读取 `.gz` / `.bgz` 等压缩流，无需预先解压。" : "Most data files are delegated to the underlying engine. Compressed `.gz` / `.bgz` files are streamed natively without extracting.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .menuStyle(.borderlessButton)
+            .fixedSize()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(24)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.18),
-                    Color.white.opacity(0.05),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
-        .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
-    }
-
-    private var firstRunEmptyStateCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "tablecells")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 38, height: 38)
-                    .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(localizedText(isChinese, english: "Start with a table", chinese: "先打开一份数据"))
-                        .font(.headline)
-                    Text(localizedText(
-                        isChinese,
-                        english: "Choose the path that matches this file: inspect it in iData, learn with a sample, or review small-file handoff.",
-                        chinese: "按文件目的选择下一步：在 iData 中查看、用示例练习，或确认小文件转交设置。"
-                    ))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    firstRunActionButton(
-                        title: localizedText(isChinese, english: "Open First Table", chinese: "打开第一份表格"),
-                        symbol: "tablecells",
-                        prominent: true,
-                        action: { model.openDocument() }
-                    )
-
-                    firstRunActionButton(
-                        title: localizedText(isChinese, english: "Try Sample Tutorial", chinese: "试用示例教程"),
-                        symbol: "graduationcap.fill",
-                        prominent: false,
-                        action: { model.presentTutorialHub() }
-                    )
-
-                    SettingsLink {
-                        Label(localizedText(isChinese, english: "Review Handoff Settings", chinese: "查看转交设置"), systemImage: "arrow.triangle.branch")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .quietInteractiveSurface(enabled: motionEnabled)
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    firstRunActionButton(
-                        title: localizedText(isChinese, english: "Open First Table", chinese: "打开第一份表格"),
-                        symbol: "tablecells",
-                        prominent: true,
-                        action: { model.openDocument() }
-                    )
-
-                    firstRunActionButton(
-                        title: localizedText(isChinese, english: "Try Sample Tutorial", chinese: "试用示例教程"),
-                        symbol: "graduationcap.fill",
-                        prominent: false,
-                        action: { model.presentTutorialHub() }
-                    )
-
-                    SettingsLink {
-                        Label(localizedText(isChinese, english: "Review Handoff Settings", chinese: "查看转交设置"), systemImage: "arrow.triangle.branch")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-                    .quietInteractiveSurface(enabled: motionEnabled)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
     }
 
     @ViewBuilder
-    private func firstRunActionButton(
-        title: String,
-        symbol: String,
-        prominent: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        if prominent {
-            Button(action: action) {
-                Label(title, systemImage: symbol)
+    private var heroPrimaryActions: some View {
+        Button {
+            model.openDocument()
+        } label: {
+            Label(isChinese ? "打开…" : "Open…", systemImage: "tablecells")
+        }
+        .buttonStyle(.borderedProminent)
+
+        if case .missing = model.visiDataDependencyState {
+            Button {
+                model.runVisiDataOneClickSetup()
+            } label: {
+                Label(isChinese ? "安装 VisiData" : "Install VisiData", systemImage: "shippingbox")
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-            .quietInteractiveSurface(enabled: motionEnabled)
-        } else {
-            Button(action: action) {
-                Label(title, systemImage: symbol)
+        }
+    }
+
+    @ViewBuilder
+    private var heroSecondaryActions: some View {
+        Button {
+            updater.checkForUpdates()
+        } label: {
+            Label(isChinese ? "检查更新" : "Check for Updates", systemImage: "arrow.trianglehead.clockwise")
+        }
+        .buttonStyle(.bordered)
+        .quietInteractiveSurface(enabled: motionEnabled)
+
+        if let fileURL = model.lastOpenedFile {
+            Button {
+                model.revealInFinder(fileURL)
+            } label: {
+                Label(isChinese ? "在 Finder 中显示" : "Show in Finder", systemImage: "finder")
             }
             .buttonStyle(.bordered)
-            .controlSize(.regular)
             .quietInteractiveSurface(enabled: motionEnabled)
         }
+
+        Link(destination: repositoryURL) {
+            Label("GitHub", systemImage: "link")
+        }
+        .buttonStyle(.bordered)
+        .quietInteractiveSurface(enabled: motionEnabled)
+        .help(isChinese ? "在 GitHub 查看 iData" : "View iData on GitHub")
     }
 
     private var showsReadyDependencyPillInTitleRow: Bool {
@@ -2216,62 +2056,30 @@ private struct WelcomeDetailView: View {
     private var dependencyPill: some View {
         switch model.visiDataDependencyState {
         case .available:
-            return AnyView(StatusPill(title: localizedText(isChinese, english: "VisiData Ready", chinese: "VisiData 已就绪"), tint: .green.opacity(0.20), icon: "checkmark.circle.fill"))
+            return AnyView(StatusPill(title: localizedText(isChinese, english: "VisiData Ready", chinese: "VisiData 可用"), tint: .green.opacity(0.20), icon: "checkmark.circle.fill"))
         case .missing:
-            return AnyView(StatusPill(title: localizedText(isChinese, english: "Install VisiData", chinese: "安装 VisiData"), tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill"))
+            return AnyView(StatusPill(title: localizedText(isChinese, english: "VisiData Missing", chinese: "未安装 VisiData"), tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill"))
         }
     }
 
     private var systemStatusSection: some View {
-        let runtimeDetail = localizedText(
-            isChinese,
-            english: "\(model.visiDataDependencySummary) Automatic format detection enabled. Compressed .gz/.bgz streams are natively supported.",
-            chinese: "\(model.visiDataDependencySummary) 格式自动识别已启用，且原生支持读取 .gz / .bgz 等各类压缩数据流。"
-        )
+        HStack(spacing: 8) {
+            Image(systemName: model.visiDataDependencyState.isAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(model.visiDataDependencyState.isAvailable ? .green : .orange)
 
-        return VStack(alignment: .leading, spacing: 20) {
-            Text(localizedText(isChinese, english: "System Status", chinese: "系统状态"))
-                .font(.title3.weight(.semibold))
+            Text(model.visiDataDependencyState.isAvailable
+                ? (isChinese ? "VisiData 已就绪" : "VisiData Ready")
+                : (isChinese ? "需要安装 VisiData" : "VisiData Required"))
+                .font(.subheadline.weight(.semibold))
 
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 36) {
-                    systemStatusItem(
-                        title: localizedText(isChinese, english: "Runtime", chinese: "运行环境"),
-                        icon: "terminal",
-                        detail: runtimeDetail
-                    )
+            Spacer()
 
-                    Divider()
-                        .padding(.vertical, 6)
-
-                    systemStatusItem(
-                        title: localizedText(isChinese, english: "Updates", chinese: "更新"),
-                        icon: "arrow.triangle.2.circlepath",
-                        detail: updater.statusMessage
-                    )
-                }
-                .frame(minHeight: 104, alignment: .top)
-
-                VStack(alignment: .leading, spacing: 18) {
-                    systemStatusItem(
-                        title: localizedText(isChinese, english: "Runtime", chinese: "运行环境"),
-                        icon: "terminal",
-                        detail: runtimeDetail
-                    )
-
-                    Divider()
-
-                    systemStatusItem(
-                        title: localizedText(isChinese, english: "Updates", chinese: "更新"),
-                        icon: "arrow.triangle.2.circlepath",
-                        detail: updater.statusMessage
-                    )
-                }
-            }
+            Text(model.appVersionDisplay(revealingBuild: false))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
+        .padding(.vertical, 2)
+        .frame(maxWidth: .infinity)
     }
 
     private func systemStatusItem(title: String, icon: String, detail: String) -> some View {
@@ -2298,7 +2106,7 @@ private struct WelcomeDetailView: View {
     }
 
     private var quickTipsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(localizedText(isChinese, english: "VisiData Quick Start", chinese: "VisiData 快速上手"))
@@ -2307,7 +2115,7 @@ private struct WelcomeDetailView: View {
                     Text(localizedText(
                         isChinese,
                         english: "These are common starter shortcuts. All normal VisiData commands still work inside the embedded session.",
-                        chinese: "这里列出的是常见入门快捷键。内嵌会话里其余标准 VisiData 命令仍然都可以正常使用。"
+                        chinese: "常用快捷键；其他 VisiData 命令同样可用。"
                     ))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -2317,29 +2125,13 @@ private struct WelcomeDetailView: View {
                 Spacer(minLength: 0)
             }
 
-            VStack(spacing: 9) {
-                ForEach(quickTips) { tip in
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 10) {
+                ForEach(Array(quickTips.prefix(4))) { tip in
                     quickTipPreviewRow(tip)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(22)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.20),
-                    Color.white.opacity(0.05),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
     }
 
     @ViewBuilder
@@ -2348,10 +2140,8 @@ private struct WelcomeDetailView: View {
             Text(tip.keys)
                 .font(.system(.caption, design: .monospaced, weight: .semibold))
                 .lineLimit(1)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.08), in: Capsule())
-                .frame(minWidth: 155, alignment: .leading)
+                .foregroundStyle(Color.accentColor)
+                .frame(minWidth: 110, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(tip.title)
@@ -2368,7 +2158,7 @@ private struct WelcomeDetailView: View {
     private var formatsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 10) {
-                Text(localizedText(isChinese, english: "Supported Formats", chinese: "支持的格式"))
+                Text(localizedText(isChinese, english: "Supported Formats", chinese: "默认打开方式"))
                     .font(.headline)
                 
                 Button {
@@ -2381,12 +2171,13 @@ private struct WelcomeDetailView: View {
                         .background(Color.accentColor.opacity(0.12), in: Circle())
                 }
                 .buttonStyle(.plain)
-                .help(localizedText(isChinese, english: "Refresh system defaults", chinese: "从系统刷新默认设置状态"))
+                .accessibilityLabel(localizedText(isChinese, english: "Refresh system defaults", chinese: "刷新默认应用"))
+                .help(localizedText(isChinese, english: "Refresh system defaults", chinese: "刷新默认应用"))
                 
                 Spacer()
                 
                 SettingsLink {
-                    Label(localizedText(isChinese, english: "Handoff Rules", chinese: "设置转交规则"), systemImage: "gearshape.fill")
+                    Label(localizedText(isChinese, english: "Handoff Rules", chinese: "小文件设置…"), systemImage: "gearshape.fill")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
@@ -2396,16 +2187,8 @@ private struct WelcomeDetailView: View {
 
             Text(localizedText(
                 isChinese,
-                english: "A concise set of common formats is shown below. iData still forwards most regular files directly to VisiData.",
-                chinese: "下面仅展示常见格式的精简集合。iData 仍会把大多数常规文件直接转交给 VisiData。"
-            ))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Text(localizedText(
-                isChinese,
                 english: "Tap a chip to toggle default handling: set iData, then tap again to restore another app.",
-                chinese: "点击格式卡片可切换默认处理：先设为 iData，再点一次恢复到其他应用。"
+                chinese: "点击格式，设为 iData 默认打开；再次点击可恢复。"
             ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -2429,7 +2212,7 @@ private struct WelcomeDetailView: View {
                 .overlay(Color.white.opacity(0.08))
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(localizedText(isChinese, english: "Custom Suffix", chinese: "自定义后缀"))
+                Text(localizedText(isChinese, english: "Custom Suffix", chinese: "其他扩展名"))
                     .font(.subheadline.weight(.semibold))
 
                 HStack(spacing: 10) {
@@ -2468,14 +2251,14 @@ private struct WelcomeDetailView: View {
                         if isSettingCustomAssociation {
                             ProgressView()
                                 .controlSize(.small)
-                            Text(localizedText(isChinese, english: "Setting...", chinese: "正在设置..."))
+                            Text(localizedText(isChinese, english: "Setting...", chinese: "设置中…"))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else if isCustomAssociationDefault {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundStyle(.green)
-                            Text(localizedText(isChinese, english: "Default: iData", chinese: "默认应用：iData"))
+                            Text(localizedText(isChinese, english: "Default: iData", chinese: "已设为 iData"))
                                 .font(.caption)
                                 .foregroundStyle(.green)
                         }
@@ -2484,7 +2267,7 @@ private struct WelcomeDetailView: View {
                     Text(localizedText(
                         isChinese,
                         english: "Enter a suffix to set its default handler to iData.",
-                        chinese: "输入一个后缀，把它的默认打开方式设为 iData。"
+                        chinese: "输入扩展名，如 .vcf。"
                     ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -2527,10 +2310,10 @@ private struct TutorialEntryCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(isChinese ? "交互式教程" : "Interactive Tutorial")
+                    Text(isChinese ? "教程" : "Interactive Tutorial")
                         .font(.headline)
 
-                    Text(isChinese ? "用示例数据学习 VisiData，并在会话内跟随引导完成练习。" : "Learn VisiData with a sample dataset and a guided in-session coach.")
+                    Text(isChinese ? "用示例数据边学边练。" : "Learn VisiData with a sample dataset and a guided in-session coach.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2694,39 +2477,34 @@ private struct SessionDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             sessionHeader
-            .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: shouldShowSessionInfoHint)
+
+            if shouldShowSessionInfoHint {
+                SessionInfoHintPanel(
+                    isChinese: isChinese,
+                    message: sessionInfoHint,
+                    motionEnabled: motionEnabled,
+                    canCycle: sessionInfoHints.count > 1,
+                    onPrevious: { moveSessionHint(by: -1) },
+                    onNext: { moveSessionHint(by: 1) },
+                    onDismiss: { isSessionInfoHintDismissed = true }
+                )
+                .transition(.opacity)
+            }
 
             ZStack(alignment: .topTrailing) {
                 EmbeddedTerminalView(session: session)
                     .id(ObjectIdentifier(session))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color.black.opacity(0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.08))
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.10))
                     )
-                    .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
-
-                if shouldShowSessionInfoHint {
-                    SessionInfoHintPanel(
-                        isChinese: isChinese,
-                        message: sessionInfoHint,
-                        motionEnabled: motionEnabled,
-                        canCycle: sessionInfoHints.count > 1,
-                        onPrevious: { moveSessionHint(by: -1) },
-                        onNext: { moveSessionHint(by: 1) },
-                        onDismiss: { isSessionInfoHintDismissed = true }
-                    )
-                    .padding(.top, 16)
-                    .padding(.trailing, 16)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
 
                 if model.isTutorialActive, model.tutorialCurrentStep != nil {
                     TutorialCoachOverlay(model: model)
-                        .padding(.top, 62)
-                        .padding(.trailing, 16)
+                        .padding(12)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -2869,52 +2647,20 @@ private struct SessionHeaderActions: View {
     let copyAction: () -> Void
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                headerActionButton(
-                    title: localizedText(isChinese, english: "Open…", chinese: "打开…"),
-                    systemImage: "folder",
-                    action: openAction
-                )
-                .keyboardShortcut("o")
-
-                headerActionButton(
-                    title: localizedText(isChinese, english: "Reopen", chinese: "重新打开"),
-                    systemImage: "arrow.clockwise",
-                    action: reopenAction
-                )
-                .disabled(!canReopen)
-
-                headerActionButton(
-                    title: localizedText(isChinese, english: "Show in Finder", chinese: "在 Finder 中显示"),
-                    systemImage: "finder",
-                    action: revealAction
-                )
-
-                headerActionButton(
-                    title: localizedText(isChinese, english: "Copy Path", chinese: "复制路径"),
-                    systemImage: "doc.on.doc",
-                    action: copyAction
-                )
+        HStack(spacing: 8) {
+            Button(action: openAction) {
+                Label(localizedText(isChinese, english: "Open…", chinese: "打开…"), systemImage: "folder")
             }
-            .fixedSize(horizontal: true, vertical: false)
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut("o")
 
             Menu {
-                Button {
-                    openAction()
-                } label: {
-                    Label(localizedText(isChinese, english: "Open…", chinese: "打开…"), systemImage: "folder")
-                }
-                .keyboardShortcut("o")
-
                 Button {
                     reopenAction()
                 } label: {
                     Label(localizedText(isChinese, english: "Reopen", chinese: "重新打开"), systemImage: "arrow.clockwise")
                 }
                 .disabled(!canReopen)
-
-                Divider()
 
                 Button {
                     revealAction()
@@ -2928,9 +2674,10 @@ private struct SessionHeaderActions: View {
                     Label(localizedText(isChinese, english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
                 }
             } label: {
-                Label(localizedText(isChinese, english: "Actions", chinese: "操作"), systemImage: "ellipsis.circle")
+                Image(systemName: "ellipsis.circle")
             }
-            .buttonStyle(.bordered)
+            .menuStyle(.borderlessButton)
+            .fixedSize()
             .help(localizedText(
                 isChinese,
                 english: "Actions for \(fileURL.lastPathComponent)",
@@ -3053,10 +2800,10 @@ private struct ExternalHandoffNoticeBanner: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                Text(detail)
+            Text(detail)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .truncationMode(.middle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -3083,33 +2830,14 @@ private struct ExternalHandoffNoticeBanner: View {
             .buttonStyle(.plain)
             .help(localizedText(isChinese, english: "Dismiss", chinese: "关闭提示"))
         }
-        .padding(12)
-        .frame(width: 420, alignment: .leading)
-        .background {
-            ZStack {
-                Color.clear.background(.ultraThinMaterial)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.10),
-                        Color.accentColor.opacity(0.14),
-                        Color.black.opacity(0.04),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        .padding(10)
+        .frame(width: 380, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(isHovering ? 0.24 : 0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.24), radius: 22, y: 8)
-        .shadow(color: Color.accentColor.opacity(isHovering ? 0.18 : 0.08), radius: 28, y: 0)
-        .onHover { hovering in
-            isHovering = hovering
-        }
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
     }
 }
 
@@ -3119,8 +2847,6 @@ private struct StatusAndInputCard: View {
     let inputDisplayName: String
     let isLikelyEnglish: Bool
     let onSwitchToEnglish: () -> Void
-
-    @State private var isHovering = false
 
     private var statusBadgeTitle: String {
         if isLikelyEnglish {
@@ -3143,10 +2869,7 @@ private struct StatusAndInputCard: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(isChinese ? "状态" : "Status")
-                    .font(.subheadline.weight(.semibold))
-
+            VStack(alignment: .leading, spacing: 3) {
                 Text(statusMessage)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -3154,53 +2877,25 @@ private struct StatusAndInputCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .trailing, spacing: 8) {
-                StatusPill(
-                    title: statusBadgeTitle,
-                    tint: statusBadgeTint,
-                    icon: statusBadgeIcon
-                )
-
-                Text(inputDisplayName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: 220, alignment: .trailing)
-            }
+            Label(inputDisplayName, systemImage: statusBadgeIcon)
+                .font(.caption)
+                .foregroundStyle(isLikelyEnglish ? .green : .orange)
+                .lineLimit(1)
 
             InputMethodQuickSwitchOrbButton(
                 isChinese: isChinese,
                 onTap: onSwitchToEnglish
             )
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            ZStack {
-                cardTint
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(isHovering ? 0.07 : 0.05),
-                        Color.accentColor.opacity(isHovering ? 0.08 : 0),
-                        Color.black.opacity(0.04),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        .background(cardTint, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(isHovering ? 0.16 : 0.10), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
                 .allowsHitTesting(false)
         )
-        .animation(.easeOut(duration: 0.18), value: isHovering)
-        .onHover { hovering in
-            isHovering = hovering
-        }
     }
 }
 
@@ -3359,33 +3054,14 @@ private struct SessionInfoHintPanel: View {
                 action: onDismiss
             )
         }
-        .padding(12)
-        .frame(width: 440, alignment: .leading)
-        .background {
-            ZStack {
-                Color.clear.background(.ultraThinMaterial)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.10),
-                        Color.accentColor.opacity(0.12),
-                        Color.black.opacity(0.04),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(isHovering ? 0.22 : 0.12), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.16), lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.22), radius: 20, y: 8)
-        .shadow(color: Color.accentColor.opacity(isHovering ? 0.16 : 0.06), radius: 24, y: 0)
-        .onHover { hovering in
-            isHovering = hovering
-        }
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHovering)
         .help(isChinese ? "随机提示" : "Random tip")
     }
 }

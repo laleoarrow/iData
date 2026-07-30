@@ -716,10 +716,12 @@ struct AppModelTests {
             preferredLanguagesProvider: { ["zh-Hans-CN"] }
         )
 
-        #expect(model.visiDataDependencySummary.contains("未找到"))
-        #expect(model.visiDataDependencySummary.contains("一键配置"))
+        #expect(model.visiDataDependencySummary.contains("未安装"))
+        #expect(model.visiDataDependencySummary.contains("安装 VisiData"))
         #expect(model.visiDataDependencySummary.contains("pipx install visidata"))
-        #expect(model.visiDataDependencySummary.contains("偏好设置"))
+        #expect(model.visiDataDependencySummary.contains("pipx inject visidata openpyxl"))
+        #expect(model.visiDataDependencySummary.contains("brew install visidata"))
+        #expect(model.visiDataDependencySummary.contains("设置"))
     }
 
     @Test
@@ -1526,7 +1528,7 @@ struct AppModelTests {
     }
 
     @Test
-    func tutorialProgressTextLocalizesToChinese() {
+    func tutorialProgressTextLocalizesToChinese() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
@@ -1535,9 +1537,9 @@ struct AppModelTests {
 
         let model = AppModel(defaults: defaults, preferredLanguagesProvider: { ["zh-Hans-CN"] })
         model.beginTutorialGuide()
+        let chapter = try #require(model.tutorialCurrentChapter)
 
-        #expect(model.tutorialProgressText.contains("第 1 步"))
-        #expect(model.tutorialProgressText.contains(" / "))
+        #expect(model.tutorialProgressText == "\(chapter.title) · 第 1/\(chapter.steps.count) 步")
     }
 
     @Test

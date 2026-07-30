@@ -1,318 +1,316 @@
+import AppKit
 import SwiftUI
 
 struct PreferencesView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
-    private var motionEnabled: Bool {
-        model.animationsEnabled && !accessibilityReduceMotion
-    }
+    @State private var selectedTab: PreferencesTab = .general
+    @State private var customAssociationInput = ""
 
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
     }
 
+    private var normalizedCustomAssociationExtension: String {
+        AppModel.associationExtension(for: customAssociationInput)
+    }
+
+    private var canSubmitCustomAssociation: Bool {
+        AppModel.canSetAssociationExtensionInput(customAssociationInput) && !model.isSettingFormatDefault
+    }
+
+    private var isCustomAssociationDefault: Bool {
+        guard !normalizedCustomAssociationExtension.isEmpty else {
+            return false
+        }
+        return model.formatAssociationStatus[normalizedCustomAssociationExtension] ?? false
+    }
+
+    private var displayedFormatExtensions: [String] {
+        AppModel.formatPanelFormats.map(\.fileExtension)
+    }
+
+    private var orderedSupportedFormats: [(format: AppModel.SupportedFormat, isDefault: Bool)] {
+        AppModel.formatPanelFormats.map { format in
+            let lookupExtension = AppModel.associationExtension(for: format.fileExtension)
+            let isDefault = model.formatAssociationStatus[lookupExtension]
+                ?? model.formatAssociationStatus[format.fileExtension]
+                ?? false
+            return (format, isDefault)
+        }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                preferencesHero
-                smallFileRoutingCard
-                animationsCard
-                appLanguageCard
-                runtimeCard
-                updatesCard
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        TabView(selection: $selectedTab) {
+            generalTab
+                .tabItem {
+                    Label(isChinese ? "通用" : "General", systemImage: "gearshape")
+                }
+                .tag(PreferencesTab.general)
+
+            filesTab
+                .tabItem {
+                    Label(isChinese ? "文件" : "Files", systemImage: "doc")
+                }
+                .tag(PreferencesTab.files)
+
+            runtimeTab
+                .tabItem {
+                    Label("VisiData", systemImage: "terminal")
+                }
+                .tag(PreferencesTab.runtime)
+
+            updatesTab
+                .tabItem {
+                    Label(isChinese ? "更新" : "Updates", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .tag(PreferencesTab.updates)
         }
-        .scrollIndicators(.hidden)
-        .frame(width: 620, height: 660)
-        .background(preferencesBackground.ignoresSafeArea())
-        .environment(\EnvironmentValues.idataAnimationsEnabled, model.animationsEnabled)
+        .frame(width: 640, height: 520)
+        .background(Color(nsColor: .windowBackgroundColor))
+        .environment(\.idataAnimationsEnabled, model.animationsEnabled)
+        .onAppear(perform: refreshFormatAssociations)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshFormatAssociations()
+        }
+        .onChange(of: normalizedCustomAssociationExtension) { _, newValue in
+            guard !newValue.isEmpty else {
+                return
+            }
+            model.refreshFormatAssociationStatuses(forExtensions: [newValue])
+        }
     }
 
-    private var preferencesHero: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 16) {
-                Image(systemName: "gearshape.2.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 54, height: 54)
-                    .background(Color.accentColor.opacity(0.24), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    private var generalTab: some View {
+        Form {
+            Section {
+                Picker(isChinese ? "语言" : "Language", selection: $model.appLanguagePreference) {
+                    ForEach(AppModel.AppLanguagePreference.allCases) { option in
+                        Text(model.appLanguageOptionTitle(option))
+                            .tag(option)
+                    }
+                }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(isChinese ? "偏好设置" : "Preferences")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                Toggle(isChinese ? "减少动画" : "Reduce motion", isOn: $model.reduceAnimations)
+            } footer: {
+                Text(isChinese ? "系统“减少动态效果”始终优先。" : "System Reduce Motion always takes priority.")
+            }
 
-                    Text(isChinese ? "管理小文件转交、VisiData 路径与更新。" : "Manage handoff, VisiData path, and updates.")
-                        .font(.body)
+            Section(isChinese ? "状态" : "Status") {
+                LabeledContent(isChinese ? "版本" : "Version") {
+                    Text(model.appVersionDisplay(revealingBuild: false))
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 10) {
-                        VersionPill(model: model, tint: .white.opacity(0.12), icon: "shippingbox")
-
-                        switch model.visiDataDependencyState {
-                        case .available:
-                            PreferencePill(title: isChinese ? "VisiData 已就绪" : "VisiData Ready", tint: .green.opacity(0.20), icon: "checkmark.circle.fill", animated: motionEnabled)
-                        case .missing:
-                            PreferencePill(title: isChinese ? "缺少 VisiData" : "VisiData Missing", tint: Color.primary.opacity(0.12), icon: "exclamationmark.triangle.fill", animated: motionEnabled)
-                        }
-                    }
                 }
-            }
-        }
-        .padding(22)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(.regularMaterial)
 
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.accentColor.opacity(0.18),
-                                Color.accentColor.opacity(0.08),
-                                Color.white.opacity(0.04),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+                LabeledContent("VisiData") {
+                    Label(
+                        visiDataStatusTitle,
+                        systemImage: model.visiDataDependencyState.isAvailable
+                            ? "checkmark.circle.fill"
+                            : "exclamationmark.triangle.fill"
                     )
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.14),
-                            Color.accentColor.opacity(0.16),
-                            Color.white.opacity(0.05),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(0.10), radius: 18, y: 8)
-    }
-
-    private var animationsCard: some View {
-        PreferencesCard(title: isChinese ? "外观" : "Appearance", icon: "sparkles") {
-            VStack(alignment: .leading, spacing: 14) {
-                Toggle(isChinese ? "减少 iData 动画效果" : "Reduce iData animations", isOn: $model.reduceAnimations)
-                    .toggleStyle(.switch)
-
-                Text(isChinese ? "降低悬停、弹性和渐显动画；系统“减少动态效果”优先。" : "Reduces hover, spring, and reveal motion while respecting System Reduce Motion.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .foregroundStyle(model.visiDataDependencyState.isAvailable ? .green : .orange)
+                }
             }
         }
+        .formStyle(.grouped)
+        .padding()
     }
 
-    private var runtimeCard: some View {
-        PreferencesCard(title: isChinese ? "VisiData 运行环境" : "VisiData Runtime", icon: "terminal", accessory: {
-            PreferencesMenuButton(title: isChinese ? "操作" : "Actions", icon: "ellipsis.circle", animated: motionEnabled) {
-                Button {
-                    model.chooseVDExecutable()
-                } label: {
-                    Label(isChinese ? "选择可执行文件…" : "Choose Executable…", systemImage: "folder")
+    private var filesTab: some View {
+        Form {
+            Section {
+                LabeledContent(isChinese ? "转交给" : "Hand off to") {
+                    Text(model.preferredSmallFileApplicationDisplayName)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
 
-                Button {
-                    model.vdExecutablePath = ""
-                } label: {
-                    Label(isChinese ? "自动检测" : "Auto Detect", systemImage: "wand.and.stars")
+                HStack {
+                    Button(isChinese ? "选择应用…" : "Choose App…") {
+                        model.choosePreferredSmallFileApplication()
+                    }
+
+                    Button(isChinese ? "测试打开" : "Test Open") {
+                        testSmallFileHandoff()
+                    }
+
+                    Spacer()
+
+                    Button(isChinese ? "恢复默认" : "Restore Default") {
+                        model.clearPreferredSmallFileApplication()
+                    }
+                    .disabled(model.preferredSmallFileApplication == nil)
                 }
+            } header: {
+                Text(isChinese ? "小文件" : "Small Files")
+            } footer: {
+                Text(isChinese
+                    ? "从 Finder 打开的 CSV、TSV 和 Excel 文件不超过 \(AppModel.smallFileRoutingThresholdDisplay) 时转交；压缩文件仍由 iData 打开。"
+                    : "CSV, TSV, and Excel files opened from Finder are handed off up to \(AppModel.smallFileRoutingThresholdDisplay). Compressed files stay in iData.")
+            }
 
-                if case .missing = model.visiDataDependencyState {
-                    Divider()
-
-                    Button {
-                        model.runVisiDataOneClickSetup()
-                    } label: {
-                        Label(isChinese ? "一键安装" : "One-Click Setup", systemImage: "arrow.down.circle")
+            Section {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8)], spacing: 8) {
+                    ForEach(orderedSupportedFormats, id: \.format.fileExtension) { entry in
+                        FormatChip(
+                            title: entry.format.localizedDisplayName(for: model.effectiveLanguage),
+                            extensionText: entry.format.fileExtension,
+                            isDefault: entry.isDefault,
+                            isLoading: model.isSettingFormatDefault
+                                && model.settingFormatExtension == entry.format.fileExtension,
+                            isChinese: isChinese,
+                            onTap: {
+                                model.setFormatAsDefault(forExtension: entry.format.fileExtension)
+                            }
+                        )
                     }
                 }
+
+                HStack(spacing: 8) {
+                    TextField(".vcf", text: $customAssociationInput)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.body, design: .monospaced))
+                        .onSubmit(setCustomAssociation)
+
+                    Button(customAssociationActionTitle, action: setCustomAssociation)
+                        .disabled(!canSubmitCustomAssociation)
+                }
+
+                if !normalizedCustomAssociationExtension.isEmpty {
+                    Label(
+                        customAssociationStatusTitle,
+                        systemImage: isCustomAssociationDefault ? "checkmark.circle.fill" : "circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(isCustomAssociationDefault ? .green : .secondary)
+                }
+            } header: {
+                HStack {
+                    Text(isChinese ? "默认打开方式" : "Default Applications")
+                    Spacer()
+                    Button {
+                        refreshFormatAssociations()
+                    } label: {
+                        Label(isChinese ? "刷新" : "Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderless)
+                }
+            } footer: {
+                Text(isChinese ? "点击格式设为 iData；再次点击恢复原应用。" : "Click a format to use iData; click again to restore the previous app.")
             }
-        }) {
-            VStack(alignment: .leading, spacing: 10) {
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private var runtimeTab: some View {
+        Form {
+            Section {
                 TextField("/opt/homebrew/bin/vd", text: $model.vdExecutablePath)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
 
-                Text(model.visiDataDependencySummary)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var smallFileRoutingCard: some View {
-        PreferencesCard(title: isChinese ? "小文件打开方式" : "Small-File Opening", icon: "arrowshape.turn.up.right.circle", accessory: {
-            PreferencesMenuButton(title: isChinese ? "操作" : "Actions", icon: "ellipsis.circle", animated: motionEnabled) {
-                Button {
-                    model.choosePreferredSmallFileApplication()
-                } label: {
-                    Label(isChinese ? "选择应用…" : "Choose App…", systemImage: "app.badge")
-                }
-
-                Button {
-                    testSmallFileHandoff()
-                } label: {
-                    Label(isChinese ? "测试转交" : "Test Handoff", systemImage: "arrowshape.turn.up.right")
-                }
-
-                Divider()
-
-                Button {
-                    model.clearPreferredSmallFileApplication()
-                } label: {
-                    Label(isChinese ? "清除自定义应用" : "Clear Custom App", systemImage: "xmark.circle")
-                }
-                .disabled(model.preferredSmallFileApplication == nil)
-            }
-        }) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 38, height: 38)
-                        .background(Color.accentColor.opacity(0.16), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(isChinese ? "默认目标：\(model.preferredSmallFileApplicationDisplayName)" : "Default target: \(model.preferredSmallFileApplicationDisplayName)")
-                            .font(.headline)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(isChinese ? "Finder 交来的小型 CSV / Excel 优先转交；压缩文件仍留在 iData。" : "Small CSV / Excel files from Finder hand off first; compressed files stay in iData.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button(isChinese ? "选择…" : "Choose…") {
+                        model.chooseVDExecutable()
                     }
-                }
 
-                HStack(spacing: 8) {
-                    PreferencePill(
-                        title: isChinese ? "≤ \(AppModel.smallFileRoutingThresholdDisplay)" : "≤ \(AppModel.smallFileRoutingThresholdDisplay)",
-                        tint: Color.accentColor.opacity(0.16),
-                        icon: "scalemass",
-                        animated: motionEnabled
-                    )
-
-                    PreferencePill(
-                        title: isChinese ? "压缩文件留在 iData" : "Compressed files stay in iData",
-                        tint: Color.accentColor.opacity(0.12),
-                        icon: "archivebox",
-                        animated: motionEnabled
-                    )
-                }
-
-                HStack(spacing: 8) {
-                    ForEach([".csv", ".tsv", ".xlsx", ".xls"], id: \.self) { suffix in
-                        Text(suffix)
-                            .font(.system(.caption, design: .monospaced, weight: .semibold))
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(Color.white.opacity(0.08), in: Capsule())
+                    Button(isChinese ? "自动检测" : "Auto Detect") {
+                        model.vdExecutablePath = ""
                     }
-                }
 
-                Text(isChinese ? "仅影响 Finder / 系统把文件交给 iData 的外部打开流程；不会改变你在 iData 内点“打开…”时的行为。" : "This only affects files handed to iData by Finder or other system open events. It does not change what happens when you click Open inside iData.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private var appLanguageCard: some View {
-        PreferencesCard(title: isChinese ? "通用与语言" : "Language", icon: "globe") {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .center, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(isChinese ? "应用语言" : "App language")
-                            .font(.headline)
-
-                        Text(isChinese ? "跟随系统，或固定为中文/英文。" : "Follow the system language, or lock the app to Chinese or English.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    PreferencesMenuButton(title: model.appLanguageOptionTitle(model.appLanguagePreference), animated: motionEnabled) {
-                        ForEach(AppModel.AppLanguagePreference.allCases) { option in
-                            Button {
-                                model.appLanguagePreference = option
-                            } label: {
-                                if option == model.appLanguagePreference {
-                                    Label(model.appLanguageOptionTitle(option), systemImage: "checkmark")
-                                } else {
-                                    Text(model.appLanguageOptionTitle(option))
-                                }
-                            }
+                    if case .missing = model.visiDataDependencyState {
+                        Button(isChinese ? "安装 VisiData" : "Install VisiData") {
+                            model.runVisiDataOneClickSetup()
                         }
                     }
-                    .frame(minWidth: 150, alignment: .trailing)
                 }
-
-                Text(model.appLanguageSummary)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+            } header: {
+                Text(isChinese ? "可执行文件" : "Executable")
+            } footer: {
+                Text(model.visiDataDependencySummary)
+                    .textSelection(.enabled)
             }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private var updatesTab: some View {
+        Form {
+            Section {
+                Toggle(
+                    isChinese ? "自动检查更新" : "Automatically check for updates",
+                    isOn: Binding(
+                        get: { updater.automaticallyChecksForUpdates },
+                        set: { updater.setAutomaticallyChecksForUpdates($0) }
+                    )
+                )
+
+                Toggle(
+                    isChinese ? "自动下载更新" : "Automatically download updates",
+                    isOn: Binding(
+                        get: { updater.automaticallyDownloadsUpdates },
+                        set: { updater.setAutomaticallyDownloadsUpdates($0) }
+                    )
+                )
+                .disabled(!updater.automaticallyChecksForUpdates)
+
+                HStack {
+                    Button(isChinese ? "检查更新" : "Check for Updates") {
+                        updater.checkForUpdates()
+                    }
+
+                    Button(isChinese ? "查看发布页" : "View Releases") {
+                        NSWorkspace.shared.open(updater.releasesURL)
+                    }
+                }
+            } footer: {
+                Text(updater.statusMessage)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private var visiDataStatusTitle: String {
+        switch model.visiDataDependencyState {
+        case .available:
+            isChinese ? "已就绪" : "Ready"
+        case .missing:
+            isChinese ? "未安装" : "Not Installed"
         }
     }
 
-    private var updatesCard: some View {
-        PreferencesCard(title: isChinese ? "更新" : "Updates", icon: "square.and.arrow.down", accessory: {
-            PreferencesMenuButton(title: isChinese ? "操作" : "Actions", icon: "ellipsis.circle", animated: motionEnabled) {
-                Button {
-                    updater.checkForUpdates()
-                } label: {
-                    Label(isChinese ? "立即检查更新" : "Check for Updates Now", systemImage: "arrow.clockwise")
-                }
-
-                Button {
-                    NSWorkspace.shared.open(updater.releasesURL)
-                } label: {
-                    Label(isChinese ? "打开发布页" : "Open Releases", systemImage: "safari")
-                }
-            }
-        }) {
-            VStack(alignment: .leading, spacing: 14) {
-                Toggle(isChinese ? "自动检查更新" : "Automatically check for updates", isOn: Binding(
-                    get: { updater.automaticallyChecksForUpdates },
-                    set: { updater.setAutomaticallyChecksForUpdates($0) }
-                ))
-                .toggleStyle(.switch)
-
-                Toggle(isChinese ? "自动下载更新" : "Automatically download updates", isOn: Binding(
-                    get: { updater.automaticallyDownloadsUpdates },
-                    set: { updater.setAutomaticallyDownloadsUpdates($0) }
-                ))
-                .toggleStyle(.switch)
-                .disabled(!updater.automaticallyChecksForUpdates)
-
-                Text(updater.statusMessage)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+    private var customAssociationActionTitle: String {
+        if isCustomAssociationDefault {
+            return isChinese ? "恢复原应用" : "Restore"
         }
+        return isChinese ? "设为 iData" : "Use iData"
+    }
+
+    private var customAssociationStatusTitle: String {
+        if model.isSettingFormatDefault,
+           AppModel.associationExtension(for: model.settingFormatExtension ?? "")
+            == normalizedCustomAssociationExtension {
+            return isChinese ? "设置中…" : "Updating…"
+        }
+        if isCustomAssociationDefault {
+            return isChinese ? ".\(normalizedCustomAssociationExtension) 已使用 iData" : ".\(normalizedCustomAssociationExtension) uses iData"
+        }
+        return isChinese ? ".\(normalizedCustomAssociationExtension) 使用其他应用" : ".\(normalizedCustomAssociationExtension) uses another app"
+    }
+
+    private func setCustomAssociation() {
+        guard canSubmitCustomAssociation else {
+            return
+        }
+        model.setFormatAsDefault(forExtension: customAssociationInput)
+    }
+
+    private func refreshFormatAssociations() {
+        model.refreshFormatAssociationStatuses(forExtensions: displayedFormatExtensions)
     }
 
     private func testSmallFileHandoff() {
@@ -322,185 +320,24 @@ struct PreferencesView: View {
             model.statusMessage = nil
             model.errorMessage = model.localized(
                 english: "Could not prepare the handoff test: \(error.localizedDescription)",
-                chinese: "无法准备转交测试：\(error.localizedDescription)"
+                chinese: "无法准备测试：\(error.localizedDescription)"
             )
         }
     }
 }
 
-private struct PreferencesCard<Content: View, Accessory: View>: View {
-    let title: String
-    let icon: String
-    let tint: Color
-    let accessory: Accessory
-    let content: Content
+private enum PreferencesTab: Hashable {
+    case general
+    case files
+    case runtime
+    case updates
+}
 
-    init(
-        title: String,
-        icon: String,
-        tint: Color = .accentColor,
-        @ViewBuilder accessory: () -> Accessory,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.icon = icon
-        self.tint = tint
-        self.accessory = accessory()
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(tint)
-                        .frame(width: 22, height: 22)
-
-                    Text(title)
-                        .font(.headline)
-                }
-
-                Spacer(minLength: 12)
-
-                accessory
-            }
-
-            content
+extension AppModel.VisiDataDependencyState {
+    var isAvailable: Bool {
+        if case .available = self {
+            return true
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(.regularMaterial)
-
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                tint.opacity(0.16),
-                                Color.white.opacity(0.05),
-                                Color.clear,
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(tint.opacity(0.74))
-                    .frame(width: 3)
-                    .padding(.vertical, 18)
-                    .padding(.leading, 1)
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.12),
-                            tint.opacity(0.20),
-                            Color.white.opacity(0.04),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
+        return false
     }
 }
-
-private extension PreferencesCard where Accessory == EmptyView {
-    init(
-        title: String,
-        icon: String,
-        tint: Color = .accentColor,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.init(title: title, icon: icon, tint: tint, accessory: { EmptyView() }, content: content)
-    }
-}
-
-private struct PreferencesMenuButton<Content: View>: View {
-    let title: String
-    let icon: String?
-    let animated: Bool
-    @ViewBuilder let content: Content
-
-    init(
-        title: String,
-        icon: String? = nil,
-        animated: Bool,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.icon = icon
-        self.animated = animated
-        self.content = content()
-    }
-
-    var body: some View {
-        Menu {
-            content
-        } label: {
-            HStack(spacing: 8) {
-                if let icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 16, height: 16)
-                }
-
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 12, height: 12)
-            }
-            .padding(.horizontal, 12)
-            .frame(width: 150, height: 34, alignment: .leading)
-            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .quietInteractiveSurface(enabled: animated)
-    }
-}
-
-private struct PreferencePill: View {
-    let title: String
-    let tint: Color
-    let icon: String
-    let animated: Bool
-
-    var body: some View {
-        Label(title, systemImage: icon)
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(tint, in: Capsule())
-            .quietInteractiveSurface(enabled: animated, hoverScale: 1.012, hoverYOffset: -0.5, shadowOpacity: 0.08, shadowRadius: 8)
-    }
-}
-
-private let preferencesBackground = LinearGradient(
-    colors: [
-        Color.accentColor.opacity(0.16),
-        Color(nsColor: .windowBackgroundColor),
-        Color.black.opacity(0.05),
-    ],
-    startPoint: .topLeading,
-    endPoint: .bottomTrailing
-)

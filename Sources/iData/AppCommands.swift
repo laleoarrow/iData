@@ -27,13 +27,13 @@ struct IDataAppCommands: Commands {
         }
 
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") {
+            Button(model.localized(english: "Check for Updates…", chinese: "检查更新…")) {
                 updater.checkForUpdates()
             }
             .disabled(!updater.canCheckForUpdates)
         }
 
-        CommandMenu("Session") {
+        CommandMenu(model.localized(english: "Session", chinese: "会话")) {
             Button {
                 model.toggleSidebarCollapsed()
             } label: {
@@ -51,7 +51,7 @@ struct IDataAppCommands: Commands {
             Button {
                 model.revealCurrentFileInFinder()
             } label: {
-                Label(model.localized(english: "Show Current File in Finder", chinese: "在 Finder 中显示当前文件"), systemImage: "finder")
+                Label(model.localized(english: "Show in Finder", chinese: "在 Finder 中显示"), systemImage: "finder")
             }
             .keyboardShortcut("f", modifiers: [.command, .option])
             .disabled(!model.canActOnCurrentSessionFile)
@@ -59,7 +59,7 @@ struct IDataAppCommands: Commands {
             Button {
                 model.copyCurrentFilePathToPasteboard()
             } label: {
-                Label(model.localized(english: "Copy Current File Path", chinese: "复制当前文件路径"), systemImage: "doc.on.doc")
+                Label(model.localized(english: "Copy Path", chinese: "复制路径"), systemImage: "doc.on.doc")
             }
             .keyboardShortcut("c", modifiers: [.command, .option])
             .disabled(!model.canActOnCurrentSessionFile)

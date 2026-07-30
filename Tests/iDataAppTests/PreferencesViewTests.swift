@@ -3,144 +3,75 @@ import Testing
 
 struct PreferencesViewTests {
     @Test
-    func smallFileOpeningSectionIsFirstClassAndActionable() throws {
+    func settingsUseNativeTabbedStructure() throws {
         let source = try preferencesViewSource()
-        let normalized = normalizeWhitespace(source)
-        let bodySection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "VStack(alignment: .leading, spacing: 18) {",
-            end: ".padding(24)"
-        ))
-        let cardSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var smallFileRoutingCard: some View {",
-            end: "private var appLanguageCard: some View {"
-        ))
 
-        #expect(bodySection.contains("preferencesHero smallFileRoutingCard animationsCard appLanguageCard"))
-        #expect(cardSection.contains("Small-File Opening"))
-        #expect(cardSection.contains("小文件打开方式"))
-        #expect(cardSection.contains("model.preferredSmallFileApplicationDisplayName"))
-        #expect(cardSection.contains("PreferencesMenuButton(title: isChinese ? \"操作\" : \"Actions\""))
-        #expect(cardSection.contains("testSmallFileHandoff()"))
-        #expect(cardSection.contains("Test Handoff"))
-        #expect(cardSection.contains("测试转交"))
-        #expect(!cardSection.contains(".buttonStyle(.borderedProminent)"))
-        #expect(normalized.contains("AppModel.smallFileRoutingThresholdDisplay"))
+        #expect(source.contains("TabView(selection: $selectedTab)"))
+        #expect(source.contains("case general"))
+        #expect(source.contains("case files"))
+        #expect(source.contains("case runtime"))
+        #expect(source.contains("case updates"))
+        #expect(source.contains(".formStyle(.grouped)"))
+        #expect(!source.contains("PreferencesCard"))
+        #expect(!source.contains("preferencesHero"))
     }
 
     @Test
-    func settingsUseMenuControlsForGroupedActionsAndOptionSelection() throws {
+    func generalTabKeepsOnlyGlobalPreferencesAndStatus() throws {
         let source = try preferencesViewSource()
-        let normalized = normalizeWhitespace(source)
-        let runtimeSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var runtimeCard: some View {",
-            end: "private var smallFileRoutingCard: some View {"
-        ))
-        let languageSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var appLanguageCard: some View {",
-            end: "private var updatesCard: some View {"
-        ))
-        let updatesSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var updatesCard: some View {",
-            end: "private func testSmallFileHandoff()"
-        ))
+        let general = try extractSection(from: source, start: "private var generalTab", end: "private var filesTab")
 
-        #expect(normalized.contains("private struct PreferencesMenuButton<Content: View>: View"))
-        #expect(runtimeSection.contains("PreferencesMenuButton(title: isChinese ? \"操作\" : \"Actions\""))
-        #expect(runtimeSection.contains("Choose Executable"))
-        #expect(runtimeSection.contains("Auto Detect"))
-        #expect(languageSection.contains("PreferencesMenuButton(title: model.appLanguageOptionTitle(model.appLanguagePreference), animated: motionEnabled)"))
-        #expect(languageSection.contains("model.appLanguagePreference = option"))
-        #expect(!languageSection.contains("chevron.up.chevron.down"))
-        #expect(!languageSection.contains("Picker("))
-        #expect(!source.contains(".pickerStyle(.menu)"))
-        #expect(!source.contains(".pickerStyle(.segmented)"))
-        #expect(updatesSection.contains("PreferencesMenuButton(title: isChinese ? \"操作\" : \"Actions\""))
-        #expect(updatesSection.contains("Check for Updates Now"))
-        #expect(updatesSection.contains("Open Releases"))
+        #expect(general.contains("Picker(isChinese ? \"语言\""))
+        #expect(general.contains("Toggle(isChinese ? \"减少动画\""))
+        #expect(general.contains("LabeledContent(isChinese ? \"版本\""))
+        #expect(general.contains("LabeledContent(\"VisiData\")"))
     }
 
     @Test
-    func actionMenusStayInCardHeadersWithoutFooterWhitespace() throws {
+    func filesTabCombinesHandoffAndDefaultApplications() throws {
         let source = try preferencesViewSource()
-        let smallFileSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var smallFileRoutingCard: some View {",
-            end: "private var appLanguageCard: some View {"
-        ))
-        let runtimeSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var runtimeCard: some View {",
-            end: "private var smallFileRoutingCard: some View {"
-        ))
-        let updatesSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var updatesCard: some View {",
-            end: "private func testSmallFileHandoff()"
-        ))
+        let files = try extractSection(from: source, start: "private var filesTab", end: "private var runtimeTab")
 
-        for section in [smallFileSection, runtimeSection, updatesSection] {
-            #expect(section.contains("accessory: { PreferencesMenuButton"))
-            #expect(!section.contains("HStack { Spacer(minLength: 0) PreferencesMenuButton"))
+        #expect(files.contains("model.preferredSmallFileApplicationDisplayName"))
+        #expect(files.contains("model.choosePreferredSmallFileApplication()"))
+        #expect(files.contains("testSmallFileHandoff()"))
+        #expect(files.contains("model.clearPreferredSmallFileApplication()"))
+        #expect(files.contains("FormatChip("))
+        #expect(files.contains("customAssociationInput"))
+        #expect(files.contains("点击格式设为 iData；再次点击恢复原应用。"))
+    }
+
+    @Test
+    func runtimeAndUpdatesExposeDirectActions() throws {
+        let source = try preferencesViewSource()
+        let runtime = try extractSection(from: source, start: "private var runtimeTab", end: "private var updatesTab")
+        let updates = try extractSection(from: source, start: "private var updatesTab", end: "private var visiDataStatusTitle")
+
+        #expect(runtime.contains("model.chooseVDExecutable()"))
+        #expect(runtime.contains("model.vdExecutablePath = \"\""))
+        #expect(runtime.contains("model.runVisiDataOneClickSetup()"))
+        #expect(updates.contains("updater.checkForUpdates()"))
+        #expect(updates.contains("updater.releasesURL"))
+    }
+
+    @Test
+    func chineseCopyIsCompactAndTaskFocused() throws {
+        let source = try preferencesViewSource()
+
+        for text in [
+            "通用",
+            "文件",
+            "小文件",
+            "默认打开方式",
+            "选择应用…",
+            "测试打开",
+            "恢复默认",
+            "自动检测",
+            "检查更新",
+            "查看发布页",
+        ] {
+            #expect(source.contains(text))
         }
-    }
-
-    @Test
-    func preferenceCardsUseRestrainedAccentTintAndCompactCopy() throws {
-        let source = try preferencesViewSource()
-        let heroSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var preferencesHero: some View {",
-            end: "private var animationsCard: some View {"
-        ))
-        let smallFileSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private var smallFileRoutingCard: some View {",
-            end: "private var appLanguageCard: some View {"
-        ))
-        let cardChromeSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private struct PreferencesCard<Content: View, Accessory: View>: View {",
-            end: "private extension PreferencesCard where Accessory == EmptyView {"
-        ))
-
-        #expect(heroSection.contains("Color.accentColor.opacity(0.18)"))
-        #expect(heroSection.contains("Color.accentColor.opacity(0.08)"))
-        #expect(smallFileSection.contains("PreferencesCard(title: isChinese ? \"小文件打开方式\""))
-        #expect(smallFileSection.contains("Color.accentColor.opacity(0.16)"))
-        #expect(smallFileSection.contains("Finder 交来的小型 CSV / Excel 优先转交"))
-        #expect(!smallFileSection.contains("model.smallFileRoutingSummary"))
-        #expect(!source.contains("tint: .cyan"))
-        #expect(!source.contains("tint: .orange"))
-        #expect(!source.contains("tint: .indigo"))
-        #expect(!source.contains("tint: .blue"))
-        #expect(!source.contains("tint: .green, accessory"))
-        #expect(cardChromeSection.contains("let tint: Color"))
-        #expect(cardChromeSection.contains(".foregroundStyle(tint)"))
-        #expect(cardChromeSection.contains("tint.opacity(0.16)"))
-        #expect(cardChromeSection.contains("RoundedRectangle(cornerRadius: 2"))
-    }
-
-    @Test
-    func preferenceMenuButtonsUseConsistentModernDropdownChrome() throws {
-        let source = try preferencesViewSource()
-        let menuSection = normalizeWhitespace(try extractSection(
-            from: source,
-            start: "private struct PreferencesMenuButton<Content: View>: View {",
-            end: "private struct PreferencePill: View {"
-        ))
-
-        #expect(menuSection.contains("let icon: String?"))
-        #expect(menuSection.contains("icon: String? = nil"))
-        #expect(menuSection.contains("Image(systemName: \"chevron.down\")"))
-        #expect(menuSection.contains(".frame(width: 150, height: 34, alignment: .leading)"))
-        #expect(menuSection.contains(".buttonStyle(.plain)"))
-        #expect(!menuSection.contains(".buttonStyle(.bordered)"))
-        #expect(!source.contains("chevron.up.chevron.down"))
     }
 }
 
@@ -150,14 +81,10 @@ private func preferencesViewSource(filePath: StaticString = #filePath) throws ->
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let preferencesViewURL = repositoryRoot.appendingPathComponent("Sources/iData/PreferencesView.swift")
-    return try String(contentsOf: preferencesViewURL, encoding: .utf8)
-}
-
-private func normalizeWhitespace(_ value: String) -> String {
-    value
-        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return try String(
+        contentsOf: repositoryRoot.appendingPathComponent("Sources/iData/PreferencesView.swift"),
+        encoding: .utf8
+    )
 }
 
 private func extractSection(from source: String, start: String, end: String) throws -> String {

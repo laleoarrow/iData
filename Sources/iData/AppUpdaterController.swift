@@ -173,7 +173,7 @@ final class AppUpdaterController: ObservableObject {
             case .enabledThroughSparkle:
                 return AppModel.localized(
                     english: "Automatic updates are enabled through Sparkle.",
-                    chinese: "自动更新已通过 Sparkle 启用。"
+                    chinese: "自动更新已开启。"
                 )
             case .waitingForSparkleConfiguration:
                 return AppModel.localized(

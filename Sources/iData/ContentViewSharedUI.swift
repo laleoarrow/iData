@@ -6,13 +6,12 @@ struct GlassCardModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
     func body(content: Content) -> some View {
         content
-            .padding(24)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(18)
+            .background(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.4), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 16, x: 0, y: 8)
     }
 }
 
@@ -206,27 +205,8 @@ private struct QuietInteractiveSurfaceModifier: ViewModifier {
     let shadowRadius: CGFloat
     let glowStyle: SidebarHoverGlowStyle
 
-    @State private var isHovering = false
-
     func body(content: Content) -> some View {
         content
-            .background {
-                SidebarHoverGlow(
-                    isVisible: enabled && isHovering,
-                    style: glowStyle
-                )
-            }
-            .scaleEffect(enabled && isHovering ? hoverScale : 1)
-            .offset(y: enabled && isHovering ? hoverYOffset : 0)
-            .shadow(
-                color: .black.opacity(enabled && isHovering ? shadowOpacity : 0),
-                radius: enabled && isHovering ? shadowRadius : 0,
-                y: enabled && isHovering ? max(2, shadowRadius * 0.35) : 0
-            )
-            .animation(enabled ? .easeOut(duration: 0.24) : nil, value: isHovering)
-            .onHover { hovering in
-                isHovering = enabled && hovering
-            }
     }
 }
 
@@ -283,8 +263,6 @@ struct StatusPill: View {
     let title: String
     let tint: Color
     var icon: String? = nil
-    @Environment(\EnvironmentValues.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         HStack(spacing: 6) {
@@ -299,13 +277,6 @@ struct StatusPill: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(tint, in: Capsule())
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.012,
-            hoverYOffset: -0.5,
-            shadowOpacity: 0.08,
-            shadowRadius: 8
-        )
     }
 }
 
@@ -316,16 +287,13 @@ struct FormatChip: View {
     let isLoading: Bool
     let isChinese: Bool
     let onTap: () -> Void
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
     private var statusRow: some View {
         HStack(spacing: 4) {
             if isLoading {
                 ProgressView()
                     .scaleEffect(0.5)
                     .frame(width: 12, height: 12)
-                Text(localizedText(isChinese, english: "Setting...", chinese: "正在设置..."))
+                Text(localizedText(isChinese, english: "Setting...", chinese: "设置中…"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             } else {
@@ -344,45 +312,32 @@ struct FormatChip: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-            Text(".\(extensionText)")
-                .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(.secondary)
-            statusRow
-        }
-        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(isDefault ? Color.green.opacity(0.3) : Color.white.opacity(0.06))
-        )
-        .overlay(alignment: .bottom) {
-            if isDefault && !isLoading {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.green)
-                    .frame(height: 3)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-            }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
+        Button {
             if !isLoading {
                 onTap()
             }
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(".\(extensionText)")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                statusRow
+            }
+            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
+            .padding(10)
+            .contentShape(Rectangle())
         }
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.012,
-            hoverYOffset: -1,
-            shadowOpacity: 0.06,
-            shadowRadius: 8
+        .buttonStyle(.plain)
+        .background(isDefault ? Color.green.opacity(0.10) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(isDefault ? Color.green.opacity(0.35) : Color.primary.opacity(0.08))
         )
-        .animation(.easeInOut(duration: 0.2), value: isDefault)
+        .disabled(isLoading)
+        .accessibilityLabel("\(title), .\(extensionText)")
+        .accessibilityValue(isDefault ? localizedText(isChinese, english: "Default app: iData", chinese: "默认使用 iData") : "")
     }
 }
 
@@ -398,25 +353,24 @@ struct MessageCard: View {
     let title: String
     let message: String
     let color: Color
-    @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(message)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+        HStack(alignment: .top, spacing: 10) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+                .padding(.top, 6)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
         }
-        .glassCard()
-        .background(color.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .quietInteractiveSurface(
-            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
-            hoverScale: 1.006,
-            hoverYOffset: -0.5,
-            shadowOpacity: 0.05,
-            shadowRadius: 8
-        )
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.20), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 }
