@@ -19,6 +19,9 @@ struct ContentViewLayoutTests {
 
         #expect(sidebar.contains("ScrollView(.vertical)"))
         #expect(sidebar.contains(".scrollIndicators(.automatic)"))
+        #expect(sidebar.contains(".background(Color.clear)"))
+        #expect(sidebar.contains("Color.primary.opacity(0.055)"))
+        #expect(!sidebar.contains("controlBackgroundColor"))
         #expect(!sidebar.contains("SidebarScrollPositionLine("))
         #expect(!sidebar.contains("HiddenScrollIndicatorsConfigurator()"))
     }
@@ -56,7 +59,13 @@ struct ContentViewLayoutTests {
         let welcome = try extractSection(from: source, start: "private struct WelcomeDetailView: View {", end: "private struct TutorialEntryCard")
 
         #expect(welcome.contains("Label(isChinese ? \"打开…\" : \"Open…\", systemImage: \"tablecells\")"))
-        #expect(welcome.contains("Label(isChinese ? \"更多\" : \"More\", systemImage: \"ellipsis.circle\")"))
+        #expect(welcome.contains("Text(isChinese ? \"更多\" : \"More\")"))
+        #expect(welcome.contains(".menuStyle(.button)"))
+        #expect(welcome.contains(".buttonStyle(.bordered)"))
+        #expect(welcome.contains("quickTipColumn(Array(quickTips.prefix(2)), keyWidth: 94)"))
+        #expect(welcome.contains("quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)"))
+        #expect(welcome.contains(".minimumScaleFactor(0.72)"))
+        #expect(welcome.contains(".frame(minHeight: max(0, geometry.size.height - 72), alignment: .top)"))
         #expect(welcome.contains("model.presentTutorialHub()"))
         #expect(welcome.contains("SettingsLink"))
     }

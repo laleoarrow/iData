@@ -151,7 +151,13 @@ private struct SidebarView: View {
             SidebarFooter(model: model)
         }
         .padding(model.isSidebarCollapsed ? 12 : 16)
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        .background(Color.clear)
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(Color.primary.opacity(0.055))
+                .frame(width: 1)
+                .allowsHitTesting(false)
+        }
         .clipped()
         .onChange(of: model.isSidebarCollapsed) { _, _ in
             hoveredRecentFilePath = nil
@@ -1892,31 +1898,39 @@ private struct WelcomeDetailView: View {
     private let repositoryURL = URL(string: "https://github.com/laleoarrow/iData")!
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                heroCard
-                Divider()
-                quickTipsCard
-                systemStatusSection
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    heroCard
+                    Divider()
+                    quickTipsCard
 
-                if let errorMessage = model.errorMessage {
-                    MessageCard(
-                        title: localizedText(isChinese, english: "Launch Error", chinese: "启动错误"),
-                        message: errorMessage,
-                        color: .red.opacity(0.14)
-                    )
-                } else if let statusMessage = model.statusMessage {
-                    MessageCard(
-                        title: localizedText(isChinese, english: "Status", chinese: "状态"),
-                        message: statusMessage,
-                        color: .green.opacity(0.14)
-                    )
+                    if model.errorMessage == nil && model.statusMessage == nil {
+                        Spacer(minLength: 18)
+                    }
+
+                    systemStatusSection
+
+                    if let errorMessage = model.errorMessage {
+                        MessageCard(
+                            title: localizedText(isChinese, english: "Launch Error", chinese: "启动错误"),
+                            message: errorMessage,
+                            color: .red.opacity(0.14)
+                        )
+                    } else if let statusMessage = model.statusMessage {
+                        MessageCard(
+                            title: localizedText(isChinese, english: "Status", chinese: "状态"),
+                            message: statusMessage,
+                            color: .green.opacity(0.14)
+                        )
+                    }
                 }
+                .frame(maxWidth: 760)
+                .frame(minHeight: max(0, geometry.size.height - 72), alignment: .top)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 36)
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: 760)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 36)
-            .frame(maxWidth: .infinity)
         }
     }
 
@@ -1974,9 +1988,17 @@ private struct WelcomeDetailView: View {
                     Label("GitHub", systemImage: "link")
                 }
             } label: {
-                Label(isChinese ? "更多" : "More", systemImage: "ellipsis.circle")
+                HStack(spacing: 7) {
+                    Image(systemName: "ellipsis.circle")
+                    Text(isChinese ? "更多" : "More")
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
             }
-            .menuStyle(.borderlessButton)
+            .menuStyle(.button)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
             .fixedSize()
         }
     }
@@ -2125,23 +2147,40 @@ private struct WelcomeDetailView: View {
                 Spacer(minLength: 0)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 260), spacing: 12)], spacing: 10) {
-                ForEach(Array(quickTips.prefix(4))) { tip in
-                    quickTipPreviewRow(tip)
-                }
+            HStack(alignment: .top, spacing: 24) {
+                quickTipColumn(Array(quickTips.prefix(2)), keyWidth: 94)
+
+                Divider()
+
+                quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func quickTipColumn(_ tips: [QuickTip], keyWidth: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(tips.enumerated()), id: \.element.id) { index, tip in
+                quickTipPreviewRow(tip, keyWidth: keyWidth)
+                    .padding(.vertical, 12)
+
+                if index < tips.count - 1 {
+                    Divider()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
     @ViewBuilder
-    private func quickTipPreviewRow(_ tip: QuickTip) -> some View {
+    private func quickTipPreviewRow(_ tip: QuickTip, keyWidth: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Text(tip.keys)
                 .font(.system(.caption, design: .monospaced, weight: .semibold))
                 .lineLimit(1)
+                .minimumScaleFactor(0.72)
                 .foregroundStyle(Color.accentColor)
-                .frame(minWidth: 110, alignment: .leading)
+                .frame(width: keyWidth, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(tip.title)

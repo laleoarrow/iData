@@ -3,43 +3,38 @@
 ## Comparison setup
 
 - Appearance: Chinese, dark mode.
-- Build: Release `0.2.8` (build 28), installed at `/Applications/iData.app`.
-- Welcome, Settings, and Help were compared in temporary side-by-side images at matching states.
+- Build: Release `0.2.9` (build 29), installed at `/Applications/iData.app`.
+- Source: the user-selected welcome concept, normalized to the implementation screenshot size of 1856 × 1360 px.
+- Implementation: the installed Release app at the 860 × 612 pt minimum window, expanded sidebar, and matching recent-file state.
+- The complete source and implementation windows were compared side by side at the same aspect ratio.
 - The temporary PNG evidence was removed after review so it does not ship in the repository.
-- Interaction method: background launch plus targeted accessibility actions; the foreground app, pointer, and keyboard focus were not changed.
+- Interaction method: background launch and window-ID capture; the foreground app, pointer, and keyboard focus were not changed.
 
 ## Findings and resolutions
 
-- Welcome: repeated hero, action rows, tutorial card, system card, and format card were competing for attention.
-  Resolution: one opening task, one overflow menu, a flat shortcut reference, and one compact readiness row.
-- Settings: decorative hero and stacked non-interactive cards made basic preferences feel like a dashboard.
-  Resolution: native macOS tabs and grouped forms for General, Files, VisiData, and Updates.
-- Help: the long stack required scrolling and repeated app identity.
-  Resolution: topic navigation with one concise article visible at a time.
-- Tutorial: chapter cards repeated the same controls and consumed excessive vertical space.
-  Resolution: chapter navigation on the left and the selected lesson on the right.
-- Sidebar: custom scroll rail, card rows, glow, and layout animation added cost without clarifying state.
-  Resolution: native scrolling, flat rows, a single action menu, and instant width changes.
-- Session: the shortcut panel covered the terminal and the toolbar exposed too many peer actions.
-  Resolution: the tip is now above the terminal; Open remains visible and secondary actions move to a menu.
-- Status and handoff notices: layered gradients and hover shadows made read-only information look interactive.
-  Resolution: compact, single-layer banners with explicit actions only.
-- Chinese copy: redundant explanations and English command labels were present.
-  Resolution: shorter task-oriented Chinese and localized update/session menus.
+- Welcome hierarchy: the selected concept uses one clear task, one primary Open action, and one compact overflow action.
+  Resolution: retained native button proportions and removed competing welcome-page cards.
+- Shortcut layout: the first implementation truncated the movement keys and wrapped the Select Rows description.
+  Resolution: used two explicit columns with column-specific key widths and a bounded scale-down for long key sequences.
+- Vertical balance: the first implementation placed readiness too close to the shortcut section.
+  Resolution: let the neutral state expand to the viewport and anchored readiness near the bottom while keeping errors directly below it.
+- Sidebar color: the fixed dark fill created an abrupt block against the shared window background.
+  Resolution: made the sidebar transparent and kept only a subtle one-pixel separator.
+- Settings and Tutorial were intentionally left unchanged.
 
 ## Visual review
 
-- Typography: hierarchy is clear and uses native macOS sizes; no oversized decorative title remains outside the primary task.
-- Spacing: consistent 8–20 pt rhythm; large empty card interiors and card-within-card stacks were removed.
-- Color: accent color now marks actions, selection, and status rather than decorating every container.
-- Controls: interactive format tiles remain visibly clickable; read-only status no longer animates on hover.
-- Narrow layout: welcome content fits the 860 × 612 pt minimum window without clipping.
+- Typography: the selected title, subtitle, shortcut labels, status, and version hierarchy is preserved.
+- Spacing: hero, divider, shortcut grid, and footer follow the selected concept without nested cards.
+- Color: the background capture shows the inactive native button state; the primary action uses the normal blue accent when the window is active.
+- Controls: Open and More remain compact native macOS controls with balanced heights and no oversized CTA.
+- Narrow layout: all four shortcuts fit the 860 × 612 pt minimum window without clipping or unwanted wrapping.
 
 ## Verification scope
 
-- Compared before/after images for Welcome, Settings, and Help in a single side-by-side view.
-- Inspected the Files settings tab at the installed Release build.
-- Verified sidebar collapse logic, native scrolling, menu localization, and session layout in source tests.
+- Iteration 1 found key truncation, text wrapping, and a high readiness row.
+- Iteration 2 matched the selected concept with those P2 issues resolved; no P0, P1, or P2 visual differences remained.
+- Verified the installed Release build, minimum-window relayout, sidebar styling, compact actions, overflow contents, localization, and shortcut layout.
 - Drag-and-drop was intentionally not tested at the user’s request.
 
-final result: pass
+final result: passed

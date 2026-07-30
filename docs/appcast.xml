@@ -3,24 +3,21 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.8</title>
-            <pubDate>Thu, 30 Jul 2026 13:39:12 +0800</pubDate>
+            <title>0.2.9</title>
+            <pubDate>Thu, 30 Jul 2026 17:26:15 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>28</sparkle:version>
-            <sparkle:shortVersionString>0.2.8</sparkle:shortVersionString>
+            <sparkle:version>29</sparkle:version>
+            <sparkle:shortVersionString>0.2.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.8
+            <description sparkle:format="markdown"><![CDATA[## v0.2.9
 
-这次更新重新梳理了整套 macOS 界面：
+这次更新继续打磨欢迎页：
 
-- 欢迎页聚焦打开数据，移除重复入口和格式卡片。
-- 设置改为通用、文件、VisiData、更新四个原生标签页。
-- 帮助和教程采用侧栏导航，内容更短、更易查找。
-- 会话提示不再遮挡表格，工具栏和状态栏更紧凑。
-- 侧栏改用轻量列表，收起与展开不再执行高开销动画。
-- 全面精简中文文案，并补齐菜单本地化。
+- 欢迎页采用更清晰的双栏快捷键布局。
+- 打开与更多操作保持紧凑、协调的 macOS 按钮比例。
+- 侧栏与窗口共用背景，移除突兀的深色色块。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.8/iData-v0.2.8-macos-universal.zip" length="3917691" type="application/octet-stream" sparkle:edSignature="qtK0Fsa2MnAUzvesdZgcvz2EJpS9nYu/WqRgPdF7MXK+LR0RC4E/DiZKtNUZH4zBta1br4mExWxOknPR0cYeBA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.9/iData-v0.2.9-macos-universal.zip" length="3940987" type="application/octet-stream" sparkle:edSignature="zrKg7M4MBxnSr7txQsyyZmj7xCKJO1h3YcXn7pUFKV9fnBgl7bCKJbv1lu7bZiQnLklBc5fYQDSonuVhyqu8Dg=="/>
         </item>
     </channel>
 </rss>
