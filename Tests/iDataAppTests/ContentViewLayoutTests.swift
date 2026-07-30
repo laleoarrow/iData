@@ -65,7 +65,9 @@ struct ContentViewLayoutTests {
         #expect(welcome.contains("quickTipColumn(Array(quickTips.prefix(2)), keyWidth: 94)"))
         #expect(welcome.contains("quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)"))
         #expect(welcome.contains(".minimumScaleFactor(0.72)"))
-        #expect(welcome.contains(".frame(minHeight: max(0, geometry.size.height - 72), alignment: .top)"))
+        #expect(welcome.contains(".fixedSize(horizontal: false, vertical: true)"))
+        #expect(!welcome.contains("GeometryReader"))
+        #expect(!welcome.contains("Spacer(minLength: 18)"))
         #expect(welcome.contains("model.presentTutorialHub()"))
         #expect(welcome.contains("SettingsLink"))
     }

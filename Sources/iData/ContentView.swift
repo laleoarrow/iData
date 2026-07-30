@@ -1898,39 +1898,31 @@ private struct WelcomeDetailView: View {
     private let repositoryURL = URL(string: "https://github.com/laleoarrow/iData")!
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    heroCard
-                    Divider()
-                    quickTipsCard
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                heroCard
+                Divider()
+                quickTipsCard
+                systemStatusSection
 
-                    if model.errorMessage == nil && model.statusMessage == nil {
-                        Spacer(minLength: 18)
-                    }
-
-                    systemStatusSection
-
-                    if let errorMessage = model.errorMessage {
-                        MessageCard(
-                            title: localizedText(isChinese, english: "Launch Error", chinese: "启动错误"),
-                            message: errorMessage,
-                            color: .red.opacity(0.14)
-                        )
-                    } else if let statusMessage = model.statusMessage {
-                        MessageCard(
-                            title: localizedText(isChinese, english: "Status", chinese: "状态"),
-                            message: statusMessage,
-                            color: .green.opacity(0.14)
-                        )
-                    }
+                if let errorMessage = model.errorMessage {
+                    MessageCard(
+                        title: localizedText(isChinese, english: "Launch Error", chinese: "启动错误"),
+                        message: errorMessage,
+                        color: .red.opacity(0.14)
+                    )
+                } else if let statusMessage = model.statusMessage {
+                    MessageCard(
+                        title: localizedText(isChinese, english: "Status", chinese: "状态"),
+                        message: statusMessage,
+                        color: .green.opacity(0.14)
+                    )
                 }
-                .frame(maxWidth: 760)
-                .frame(minHeight: max(0, geometry.size.height - 72), alignment: .top)
-                .padding(.horizontal, 32)
-                .padding(.vertical, 36)
-                .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 36)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -2154,6 +2146,7 @@ private struct WelcomeDetailView: View {
 
                 quickTipColumn(Array(quickTips.dropFirst(2).prefix(2)), keyWidth: 58)
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

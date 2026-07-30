@@ -3,21 +3,20 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.9</title>
-            <pubDate>Thu, 30 Jul 2026 17:26:15 +0800</pubDate>
+            <title>0.2.10</title>
+            <pubDate>Thu, 30 Jul 2026 17:55:02 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>29</sparkle:version>
-            <sparkle:shortVersionString>0.2.9</sparkle:shortVersionString>
+            <sparkle:version>30</sparkle:version>
+            <sparkle:shortVersionString>0.2.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.9
+            <description sparkle:format="markdown"><![CDATA[## v0.2.10
 
-这次更新继续打磨欢迎页：
+这次更新修正欢迎页布局：
 
-- 欢迎页采用更清晰的双栏快捷键布局。
-- 打开与更多操作保持紧凑、协调的 macOS 按钮比例。
-- 侧栏与窗口共用背景，移除突兀的深色色块。
+- 移除快捷键区下方的多余空白。
+- 中间分隔线仅保留在快捷键区域。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.9/iData-v0.2.9-macos-universal.zip" length="3940987" type="application/octet-stream" sparkle:edSignature="zrKg7M4MBxnSr7txQsyyZmj7xCKJO1h3YcXn7pUFKV9fnBgl7bCKJbv1lu7bZiQnLklBc5fYQDSonuVhyqu8Dg=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.10/iData-v0.2.10-macos-universal.zip" length="3938602" type="application/octet-stream" sparkle:edSignature="sg1c2zrPkzP92T6DCKJs5QSLJOUgEg/fV73vCOiMv02MceyAcgusofPlcLhz95zVV9/99Dt8ar38u4aAaSxZDw=="/>
         </item>
     </channel>
 </rss>
