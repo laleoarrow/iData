@@ -199,33 +199,45 @@ final class InputSourceMonitor: NSObject, ObservableObject {
 
 private struct QuietInteractiveSurfaceModifier: ViewModifier {
     let enabled: Bool
-    let hoverScale: CGFloat
-    let hoverYOffset: CGFloat
-    let shadowOpacity: Double
-    let shadowRadius: CGFloat
     let glowStyle: SidebarHoverGlowStyle
+
+    @State private var isHovering = false
 
     func body(content: Content) -> some View {
         content
+            .overlay {
+                if enabled && isHovering {
+                    SidebarHoverGlow(
+                        isVisible: true,
+                        style: glowStyle
+                    )
+                    .transition(.opacity)
+                }
+            }
+            .animation(enabled ? .easeOut(duration: 0.16) : nil, value: isHovering)
+            .onHover { hovering in
+                let nextHoverState = enabled && hovering
+                guard nextHoverState != isHovering else {
+                    return
+                }
+                isHovering = nextHoverState
+            }
+            .onChange(of: enabled) { _, isEnabled in
+                if !isEnabled {
+                    isHovering = false
+                }
+            }
     }
 }
 
 extension View {
     func quietInteractiveSurface(
         enabled: Bool,
-        hoverScale: CGFloat = 1.01,
-        hoverYOffset: CGFloat = -1.5,
-        shadowOpacity: Double = 0.14,
-        shadowRadius: CGFloat = 16,
-        glowStyle: SidebarHoverGlowStyle = .none
+        glowStyle: SidebarHoverGlowStyle = .rounded(8)
     ) -> some View {
         modifier(
             QuietInteractiveSurfaceModifier(
                 enabled: enabled,
-                hoverScale: hoverScale,
-                hoverYOffset: hoverYOffset,
-                shadowOpacity: shadowOpacity,
-                shadowRadius: shadowRadius,
                 glowStyle: glowStyle
             )
         )

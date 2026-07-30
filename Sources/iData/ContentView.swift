@@ -463,7 +463,7 @@ private struct SidebarHeaderCard: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.02, hoverYOffset: -1)
+                    .quietInteractiveSurface(enabled: motionEnabled)
                     .help(localizedText(isChinese, english: "Clear all recent file records", chinese: "清空最近文件"))
                 }
 
@@ -1090,8 +1090,17 @@ struct SidebarHoverGlow: View {
     let isVisible: Bool
     let style: SidebarHoverGlowStyle
 
-    private let haloYellow = Color(red: 1.0, green: 0.86, blue: 0.26)
-    private let haloBlue = Color(red: 0.23, green: 0.58, blue: 1.0)
+    private var glowGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.accentColor.opacity(0.09),
+                Color(red: 0.24, green: 0.78, blue: 1.0).opacity(0.055),
+                Color(red: 0.50, green: 0.42, blue: 1.0).opacity(0.045),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 
     var body: some View {
         Group {
@@ -1105,41 +1114,18 @@ struct SidebarHoverGlow: View {
             }
         }
         .opacity(isVisible ? 1 : 0)
-        .animation(.easeOut(duration: 0.18), value: isVisible)
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private func glow<S: InsettableShape>(for shape: S) -> some View {
-        ZStack {
-            shape
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            haloYellow.opacity(0.12),
-                            haloBlue.opacity(0.10),
-                            Color.white.opacity(0.04),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            shape.inset(by: 1)
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color.white.opacity(0.08),
-                            haloYellow.opacity(0.10),
-                            .clear,
-                        ],
-                        center: .topLeading,
-                        startRadius: 4,
-                        endRadius: 42
-                    )
-                )
-
-        }
-        .clipShape(shape)
+        shape
+            .fill(glowGradient)
+            .overlay {
+                shape
+                    .inset(by: 0.5)
+                    .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            }
     }
 }
 
@@ -1519,7 +1505,7 @@ private struct HelpView: View {
                                 )
                         }
                         .buttonStyle(.plain)
-                        .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.03, hoverYOffset: -1)
+                        .quietInteractiveSurface(enabled: motionEnabled, glowStyle: .circle)
                         .help(localizedText(isChinese, english: "Close Help", chinese: "关闭帮助"))
                         .keyboardShortcut(.cancelAction)
                     }
@@ -1786,7 +1772,7 @@ private struct TutorialHubView: View {
                     model.startTutorial(chapterID: chapter.id)
                 }
                 .buttonStyle(.borderedProminent)
-                .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.01, hoverYOffset: -1)
+                .quietInteractiveSurface(enabled: motionEnabled)
             }
 
             VStack(spacing: 7) {
@@ -1992,6 +1978,7 @@ private struct WelcomeDetailView: View {
             .buttonStyle(.bordered)
             .controlSize(.regular)
             .fixedSize()
+            .quietInteractiveSurface(enabled: motionEnabled)
         }
     }
 
@@ -2003,6 +1990,7 @@ private struct WelcomeDetailView: View {
             Label(isChinese ? "打开…" : "Open…", systemImage: "tablecells")
         }
         .buttonStyle(.borderedProminent)
+        .quietInteractiveSurface(enabled: motionEnabled)
 
         if case .missing = model.visiDataDependencyState {
             Button {
@@ -2011,6 +1999,7 @@ private struct WelcomeDetailView: View {
                 Label(isChinese ? "安装 VisiData" : "Install VisiData", systemImage: "shippingbox")
             }
             .buttonStyle(.borderedProminent)
+            .quietInteractiveSurface(enabled: motionEnabled)
         }
     }
 
@@ -2364,7 +2353,7 @@ private struct TutorialEntryCard: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.regular)
                 .tint(.accentColor)
-                .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1)
+                .quietInteractiveSurface(enabled: motionEnabled)
             }
 
             if let chapter = currentPreviewChapter {
@@ -2690,6 +2679,7 @@ private struct SessionHeaderActions: View {
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut("o")
+            .quietInteractiveSurface(enabled: motionEnabled)
 
             Menu {
                 Button {
@@ -2715,6 +2705,7 @@ private struct SessionHeaderActions: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .quietInteractiveSurface(enabled: motionEnabled, glowStyle: .circle)
             .help(localizedText(
                 isChinese,
                 english: "Actions for \(fileURL.lastPathComponent)",
@@ -3288,10 +3279,7 @@ private struct TutorialCoachOverlay: View {
         .shadow(color: Color.accentColor.opacity(0.16), radius: 26, y: 0)
         .quietInteractiveSurface(
             enabled: motionEnabled,
-            hoverScale: 1.004,
-            hoverYOffset: -0.5,
-            shadowOpacity: 0.06,
-            shadowRadius: 8
+            glowStyle: .rounded(12)
         )
         .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: model.tutorialStepIndex)
         .animation(motionEnabled ? .easeOut(duration: 0.22) : nil, value: model.isTutorialCoachExpanded)

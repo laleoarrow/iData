@@ -143,6 +143,41 @@ struct ContentViewLayoutTests {
         #expect(!status.contains(".onHover"))
         #expect(!message.contains(".shadow("))
     }
+
+    @Test
+    func interactiveHoverGlowUpdatesOnlyAtPointerBoundaries() throws {
+        let sharedSource = try sharedUISource()
+        let modifier = try extractSection(
+            from: sharedSource,
+            start: "private struct QuietInteractiveSurfaceModifier",
+            end: "extension View"
+        )
+        let contentSource = try contentViewSource()
+        let glow = try extractSection(
+            from: contentSource,
+            start: "struct SidebarHoverGlow: View",
+            end: "private struct SidebarHoverTrackingRegion"
+        )
+
+        #expect(modifier.contains("@State private var isHovering = false"))
+        #expect(modifier.contains("if enabled && isHovering"))
+        #expect(modifier.contains("SidebarHoverGlow("))
+        #expect(modifier.contains(".transition(.opacity)"))
+        #expect(modifier.contains(".onHover { hovering in"))
+        #expect(modifier.contains("guard nextHoverState != isHovering"))
+        #expect(!modifier.contains("onContinuousHover"))
+        #expect(!modifier.contains(".scaleEffect("))
+        #expect(!modifier.contains(".offset("))
+        #expect(!modifier.contains(".shadow("))
+
+        #expect(glow.contains("LinearGradient("))
+        #expect(glow.contains(".strokeBorder("))
+        #expect(!glow.contains("GeometryReader"))
+        #expect(!glow.contains("RadialGradient("))
+        #expect(!glow.contains(".blur("))
+        #expect(!glow.contains(".shadow("))
+        #expect(!glow.contains("TimelineView"))
+    }
 }
 
 private func contentViewSource(filePath: StaticString = #filePath) throws -> String {

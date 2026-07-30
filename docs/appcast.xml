@@ -3,21 +3,21 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.11</title>
-            <pubDate>Thu, 30 Jul 2026 18:22:08 +0800</pubDate>
+            <title>0.2.12</title>
+            <pubDate>Thu, 30 Jul 2026 19:01:50 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>31</sparkle:version>
-            <sparkle:shortVersionString>0.2.11</sparkle:shortVersionString>
+            <sparkle:version>32</sparkle:version>
+            <sparkle:shortVersionString>0.2.12</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.11
+            <description sparkle:format="markdown"><![CDATA[## v0.2.12
 
-这次更新优化窗口尺寸：
+这次更新恢复并优化悬停反馈：
 
-- 默认窗口更紧凑。
-- 支持继续缩小窗口。
-- 窄窗口下快捷键自动切换为单栏。
+- 交互控件重新显示低调的蓝紫渐变光晕。
+- 光晕仅在鼠标进入控件时创建，离开后立即释放。
+- 移除连续坐标追踪、模糊阴影和缩放位移，降低悬停开销。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.11/iData-v0.2.11-macos-universal.zip" length="3941967" type="application/octet-stream" sparkle:edSignature="fYMo3RornqPl2L8PwzQBb/yDJpnydL1ZjKbdF2aaTPBKIxkQG3aV+/kHl5txiJl4RnxyD9iabnAmvE44uRbZCA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.12/iData-v0.2.12-macos-universal.zip" length="3962817" type="application/octet-stream" sparkle:edSignature="zaFHNWtn74+xpMKaUncDqCaMu9TL3+3oWA/0CPm7a7n0Bep9SFWY8B1D9fJ3b+4TH+J7qzlKFVQF2DVWHCvrBA=="/>
         </item>
     </channel>
 </rss>
