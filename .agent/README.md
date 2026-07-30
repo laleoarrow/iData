@@ -2,12 +2,16 @@
 
 Use these files when working on `iData`:
 
-- `project.md` — architecture, important files, supported formats, dependency model
-- `debugging.md` — how to reproduce, verify, and diagnose runtime issues
-- `release.md` — how to build `dist/iData.app`, publish releases, and sync Homebrew tap
+- [`project.md`](project.md) — architecture, important files, supported formats, and dependency model
+- [`debugging.md`](debugging.md) — runtime diagnosis, required handoff checks, and reproducible performance regression checks
+- [`release.md`](release.md) — installable builds, GitHub releases, Sparkle, and Homebrew sync
 
 Recommended reading order:
 
-1. `project.md`
-2. `debugging.md`
-3. `release.md`
+1. [`project.md`](project.md)
+2. [`debugging.md`](debugging.md)
+3. [`release.md`](release.md)
+
+For performance-only work, define a before/after measure first and use the
+performance regression section in `debugging.md`; UI and interaction behavior
+remain invariants.

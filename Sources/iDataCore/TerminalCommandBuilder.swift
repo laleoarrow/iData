@@ -156,39 +156,56 @@ public enum TerminalCommandBuilder {
             return nil
         }
 
-        let lines = sample
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
-
+        let lines = firstSignificantLines(in: sample, limit: 8)
         guard !lines.isEmpty else {
             return nil
         }
 
-        let limitedLines = Array(lines.prefix(8))
-        let tabMatches = limitedLines.filter { $0.contains("\t") }.count
+        let tabMatches = lines.filter { $0.contains("\t") }.count
         if tabMatches >= 2 {
             return .tsv
         }
 
-        let commaMatches = limitedLines.filter { $0.contains(",") && !$0.contains("\t") }.count
+        let commaMatches = lines.filter { $0.contains(",") && !$0.contains("\t") }.count
         if commaMatches >= 2 {
             return .csv
         }
 
-        let tokenCounts = limitedLines.map { whitespaceTokenCount(in: $0) }
+        let tokenCounts = lines.map { whitespaceTokenCount(in: $0) }
         if
-            limitedLines.count >= 2,
+            lines.count >= 2,
             let minCount = tokenCounts.min(),
             let maxCount = tokenCounts.max(),
             minCount >= 3,
             maxCount - minCount <= 2,
-            limitedLines.allSatisfy({ $0.contains(" ") && !$0.contains(",") && !$0.contains("\t") })
+            lines.allSatisfy({ $0.contains(" ") && !$0.contains(",") && !$0.contains("\t") })
         {
             return .whitespaceSeparated
         }
 
         return nil
+    }
+
+    private static func firstSignificantLines(in sample: String, limit: Int) -> [String] {
+        var lines: [String] = []
+        lines.reserveCapacity(limit)
+        var lineStart = sample.startIndex
+
+        while lineStart < sample.endIndex, lines.count < limit {
+            let lineEnd = sample[lineStart...].firstIndex(where: \.isNewline) ?? sample.endIndex
+            let line = sample[lineStart..<lineEnd]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !line.isEmpty, !line.hasPrefix("#") {
+                lines.append(line)
+            }
+
+            guard lineEnd < sample.endIndex else {
+                break
+            }
+            lineStart = sample.index(after: lineEnd)
+        }
+
+        return lines
     }
 
     private static func sampleText(for fileURL: URL, compressed: Bool) -> String? {

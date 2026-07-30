@@ -1,5 +1,7 @@
+import Combine
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import iData
 import iDataCore
 
@@ -1164,6 +1166,81 @@ struct AppModelTests {
     }
 
     @Test
+    func contentTypeIdentifiersMatchCurrentSystemMappings() {
+        let commonExtensions = [
+            "csv", "tsv", "txt", "json", "xlsx", "parquet", "vcf", "h5ad", "gz",
+        ]
+
+        for fileExtension in commonExtensions {
+            #expect(
+                AppModel.contentType(forExtension: fileExtension)?.identifier
+                    == UTType(filenameExtension: fileExtension)?.identifier
+            )
+        }
+
+        let unknownExtension = "idata-dynamic-extension"
+        let dynamicIdentifier = AppModel.contentType(forExtension: unknownExtension)?.identifier
+        #expect(dynamicIdentifier == UTType(filenameExtension: unknownExtension)?.identifier)
+        #expect(dynamicIdentifier?.hasPrefix("dyn.") == true)
+        #expect(
+            AppModel.contentType(forExtension: "  \(unknownExtension) \n")?.identifier
+                == dynamicIdentifier
+        )
+        #expect(AppModel.contentType(forExtension: " \t\n") == nil)
+    }
+
+    @Test
+    func refreshFormatAssociationStatusesPublishesOnlyChangedSnapshots() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let checker = FormatAssociationCheckerProbe(
+            states: [
+                "csv": true,
+                "tsv": false,
+            ]
+        )
+        let model = AppModel(
+            defaults: defaults,
+            formatAssociationChecker: checker.check(_:)
+        )
+        var publicationCount = 0
+        let observation = model.objectWillChange.sink {
+            publicationCount += 1
+        }
+
+        model.refreshFormatAssociationStatuses(
+            forExtensions: ["csv", "CSV", "barcodes.tsv", "tsv", " \t"]
+        )
+
+        #expect(Set(checker.checkedExtensions) == Set(["csv", "tsv"]))
+        #expect(model.formatAssociationStatus["csv"] == true)
+        #expect(model.formatAssociationStatus["tsv"] == false)
+        #expect(model.formatAssociationStatus["barcodes.tsv"] == false)
+        #expect(model.formatAssociationStatus["features.tsv"] == false)
+        #expect(publicationCount == 1)
+
+        checker.checkedExtensions.removeAll()
+        model.refreshFormatAssociationStatuses(
+            forExtensions: ["csv", "barcodes.tsv", "tsv"]
+        )
+
+        #expect(Set(checker.checkedExtensions) == Set(["csv", "tsv"]))
+        #expect(publicationCount == 1)
+
+        checker.states["tsv"] = true
+        model.refreshFormatAssociationStatuses(forExtensions: ["csv", "tsv"])
+
+        #expect(model.formatAssociationStatus["tsv"] == true)
+        #expect(model.formatAssociationStatus["barcodes.tsv"] == true)
+        #expect(publicationCount == 2)
+        withExtendedLifetime(observation) {}
+    }
+
+    @Test
     func customAssociationInputValidationRequiresNonEmptySuffix() {
         #expect(!AppModel.canSetAssociationExtensionInput(""))
         #expect(!AppModel.canSetAssociationExtensionInput("   .   "))
@@ -1273,6 +1350,41 @@ struct AppModelTests {
         #expect(basicSteps.contains("Search"))
         #expect(basicSteps.contains("Sort"))
         #expect(basicSteps.contains("Select Rows"))
+    }
+
+    @Test
+    func tutorialChapterSnapshotReadsEachPreferenceSourceOnce() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = CountingTutorialUserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        defaults.set(
+            [AppModel.defaultTutorialChapterID: 2],
+            forKey: AppModel.tutorialProgressByChapterKey
+        )
+        defaults.set(
+            [AppModel.defaultTutorialChapterID],
+            forKey: AppModel.completedTutorialChapterIDsKey
+        )
+
+        var preferredLanguageReadCount = 0
+        let model = AppModel(
+            defaults: defaults,
+            preferredLanguagesProvider: {
+                preferredLanguageReadCount += 1
+                return ["en-US"]
+            }
+        )
+        defaults.resetReadCounts()
+
+        let chapters = model.tutorialChapters
+
+        #expect(preferredLanguageReadCount == 1)
+        #expect(defaults.progressDictionaryReadCount == 1)
+        #expect(defaults.completedChapterIDsReadCount == 1)
+        #expect(chapters.first?.completedStepCount == 2)
+        #expect(chapters.first?.isCompleted == true)
     }
 
     @Test
@@ -1800,6 +1912,45 @@ private struct FakeExecutableChecker: ExecutableChecking {
 
     func isExecutableFile(atPath path: String) -> Bool {
         executablePaths.contains(path)
+    }
+}
+
+private final class CountingTutorialUserDefaults: UserDefaults {
+    private(set) var progressDictionaryReadCount = 0
+    private(set) var completedChapterIDsReadCount = 0
+
+    override func dictionary(forKey defaultName: String) -> [String: Any]? {
+        if defaultName == AppModel.tutorialProgressByChapterKey {
+            progressDictionaryReadCount += 1
+        }
+        return super.dictionary(forKey: defaultName)
+    }
+
+    override func stringArray(forKey defaultName: String) -> [String]? {
+        if defaultName == AppModel.completedTutorialChapterIDsKey {
+            completedChapterIDsReadCount += 1
+        }
+        return super.stringArray(forKey: defaultName)
+    }
+
+    func resetReadCounts() {
+        progressDictionaryReadCount = 0
+        completedChapterIDsReadCount = 0
+    }
+}
+
+@MainActor
+private final class FormatAssociationCheckerProbe {
+    var states: [String: Bool]
+    var checkedExtensions: [String] = []
+
+    init(states: [String: Bool]) {
+        self.states = states
+    }
+
+    func check(_ fileExtension: String) -> Bool {
+        checkedExtensions.append(fileExtension)
+        return states[fileExtension] ?? false
     }
 }
 

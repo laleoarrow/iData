@@ -3,6 +3,8 @@ import Testing
 @testable import iDataCore
 
 struct TerminalCommandBuilderTests {
+    private let temporaryDirectory = TerminalCommandBuilderTestDirectory()
+
     @Test
     func buildsDirectEmbeddedLaunchCommandForRegularFiles() {
         let command = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
@@ -119,6 +121,123 @@ struct TerminalCommandBuilderTests {
     }
 
     @Test
+    func sniffingPreservesDelimitedAndRawBehavior() throws {
+        let cases: [(filename: String, contents: String, expectedPrefix: [String])] = [
+            (
+                "comma-delimited.data",
+                """
+                name,value
+                first,1
+                """,
+                ["-f", "csv"]
+            ),
+            (
+                "tab-delimited.data",
+                """
+                name	value
+                first	1
+                """,
+                ["-f", "tsv"]
+            ),
+            (
+                "space-delimited.data",
+                """
+                marker allele effect stderr
+                rs1 A 0.10 0.02
+                """,
+                ["-f", "tsv", "-d", " "]
+            ),
+            (
+                "unstructured.data",
+                """
+                first
+                second
+                """,
+                []
+            ),
+        ]
+
+        for testCase in cases {
+            let fileURL = try makeTemporaryFile(
+                named: testCase.filename,
+                contents: testCase.contents
+            )
+            let command = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
+                visidataExecutable: URL(fileURLWithPath: "/Users/test/bin/vd"),
+                fileURL: fileURL
+            )
+
+            #expect(command.executablePath == "/Users/test/bin/vd")
+            #expect(command.arguments == testCase.expectedPrefix + [fileURL.path])
+        }
+    }
+
+    @Test
+    func sniffingSkipsBlankAndCommentLines() throws {
+        let fileURL = try makeTemporaryFile(
+            named: "commented.data",
+            contents: """
+
+                  # generated table
+
+                name	value
+                first	1
+                """
+        )
+
+        let command = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
+            visidataExecutable: URL(fileURLWithPath: "/Users/test/bin/vd"),
+            fileURL: fileURL
+        )
+
+        #expect(command.arguments == ["-f", "tsv", fileURL.path])
+    }
+
+    @Test
+    func sniffingOnlyUsesFirstEightSignificantLines() throws {
+        let firstEight = (1...8).map { "plain\($0)" }.joined(separator: "\n")
+        let laterDelimitedLines = (1...20).map { "column\($0)\tvalue\($0)" }.joined(separator: "\n")
+        let fileURL = try makeTemporaryFile(
+            named: "late-delimiter.data",
+            contents: firstEight + "\n" + laterDelimitedLines
+        )
+
+        let command = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
+            visidataExecutable: URL(fileURLWithPath: "/Users/test/bin/vd"),
+            fileURL: fileURL
+        )
+
+        #expect(command.arguments == [fileURL.path])
+    }
+
+    @Test
+    func sniffingPreservesLossyUTF8Fallback() throws {
+        var data = Data("name\tvalue\nfirst\t".utf8)
+        data.append(0xFF)
+        data.append(contentsOf: Data("\n".utf8))
+        let fileURL = try makeTemporaryFile(named: "invalid-utf8.data", data: data)
+
+        let command = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
+            visidataExecutable: URL(fileURLWithPath: "/Users/test/bin/vd"),
+            fileURL: fileURL
+        )
+
+        #expect(command.arguments == ["-f", "tsv", fileURL.path])
+    }
+
+    @Test
+    func sniffingPreservesEmptyFileBehavior() throws {
+        let fileURL = try makeTemporaryFile(named: "empty.data", data: Data())
+
+        let command = TerminalCommandBuilder.makeEmbeddedLaunchCommand(
+            visidataExecutable: URL(fileURLWithPath: "/Users/test/bin/vd"),
+            fileURL: fileURL
+        )
+
+        #expect(command.arguments == [fileURL.path])
+    }
+
+    @Test
     func buildsQuotedLaunchScript() {
         let script = TerminalCommandBuilder.makeLaunchScript(
             visidataExecutable: URL(fileURLWithPath: "/Users/test/bin/vd"),
@@ -138,11 +257,15 @@ struct TerminalCommandBuilderTests {
     }
 
     private func makeTemporaryFile(named filename: String, contents: String) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory
+        try makeTemporaryFile(named: filename, data: Data(contents.utf8))
+    }
+
+    private func makeTemporaryFile(named filename: String, data: Data) throws -> URL {
+        let directory = temporaryDirectory.url
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let fileURL = directory.appendingPathComponent(filename)
-        try contents.write(to: fileURL, atomically: true, encoding: .utf8)
+        try data.write(to: fileURL)
         return fileURL
     }
 
@@ -159,5 +282,18 @@ struct TerminalCommandBuilderTests {
         process.waitUntilExit()
         try data.write(to: gzipURL)
         return gzipURL
+    }
+}
+
+private final class TerminalCommandBuilderTestDirectory: @unchecked Sendable {
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("idata-terminal-command-builder-tests-\(UUID().uuidString)", isDirectory: true)
+
+    init() {
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: url)
     }
 }

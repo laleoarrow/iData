@@ -235,6 +235,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var childPID: pid_t = 0
     private var readSource: DispatchSourceRead?
     private var processSource: DispatchSourceProcess?
+    private var outputDeliveryTail: Task<Void, Never>?
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
     private var outputGeneration: UInt64 = 0
 
@@ -592,29 +593,46 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
-        var buffer = [UInt8](repeating: 0, count: 4096)
+        let maximumBatchSize = 64 * 1024
+        var buffer = [UInt8](repeating: 0, count: 16 * 1024)
+        var batch = Data()
+        batch.reserveCapacity(buffer.count)
 
-        while true {
-            let bytesRead = Darwin.read(fileDescriptor, &buffer, buffer.count)
+        while batch.count < maximumBatchSize {
+            let remainingBatchCapacity = maximumBatchSize - batch.count
+            let bytesRead = Darwin.read(
+                fileDescriptor,
+                &buffer,
+                min(buffer.count, remainingBatchCapacity)
+            )
 
             if bytesRead > 0 {
-                let data = Data(buffer.prefix(bytesRead))
-                Task { @MainActor [weak self] in
-                    self?.enqueueOutput(data, generation: generation)
-                }
+                batch.append(buffer, count: bytesRead)
                 continue
             }
 
-            if bytesRead == 0 {
-                return
+            if bytesRead < 0, errno == EINTR {
+                continue
             }
 
-            if errno == EAGAIN || errno == EWOULDBLOCK {
-                return
-            }
+            break
+        }
 
+        guard !batch.isEmpty else {
             return
         }
+
+        let precedingDelivery = outputDeliveryTail
+        let delivery = Task { @MainActor [weak self, batch, precedingDelivery] in
+            await precedingDelivery?.value
+
+            guard let self else {
+                return
+            }
+
+            enqueueOutput(batch, generation: generation)
+        }
+        outputDeliveryTail = delivery
     }
 
     @MainActor
@@ -644,6 +662,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     @MainActor
     func appendOutputForTesting(_ data: Data, generation: UInt64) {
         enqueueOutput(data, generation: generation)
+    }
+
+    func drainOutputForTesting(from fileDescriptor: Int32, generation: UInt64) {
+        drainOutput(from: fileDescriptor, generation: generation)
     }
 
     @MainActor

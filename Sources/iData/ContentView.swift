@@ -24,12 +24,6 @@ struct ContentView: View {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
-    private var sidebarLayoutAnimation: Animation? {
-        motionEnabled
-            ? .spring(response: 0.44, dampingFraction: 0.90, blendDuration: 0.18)
-            : nil
-    }
-
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
     }
@@ -63,7 +57,6 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 860, minHeight: 580)
-        .animation(sidebarLayoutAnimation, value: model.isSidebarCollapsed)
         .animation(motionEnabled ? .spring(response: 0.34, dampingFraction: 0.88, blendDuration: 0.12) : nil, value: model.externalHandoffNotice)
         .dropDestination(for: URL.self) { items, _ in
             model.handleDroppedFiles(items)
@@ -92,7 +85,7 @@ private struct SidebarView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var hoveredRecentFilePath: String?
     @State private var recentFilesScrollMetrics = SidebarScrollMetrics()
-    @State private var recentFilesFrame: CGRect = .zero
+    @State private var recentFilesMinY: CGFloat = 0
     @State private var recentFilesViewportHeight: CGFloat = 0
 
     private var motionEnabled: Bool {
@@ -103,10 +96,6 @@ private struct SidebarView: View {
         motionEnabled
             ? .spring(response: 0.32, dampingFraction: 0.90, blendDuration: 0.14)
             : nil
-    }
-
-    private var sidebarModeTransition: AnyTransition {
-        .opacity.combined(with: .scale(scale: 0.96, anchor: .leading))
     }
 
     var body: some View {
@@ -123,14 +112,12 @@ private struct SidebarView: View {
                                 isChinese: model.effectiveLanguage == .chinese,
                                 openAction: { model.openDocument() }
                             )
-                            .transition(sidebarModeTransition)
                         } else {
                             EmptySidebarState(
                                 isChinese: model.effectiveLanguage == .chinese,
                                 openAction: { model.openDocument() },
                                 tutorialAction: { model.presentTutorialHub() }
                             )
-                            .transition(sidebarModeTransition)
                         }
                     } else {
                         ScrollView(.vertical, showsIndicators: false) {
@@ -149,7 +136,6 @@ private struct SidebarView: View {
                                                 removeAction: { model.removeRecentFile(fileURL) }
                                             )
                                             .id("collapsed-\(fileURL.standardizedFileURL.path)")
-                                            .transition(sidebarModeTransition)
                                         } else {
                                             RecentFileRow(
                                                 fileURL: fileURL,
@@ -162,7 +148,6 @@ private struct SidebarView: View {
                                                 removeAction: { model.removeRecentFile(fileURL) }
                                             )
                                             .id("expanded-\(fileURL.standardizedFileURL.path)")
-                                            .transition(sidebarModeTransition)
                                         }
                                     }
                                 }
@@ -196,8 +181,8 @@ private struct SidebarView: View {
                         .background(
                             GeometryReader { proxy in
                                 Color.clear.preference(
-                                    key: SidebarScrollFramePreferenceKey.self,
-                                    value: proxy.frame(in: .named(sidebarCoordinateSpace))
+                                    key: SidebarScrollMinYPreferenceKey.self,
+                                    value: proxy.frame(in: .named(sidebarCoordinateSpace)).minY
                                 )
                             }
                         )
@@ -205,8 +190,8 @@ private struct SidebarView: View {
                         .onPreferenceChange(SidebarScrollMetricsPreferenceKey.self) { metrics in
                             recentFilesScrollMetrics = metrics
                         }
-                        .onPreferenceChange(SidebarScrollFramePreferenceKey.self) { frame in
-                            recentFilesFrame = frame
+                        .onPreferenceChange(SidebarScrollMinYPreferenceKey.self) { minY in
+                            recentFilesMinY = minY
                         }
                         .onPreferenceChange(SidebarScrollViewportHeightPreferenceKey.self) { height in
                             recentFilesViewportHeight = height
@@ -241,13 +226,12 @@ private struct SidebarView: View {
                 )
                 .offset(
                     x: model.isSidebarCollapsed ? 16 : 22,
-                    y: recentFilesFrame.minY + 5
+                    y: recentFilesMinY + 5
                 )
             }
         }
         .coordinateSpace(name: sidebarCoordinateSpace)
         .clipped()
-        .animation(listAnimation, value: model.isSidebarCollapsed)
         .onChange(of: model.isSidebarCollapsed) { _, _ in
             hoveredRecentFilePath = nil
         }
@@ -302,10 +286,10 @@ private struct SidebarScrollViewportHeightPreferenceKey: PreferenceKey {
     }
 }
 
-private struct SidebarScrollFramePreferenceKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
+private struct SidebarScrollMinYPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
 
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
 }
@@ -374,25 +358,60 @@ private struct SidebarScrollPositionLine: View {
 }
 
 private struct HiddenScrollIndicatorsConfigurator: NSViewRepresentable {
+    final class Coordinator {
+        weak var configuredScrollView: NSScrollView?
+        var isScheduling = false
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        scheduleScrollIndicatorHiding(from: view)
+        requestScrollIndicatorHiding(from: view, context: context)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        scheduleScrollIndicatorHiding(from: nsView)
+        requestScrollIndicatorHiding(from: nsView, context: context)
     }
 
-    private func scheduleScrollIndicatorHiding(from view: NSView) {
-        for delay in [0.0, 0.05, 0.25, 0.75] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                hideScrollIndicators(from: view)
+    private func requestScrollIndicatorHiding(from view: NSView, context: Context) {
+        if let configuredScrollView = context.coordinator.configuredScrollView,
+           configuredScrollView.window === view.window
+        {
+            return
+        }
+        guard !context.coordinator.isScheduling else {
+            return
+        }
+
+        context.coordinator.isScheduling = true
+        let delays = [0.0, 0.05, 0.25, 0.75]
+
+        for (index, delay) in delays.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak view, weak coordinator = context.coordinator] in
+                guard let view, let coordinator else {
+                    return
+                }
+                if let configuredScrollView = coordinator.configuredScrollView,
+                   configuredScrollView.window === view.window
+                {
+                    coordinator.isScheduling = false
+                    return
+                }
+                if let configuredScrollView = hideScrollIndicators(from: view) {
+                    coordinator.configuredScrollView = configuredScrollView
+                    coordinator.isScheduling = false
+                } else if index == delays.indices.last {
+                    coordinator.isScheduling = false
+                }
             }
         }
     }
 
-    private func hideScrollIndicators(from view: NSView) {
+    private func hideScrollIndicators(from view: NSView) -> NSScrollView? {
         let directScrollView = view.nearestEnclosingScrollView() ?? view.nearestLeftAlignedScrollViewInWindow()
         let scrollViews = ([directScrollView].compactMap { $0 } + view.leftSidebarScrollViewsInWindow())
         var hiddenScrollViewIDs = Set<ObjectIdentifier>()
@@ -405,6 +424,8 @@ private struct HiddenScrollIndicatorsConfigurator: NSViewRepresentable {
             scrollView.autohidesScrollers = true
             scrollView.scrollerStyle = .overlay
         }
+
+        return directScrollView ?? scrollViews.first
     }
 }
 
@@ -480,23 +501,6 @@ private struct SidebarHeaderCard: View {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
-    private var layoutAnimation: Animation? {
-        motionEnabled
-            ? .spring(response: 0.38, dampingFraction: 0.88, blendDuration: 0.14)
-            : nil
-    }
-
-    private var expandedDetailsTransition: AnyTransition {
-        guard motionEnabled else {
-            return .identity
-        }
-
-        return .asymmetric(
-            insertion: .opacity.animation(.easeOut(duration: 0.12).delay(0.20)),
-            removal: .identity
-        )
-    }
-
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
     }
@@ -506,19 +510,16 @@ private struct SidebarHeaderCard: View {
             if model.isSidebarCollapsed {
                 collapsedExpandButton
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .transition(.opacity)
             } else {
                 appIcon
 
                 expandedDetails
                     .padding(.leading, 60)
-                    .transition(expandedDetailsTransition)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .topLeading)
         .padding(.horizontal, model.isSidebarCollapsed ? 0 : 2)
         .padding(.vertical, model.isSidebarCollapsed ? 0 : 4)
-        .animation(layoutAnimation, value: model.isSidebarCollapsed)
     }
 
     private var expandedDetails: some View {
@@ -604,12 +605,6 @@ private struct SidebarFooter: View {
         model.animationsEnabled && !accessibilityReduceMotion
     }
 
-    private var layoutAnimation: Animation? {
-        motionEnabled
-            ? .spring(response: 0.38, dampingFraction: 0.88, blendDuration: 0.14)
-            : nil
-    }
-
     private var footerLayout: AnyLayout {
         if model.isSidebarCollapsed {
             return AnyLayout(VStackLayout(spacing: 18))
@@ -650,7 +645,6 @@ private struct SidebarFooter: View {
             alignment: model.isSidebarCollapsed ? .center : .leading
         )
         .foregroundStyle(.secondary)
-        .animation(layoutAnimation, value: model.isSidebarCollapsed)
     }
 }
 
@@ -1859,18 +1853,9 @@ private struct WelcomeDetailView: View {
     @ObservedObject var updater: AppUpdaterController
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var customAssociationInput = ""
-    @State private var tutorialPreviewChapterIndex: Int = 0
-    @State private var tutorialCarouselTimer: Timer?
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
-    }
-
-    private var currentPreviewChapter: AppModel.TutorialChapter? {
-        let chapters = model.tutorialChapters
-        guard !chapters.isEmpty else { return nil }
-        let index = tutorialPreviewChapterIndex % chapters.count
-        return chapters[index]
     }
 
     private var isChinese: Bool {
@@ -1911,8 +1896,7 @@ private struct WelcomeDetailView: View {
         guard !normalizedCustomAssociationExtension.isEmpty else {
             return false
         }
-        return model.formatAssociationStatus[normalizedCustomAssociationExtension]
-            ?? model.checkFormatAssociation(forExtension: normalizedCustomAssociationExtension)
+        return model.formatAssociationStatus[normalizedCustomAssociationExtension] ?? false
     }
 
     private var customAssociationActionTitle: String {
@@ -1931,15 +1915,13 @@ private struct WelcomeDetailView: View {
     }
 
     private var orderedSupportedFormats: [(format: AppModel.SupportedFormat, isDefault: Bool)] {
-        let snapshot = AppModel.formatPanelFormats.enumerated().map { index, format in
+        AppModel.formatPanelFormats.map { format in
             let lookupExtension = AppModel.associationExtension(for: format.fileExtension)
             let isDefault = model.formatAssociationStatus[lookupExtension]
                 ?? model.formatAssociationStatus[format.fileExtension]
                 ?? false
-            return (index: index, format: format, isDefault: isDefault)
+            return (format: format, isDefault: isDefault)
         }
-
-        return snapshot.map { (format: $0.format, isDefault: $0.isDefault) }
     }
 
     private func refreshDisplayedFormatAssociationStatus() {
@@ -2223,124 +2205,12 @@ private struct WelcomeDetailView: View {
     }
 
     private var tutorialEntryCard: some View {
-        let chapters = model.tutorialChapters
-        let chapter = currentPreviewChapter
-
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(isChinese ? "交互式教程" : "Interactive Tutorial")
-                        .font(.headline)
-
-                    Text(isChinese ? "用示例数据学习 VisiData，并在会话内跟随引导完成练习。" : "Learn VisiData with a sample dataset and a guided in-session coach.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    model.presentTutorialHub()
-                } label: {
-                    Label(isChinese ? "开始" : "Start", systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .tint(.accentColor)
-                .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1)
-            }
-
-            if let chapter {
-                // Chapter sub-header
-                HStack(spacing: 8) {
-                    Image(systemName: chapter.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                    Text(chapter.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-                .id(chapter.id + "-header")
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-
-                VStack(spacing: 9) {
-                    ForEach(Array(chapter.steps.prefix(4)), id: \.id) { step in
-                        tutorialPreviewRow(step)
-                    }
-                }
-                .id(chapter.id + "-steps")
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-            }
-
-            // Page indicator dots
-            if chapters.count > 1 {
-                HStack(spacing: 6) {
-                    Spacer()
-                    ForEach(Array(chapters.enumerated()), id: \.element.id) { index, _ in
-                        Circle()
-                            .fill(Color.white.opacity(index == (tutorialPreviewChapterIndex % chapters.count) ? 0.8 : 0.25))
-                            .frame(width: 6, height: 6)
-                            .scaleEffect(index == (tutorialPreviewChapterIndex % chapters.count) ? 1.15 : 1)
-                            .onTapGesture {
-                                withAnimation(.easeInOut(duration: 0.35)) {
-                                    tutorialPreviewChapterIndex = index
-                                }
-                                restartCarouselTimer()
-                            }
-                    }
-                    Spacer()
-                }
-                .padding(.top, 2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
-        .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
-        .onAppear { startCarouselTimer() }
-        .onDisappear { tutorialCarouselTimer?.invalidate() }
-    }
-
-    private func startCarouselTimer() {
-        tutorialCarouselTimer?.invalidate()
-        tutorialCarouselTimer = Timer.scheduledTimer(withTimeInterval: 6.0, repeats: true) { _ in
-            Task { @MainActor in
-                let chapters = model.tutorialChapters
-                guard chapters.count > 1 else { return }
-                tutorialPreviewChapterIndex = (tutorialPreviewChapterIndex + 1) % chapters.count
-            }
-        }
-    }
-
-    private func restartCarouselTimer() {
-        startCarouselTimer()
-    }
-
-    @ViewBuilder
-    private func tutorialPreviewRow(_ step: AppModel.TutorialStep) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text("\(step.index + 1)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .frame(width: 24, height: 24)
-                .background(Color.accentColor.opacity(0.22), in: Circle())
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(step.title)
-                    .font(.subheadline.weight(.semibold))
-                Text(step.command)
-                    .font(.system(.caption, design: .monospaced, weight: .semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.08), in: Capsule())
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
+        TutorialEntryCard(
+            chapters: model.tutorialChapters,
+            isChinese: isChinese,
+            motionEnabled: motionEnabled,
+            startAction: { model.presentTutorialHub() }
+        )
     }
 
     private var dependencyPill: some View {
@@ -2634,6 +2504,138 @@ private struct WelcomeDetailView: View {
                 return
             }
             model.refreshFormatAssociationStatuses(forExtensions: [newValue])
+        }
+    }
+}
+
+private struct TutorialEntryCard: View {
+    let chapters: [AppModel.TutorialChapter]
+    let isChinese: Bool
+    let motionEnabled: Bool
+    let startAction: () -> Void
+    @State private var tutorialPreviewChapterIndex = 0
+    @State private var carouselRestartToken = 0
+
+    private var currentPreviewChapter: AppModel.TutorialChapter? {
+        guard !chapters.isEmpty else {
+            return nil
+        }
+        return chapters[tutorialPreviewChapterIndex % chapters.count]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(isChinese ? "交互式教程" : "Interactive Tutorial")
+                        .font(.headline)
+
+                    Text(isChinese ? "用示例数据学习 VisiData，并在会话内跟随引导完成练习。" : "Learn VisiData with a sample dataset and a guided in-session coach.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Button(action: startAction) {
+                    Label(isChinese ? "开始" : "Start", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .tint(.accentColor)
+                .quietInteractiveSurface(enabled: motionEnabled, hoverScale: 1.012, hoverYOffset: -1)
+            }
+
+            if let chapter = currentPreviewChapter {
+                HStack(spacing: 8) {
+                    Image(systemName: chapter.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                    Text(chapter.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                }
+                .id(chapter.id + "-header")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+
+                VStack(spacing: 9) {
+                    ForEach(Array(chapter.steps.prefix(4)), id: \.id) { step in
+                        tutorialPreviewRow(step)
+                    }
+                }
+                .id(chapter.id + "-steps")
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+            }
+
+            if chapters.count > 1 {
+                HStack(spacing: 6) {
+                    Spacer()
+                    ForEach(Array(chapters.enumerated()), id: \.element.id) { index, _ in
+                        Circle()
+                            .fill(Color.white.opacity(index == (tutorialPreviewChapterIndex % chapters.count) ? 0.8 : 0.25))
+                            .frame(width: 6, height: 6)
+                            .scaleEffect(index == (tutorialPreviewChapterIndex % chapters.count) ? 1.15 : 1)
+                            .onTapGesture {
+                                withAnimation(.easeInOut(duration: 0.35)) {
+                                    tutorialPreviewChapterIndex = index
+                                }
+                                carouselRestartToken += 1
+                            }
+                    }
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassCard()
+        .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
+        .task(id: carouselRestartToken) {
+            await runCarousel()
+        }
+    }
+
+    @MainActor
+    private func runCarousel() async {
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(for: .seconds(6))
+            } catch {
+                return
+            }
+
+            guard chapters.count > 1 else {
+                continue
+            }
+            tutorialPreviewChapterIndex = (tutorialPreviewChapterIndex + 1) % chapters.count
+        }
+    }
+
+    @ViewBuilder
+    private func tutorialPreviewRow(_ step: AppModel.TutorialStep) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text("\(step.index + 1)")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .frame(width: 24, height: 24)
+                .background(Color.accentColor.opacity(0.22), in: Circle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(step.title)
+                    .font(.subheadline.weight(.semibold))
+                Text(step.command)
+                    .font(.system(.caption, design: .monospaced, weight: .semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

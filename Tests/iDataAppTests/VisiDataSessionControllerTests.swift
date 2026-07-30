@@ -341,6 +341,86 @@ struct VisiDataSessionControllerTests {
         #expect(sink.writes == ["FIRST\n", "SECOND\n"])
     }
 
+    @Test
+    func drainingOutputCoalescesBytesIntoOrderedBoundedDrains() async throws {
+        let byteCount = (64 * 1024) + 17
+        let expected = Data((0..<byteCount).map { UInt8(truncatingIfNeeded: $0) })
+        let temporaryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-output-drain-\(UUID().uuidString)")
+        try expected.write(to: temporaryURL)
+        defer {
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+
+        let fileDescriptor = open(temporaryURL.path, O_RDONLY)
+        #expect(fileDescriptor >= 0)
+        defer {
+            if fileDescriptor >= 0 {
+                close(fileDescriptor)
+            }
+        }
+
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkBuffer()
+        session.bind(displaySink: sink)
+        session.markDisplayReady()
+
+        session.drainOutputForTesting(
+            from: fileDescriptor,
+            generation: session.outputGenerationForTesting
+        )
+        #expect(lseek(fileDescriptor, 0, SEEK_CUR) == 64 * 1024)
+
+        session.drainOutputForTesting(
+            from: fileDescriptor,
+            generation: session.outputGenerationForTesting
+        )
+        #expect(lseek(fileDescriptor, 0, SEEK_CUR) == byteCount)
+        try await waitForSinkWrites(sink, count: 2)
+
+        #expect(sink.dataWrites.map(\.count) == [64 * 1024, 17])
+        #expect(sink.dataWrites.reduce(into: Data()) { $0.append($1) } == expected)
+    }
+
+    @Test
+    func drainingOutputDeliversSmallNonblockingReadImmediatelyAtEAGAIN() async throws {
+        var descriptors: [Int32] = [-1, -1]
+        #expect(pipe(&descriptors) == 0)
+        let readDescriptor = descriptors[0]
+        let writeDescriptor = descriptors[1]
+        defer {
+            if readDescriptor >= 0 {
+                close(readDescriptor)
+            }
+            if writeDescriptor >= 0 {
+                close(writeDescriptor)
+            }
+        }
+
+        let currentFlags = fcntl(readDescriptor, F_GETFL)
+        #expect(currentFlags >= 0)
+        #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) == 0)
+
+        let expected = Data([0x00, 0x7f, 0xff])
+        let bytesWritten = expected.withUnsafeBytes { buffer in
+            Darwin.write(writeDescriptor, buffer.baseAddress, buffer.count)
+        }
+        #expect(bytesWritten == expected.count)
+
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkBuffer()
+        session.bind(displaySink: sink)
+        session.markDisplayReady()
+
+        session.drainOutputForTesting(
+            from: readDescriptor,
+            generation: session.outputGenerationForTesting
+        )
+        try await waitForSinkWrites(sink, count: 1)
+
+        #expect(sink.dataWrites == [expected])
+    }
+
     private func makeFakeVDLauncher(at url: URL, childPIDFile: URL) throws {
         let escapedPIDPath = childPIDFile.path
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -379,20 +459,24 @@ private enum TestError: Error {
 @MainActor
 private final class TerminalDisplaySinkBuffer: TerminalDisplaySink {
     private(set) var writes: [String] = []
+    private(set) var dataWrites: [Data] = []
     private(set) var clearCount = 0
     private(set) var resetCount = 0
 
     func clearTerminalDisplay() {
         clearCount += 1
         writes.removeAll()
+        dataWrites.removeAll()
     }
 
     func resetTerminalDisplay() {
         resetCount += 1
         writes.removeAll()
+        dataWrites.removeAll()
     }
 
     func writeToTerminalDisplay(_ data: Data) {
+        dataWrites.append(data)
         writes.append(String(decoding: data, as: UTF8.self))
     }
 
@@ -400,6 +484,7 @@ private final class TerminalDisplaySinkBuffer: TerminalDisplaySink {
 
     func reset() {
         writes.removeAll()
+        dataWrites.removeAll()
         clearCount = 0
         resetCount = 0
     }
@@ -523,6 +608,24 @@ private func waitForCondition(timeout: TimeInterval, predicate: @escaping @Senda
     }
 
     #expect(predicate())
+}
+
+@MainActor
+private func waitForSinkWrites(
+    _ sink: TerminalDisplaySinkBuffer,
+    count: Int,
+    timeout: Duration = .seconds(1)
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+
+    while sink.dataWrites.count < count {
+        guard clock.now < deadline else {
+            Issue.record("Timed out waiting for \(count) terminal writes; received \(sink.dataWrites.count).")
+            return
+        }
+        try await Task.sleep(for: .milliseconds(5))
+    }
 }
 
 @MainActor

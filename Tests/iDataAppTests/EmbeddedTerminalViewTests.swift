@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import AppKit
+import JavaScriptCore
 import WebKit
 @testable import iData
 
@@ -375,6 +376,40 @@ struct EmbeddedTerminalViewTests {
 
         #expect(!html.contains("if (force || sizeChanged) {"))
         #expect(html.contains("if (sizeChanged || terminalNeedsResize) {"))
+    }
+
+    @Test(arguments: [
+        Data(),
+        Data((0...UInt8.max).map { $0 }),
+        Data([0x00, 0x22, 0x27, 0x5c, 0x7f, 0xff])
+    ])
+    func terminalWriteJavaScriptPreservesEveryInputByte(_ expected: Data) throws {
+        let context = try #require(JSContext())
+        context.evaluateScript(
+            """
+            var capturedPayload = null;
+            var window = {
+                iDataWriteBase64: function(payload) {
+                    capturedPayload = payload;
+                }
+            };
+            """
+        )
+
+        let functionCall = EmbeddedTerminalView.Coordinator.terminalWriteJavaScript(for: expected)
+        context.evaluateScript(functionCall)
+
+        let payload = try #require(context.objectForKeyedSubscript("capturedPayload")?.toString())
+        let decoded = try #require(Data(base64Encoded: payload))
+        #expect(decoded == expected)
+    }
+
+    @Test
+    func terminalWriteHotPathAvoidsJSONSerialization() throws {
+        let source = try embeddedTerminalViewSource()
+
+        #expect(!source.contains("JSONSerialization"))
+        #expect(!source.contains("quotedJavaScriptString"))
     }
 
     private func displayReadyFlag(for session: VisiDataSessionController) -> Bool {

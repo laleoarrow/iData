@@ -121,6 +121,63 @@ Record any visual defects such as:
 - drag/drop activating the wrong target
 - visible tearing, flicker, or incomplete repaint during fast changes
 
+## Reproducible performance regression check
+
+Compare the same build configuration, window size, files, and interaction
+sequence before and after an optimization. Record the raw observations; never
+invent a metric or mark an untested path as passing.
+
+### 1. Idle welcome-screen CPU
+
+Quit other iData builds, launch the build under test, leave the welcome screen
+untouched for 10 seconds, then capture 20 one-second samples:
+
+```bash
+IDATA_PID="$(pgrep -x iData | head -n 1)"
+top -l 20 -s 1 -pid "$IDATA_PID" -stats pid,cpu,mem,time,command
+```
+
+Report the build configuration plus the average and maximum CPU values from
+the same sample window. Keep the raw output until the comparison is complete.
+
+### 2. Sidebar collapse and expansion
+
+With the same welcome-screen window size, collapse and expand the sidebar 20
+times at a steady pace. During a 10-second run, capture a process sample:
+
+```bash
+sample "$IDATA_PID" 10 -file /tmp/idata-sidebar.sample.txt
+```
+
+Check input response, layout stability, clipped labels, stale frames, and the
+final sidebar state. Compare like-for-like runs, then delete the temporary
+sample file.
+
+### 3. Terminal output batching and bridge calls
+
+Run the focused output-path tests:
+
+```bash
+swift test --filter drainingOutput
+swift test --filter terminalWrite
+```
+
+The bounded-drain test is the automated proxy for native-to-WebKit bridge
+calls: each terminal display write becomes one `iDataWriteBase64` evaluation.
+Verify that the fixture's bytes remain ordered and complete, that each batch
+stays within the asserted limit, and that output is coalesced into the asserted
+number of display writes. If manual instrumentation is added to count reads,
+batches, or bridge calls, keep it Debug-only and remove it before handoff.
+
+### 4. Resize and file switching
+
+Open at least three representative files, switch among them rapidly for 20
+cycles, then alternate narrow and wide window sizes for 20 cycles. Confirm
+that the selected file and visible terminal agree, the table never becomes
+blank, and no content is clipped, torn, stale, or painted outside its region.
+Repeat after a fresh launch to cover the first measured resize and Ctrl+L
+repaint path.
+
 ## Terminal frontend
 
 `terminal.html` now retries layout/refresh for several seconds after:

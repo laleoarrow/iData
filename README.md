@@ -2,115 +2,112 @@
 
 <div align="center">
   <a href="https://github.com/laleoarrow/iData/actions/workflows/swift.yml">
-    <img src="https://img.shields.io/badge/BUILD-PASSING-2e7d32?style=for-the-badge&logo=githubactions&logoColor=white" alt="Build Passing" />
+    <img src="https://github.com/laleoarrow/iData/actions/workflows/swift.yml/badge.svg?branch=main" alt="Swift build and tests" />
   </a>
   <a href="https://github.com/laleoarrow/homebrew-tap/actions/workflows/tests.yml">
-    <img src="https://img.shields.io/badge/BREW%20TEST--BOT-PASSING-FBB040?style=for-the-badge&logo=homebrew&logoColor=black" alt="Brew Test-Bot Passing" />
+    <img src="https://github.com/laleoarrow/homebrew-tap/actions/workflows/tests.yml/badge.svg" alt="Homebrew tests" />
   </a>
-  <a href="https://github.com/laleoarrow/iData/releases">
-    <img src="https://img.shields.io/badge/RELEASE-V0.2.1-1565c0?style=for-the-badge&logo=github&logoColor=white" alt="Release V0.2.1" />
+  <a href="https://github.com/laleoarrow/iData/releases/latest">
+    <img src="https://img.shields.io/github/v/release/laleoarrow/iData?style=flat&amp;logo=github&amp;label=release" alt="Latest release" />
   </a>
-  <a href="https://github.com/laleoarrow/iData">
-    <img src="https://img.shields.io/badge/PLATFORM-macOS%2014%2B-111111?style=for-the-badge&logo=apple&logoColor=white" alt="Platform macOS 14+" />
-  </a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-111111?style=flat&amp;logo=apple" alt="macOS 14 or newer" />
 </div>
 
 <div align="center">
   <a href="./README.md">English</a> | <a href="./README_zh.md">简体中文</a>
 </div>
 
+## What iData is
 
-## What's iData for?
-When working with very large tabular datasets, macOS surprisingly doesn’t offer many native tools that handle them gracefully. VisiData is an excellent solution—but as a command-line tool, it sometimes feels like bringing a terminal to a double-click fight.
+iData is a lightweight, native **macOS 14+** front end for
+[VisiData](https://www.visidata.org/). It lets you open a large table from
+Finder and work with it through an embedded terminal while preserving
+VisiData's commands, shortcuts, and loaders.
 
-That’s where iData comes in. Built with Swift and SwiftUI, iData provides a smooth, native macOS interface while quietly running VisiData under the hood. Instead of launching a terminal, you can simply double-click a giant table file and start exploring—a small convenience that becomes surprisingly valuable in data-heavy fields like bioinformatics.
+**VisiData is an external dependency and is not bundled with iData.** If iData
+cannot find `vd`, it stays on the welcome screen and shows installation
+guidance instead of opening an empty terminal. A nonstandard `vd` executable
+can be selected in **Preferences > VisiData Runtime**.
 
-It also supports gzipped tabular files directly, meaning you can open compressed datasets without the ritual of manual decompression. If you regularly wrestle with large data files, you probably already know how nice that feels.
+## Install
 
-## Install iData
-
-Install with Homebrew Cask:
+### 1. Install iData
 
 ```bash
 brew install --cask laleoarrow/tap/idata
 ```
 
-Upgrade later:
+Upgrade later with:
 
 ```bash
 brew upgrade --cask laleoarrow/tap/idata
 ```
 
-`iData` does not bundle `VisiData`. Install `VisiData` separately.
+### 2. Install VisiData
 
-Recommended install:
+The recommended setup keeps VisiData and common optional loaders in one
+isolated environment:
 
 ```bash
 pipx install visidata
 pipx inject visidata openpyxl pyxlsb xlrd zstandard
 ```
 
-Optional alternative:
+Homebrew is also supported:
 
 ```bash
 brew install visidata
 ```
 
-Note: if you use Homebrew and need extra VisiData plugins (for example Excel loaders), install them in the same Python environment used by `vd`.
+If a Homebrew installation needs extra loaders, install them in the same
+Python environment used by `vd`.
 
-If you use a custom install path, set the `vd` executable path in Preferences.
+## File handling
 
-If `VisiData` is missing, `iData` stays on the welcome screen and shows install guidance instead of opening a blank terminal pane.
+Files selected with iData's **Open** command go directly to VisiData. For files
+sent to iData by Finder, uncompressed files up to 100 MiB are handed to a
+preferred desktop app (WPS Office, then Microsoft Excel by default); larger
+files open in iData. This handoff app is configurable in Preferences.
 
-## Common format examples
+Gzip-like inputs (`.gz`, `.bgz`, and `.bgzf`) always stay in iData: their
+decompressed bytes are streamed to VisiData without creating an extracted
+copy.
 
-- `csv`
-- `tsv`
-- `json`
-- `jsonl`
-- `xlsx`
-- `ma`
-- `bed.bgz`
-- `csv.gz`
-- `tsv.gz`
-- `study.any_weird_suffix`
-
-`iData` forwards most regular files directly to `VisiData`. It only special-cases gzip-like compression (`.gz`, `.bgz`, `.bgzf`) and streams those files without extracting them.
+Common examples include `csv`, `tsv`, `json`, `jsonl`, `xlsx`, `ma`,
+`bed.bgz`, `csv.gz`, and files with uncommon suffixes.
 
 ## Updates
 
-`iData` uses `Sparkle 2` for in-app updates.
+iData uses Sparkle 2 for in-app updates.
 
-- brew install path: `brew install --cask laleoarrow/tap/idata`
-- release assets live on GitHub Releases
-- the update feed lives at `docs/appcast.xml` and is intended for GitHub Pages hosting
-- package a release with `./scripts/package_release.sh <version>`
-- after a GitHub release is published, `.github/workflows/sync-homebrew-cask.yml` updates `laleoarrow/homebrew-tap` automatically when `HOMEBREW_TAP_TOKEN` is configured
+- Release assets are published on [GitHub Releases](https://github.com/laleoarrow/iData/releases).
+- The update feed is stored at `docs/appcast.xml` for GitHub Pages hosting.
+- A published GitHub release can trigger `.github/workflows/sync-homebrew-cask.yml`
+  to update `laleoarrow/homebrew-tap` when `HOMEBREW_TAP_TOKEN` is configured.
 
 ## Development
 
-Run tests:
+Run the test and Debug-build checks:
 
 ```bash
 swift test
-/bin/zsh -lc 'xcodebuild -project iData.xcodeproj -scheme iDataApp -configuration Debug -clonedSourcePackagesDirPath .build/SourcePackages -derivedDataPath .build/xcode-debug build'
+xcodebuild -project iData.xcodeproj -scheme iDataApp -configuration Debug \
+  -clonedSourcePackagesDirPath .build/SourcePackages \
+  -derivedDataPath .build/xcode-debug build
 ```
 
-Build the app bundle:
+Build the installable app:
 
 ```bash
 ./scripts/build_app.sh
 ```
 
-Package a GitHub release asset:
+Package release assets:
 
 ```bash
-./scripts/package_release.sh 0.2.1
+./scripts/package_release.sh <version>
 ```
 
-Install locally:
-
-- Copy `dist/iData.app` into `/Applications`
-- Quit any other running `iData` instance before testing the release build
-- Open `dist/iData-v0.2.1-macos-universal.dmg` if you want the drag-to-Applications installer view
-- Or run `dist/iData-v0.2.1-macos-universal.pkg` for the installer package flow
+The app bundle is written to `dist/iData.app`; packaged installers use names
+such as `dist/iData-v<version>-macos-universal.dmg` and
+`dist/iData-v<version>-macos-universal.pkg`.

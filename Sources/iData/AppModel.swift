@@ -180,6 +180,7 @@ final class AppModel: ObservableObject {
     private let externalFileOpener: any ExternalFileOpening
     private let alternateApplicationResolver: @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler?
     private let fileSizeProvider: @MainActor (URL) -> Int64?
+    private let formatAssociationChecker: @MainActor (String) -> Bool
 
     nonisolated static let vdExecutablePathKey = "vdExecutablePath"
     nonisolated static let pinnedRecentFilesKey = "pinnedRecentFiles"
@@ -471,7 +472,8 @@ final class AppModel: ObservableObject {
         preferredLanguagesProvider: @escaping () -> [String] = { Locale.preferredLanguages },
         externalFileOpener: any ExternalFileOpening = WorkspaceExternalFileOpener(),
         alternateApplicationResolver: @escaping @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler? = AppModel.resolveAlternateApplication(for:lookupExtension:storedPreviousDefaults:),
-        fileSizeProvider: @escaping @MainActor (URL) -> Int64? = AppModel.fileSizeInBytes(for:)
+        fileSizeProvider: @escaping @MainActor (URL) -> Int64? = AppModel.fileSizeInBytes(for:),
+        formatAssociationChecker: @escaping @MainActor (String) -> Bool = FileTypeAssociation.isIDataDefaultApp(forExtension:)
     ) {
         self.defaults = defaults
         self.recentFilesStore = recentFilesStore ?? RecentFilesStore(defaults: defaults)
@@ -483,6 +485,7 @@ final class AppModel: ObservableObject {
         self.externalFileOpener = externalFileOpener
         self.alternateApplicationResolver = alternateApplicationResolver
         self.fileSizeProvider = fileSizeProvider
+        self.formatAssociationChecker = formatAssociationChecker
         let initialRecentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
         self.recentFiles = Self.orderedRecentFiles(
             initialRecentFiles,
@@ -548,29 +551,33 @@ final class AppModel: ObservableObject {
     }
 
     var tutorialChapters: [TutorialChapter] {
-        Self.tutorialChapterDefinitions.map { definition in
+        let language = effectiveLanguage
+        let progressByChapter = tutorialProgressByChapter()
+        let completedChapterIDs = completedTutorialChapterIDs()
+
+        return Self.tutorialChapterDefinitions.map { definition in
             let completedStepCount = min(
-                tutorialProgressByChapter()[definition.id] ?? 0,
+                progressByChapter[definition.id] ?? 0,
                 definition.steps.count
             )
             let steps = definition.steps.enumerated().map { index, stepDefinition in
                 TutorialStep(
                     id: stepDefinition.id,
                     index: index,
-                    title: stepDefinition.title.localized(for: effectiveLanguage),
+                    title: stepDefinition.title.localized(for: language),
                     command: stepDefinition.command,
-                    instruction: stepDefinition.instruction.localized(for: effectiveLanguage),
-                    detail: stepDefinition.detail.localized(for: effectiveLanguage)
+                    instruction: stepDefinition.instruction.localized(for: language),
+                    detail: stepDefinition.detail.localized(for: language)
                 )
             }
             return TutorialChapter(
                 id: definition.id,
-                title: definition.title.localized(for: effectiveLanguage),
-                subtitle: definition.subtitle.localized(for: effectiveLanguage),
+                title: definition.title.localized(for: language),
+                subtitle: definition.subtitle.localized(for: language),
                 icon: definition.icon,
                 steps: steps,
                 completedStepCount: completedStepCount,
-                isCompleted: completedTutorialChapterIDs().contains(definition.id)
+                isCompleted: completedChapterIDs.contains(definition.id)
             )
         }
     }
@@ -1610,10 +1617,19 @@ final class AppModel: ObservableObject {
                 .filter { !$0.isEmpty }
         )
 
+        var refreshedStatus = formatAssociationStatus
         for lookupExtension in lookupExtensions {
-            let isDefault = FileTypeAssociation.isIDataDefaultApp(forExtension: lookupExtension)
-            updateAssociationStatus(forLookupExtension: lookupExtension, isDefault: isDefault)
+            let isDefault = formatAssociationChecker(lookupExtension)
+            refreshedStatus[lookupExtension] = isDefault
+            for format in Self.supportedFormats where Self.associationExtension(for: format.fileExtension) == lookupExtension {
+                refreshedStatus[format.fileExtension] = isDefault
+            }
         }
+
+        guard refreshedStatus != formatAssociationStatus else {
+            return
+        }
+        formatAssociationStatus = refreshedStatus
     }
 
     @discardableResult
@@ -1814,6 +1830,14 @@ final class AppModel: ObservableObject {
             .split(separator: ".")
             .last
             .map { String($0).lowercased() } ?? ""
+    }
+
+    static func contentType(forExtension fileExtension: String) -> UTType? {
+        let trimmed = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        return UTType(filenameExtension: trimmed)
     }
 
     static func fileSizeInBytes(for url: URL) -> Int64? {
@@ -2278,28 +2302,7 @@ private enum FileTypeAssociation {
     }
 
     private static func contentType(forExtension fileExtension: String) -> UTType? {
-        let trimmed = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return nil
-        }
-
-        let probeDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("idata-content-type-probe", isDirectory: true)
-        try? FileManager.default.createDirectory(at: probeDirectory, withIntermediateDirectories: true)
-        let probeURL = probeDirectory.appendingPathComponent("probe-\(UUID().uuidString).\(trimmed)")
-
-        do {
-            try Data("idata".utf8).write(to: probeURL, options: [.atomic])
-            defer {
-                try? FileManager.default.removeItem(at: probeURL)
-            }
-            let values = try probeURL.resourceValues(forKeys: [.contentTypeKey])
-            guard let contentType = values.contentType else {
-                return nil
-            }
-            return contentType
-        } catch {
-            return nil
-        }
+        AppModel.contentType(forExtension: fileExtension)
     }
 
     static func isIDataDefaultApp(forExtension fileExtension: String) -> Bool {
@@ -2453,27 +2456,6 @@ private enum FileTypeAssociation {
 
                 continuation.resume(returning: .unexpected(nsError.localizedDescription))
             }
-        }
-    }
-
-    private static func withProbeURL<T>(forExtension fileExtension: String, _ body: (URL) -> T?) -> T? {
-        let trimmed = fileExtension.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return nil
-        }
-
-        let probeDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("idata-content-type-probe", isDirectory: true)
-        try? FileManager.default.createDirectory(at: probeDirectory, withIntermediateDirectories: true)
-        let probeURL = probeDirectory.appendingPathComponent("probe-\(UUID().uuidString).\(trimmed)")
-
-        do {
-            try Data("idata".utf8).write(to: probeURL, options: [.atomic])
-            defer {
-                try? FileManager.default.removeItem(at: probeURL)
-            }
-            return body(probeURL)
-        } catch {
-            return nil
         }
     }
 

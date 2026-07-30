@@ -387,10 +387,11 @@ struct FormatChip: View {
 }
 
 struct QuickTip: Identifiable {
-    let id = UUID()
     let keys: String
     let title: String
     let detail: String
+
+    var id: String { keys }
 }
 
 struct MessageCard: View {

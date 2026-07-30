@@ -245,7 +245,6 @@ struct ContentViewLayoutTests {
         if model.isSidebarCollapsed {
             collapsedExpandButton
                 .frame(maxWidth: .infinity, alignment: .center)
-                .transition(.opacity)
         """)))
         #expect(sidebarHeaderSection.contains("ZStack { Circle()"))
         #expect(sidebarHeaderSection.contains("appIcon"))
@@ -498,14 +497,14 @@ struct ContentViewLayoutTests {
         ))
 
         #expect(sidebarSection.contains("@State private var recentFilesScrollMetrics = SidebarScrollMetrics()"))
-        #expect(sidebarSection.contains("@State private var recentFilesFrame: CGRect = .zero"))
+        #expect(sidebarSection.contains("@State private var recentFilesMinY: CGFloat = 0"))
         #expect(sidebarSection.contains("ScrollView(.vertical, showsIndicators: false)"))
         #expect(sidebarSection.contains("VStack(spacing: model.isSidebarCollapsed ? 12 : 10)"))
         #expect(!sidebarSection.contains("LazyVStack(spacing: model.isSidebarCollapsed ? 12 : 10)"))
         #expect(sidebarSection.contains("HiddenScrollIndicatorsConfigurator()"))
         #expect(sidebarSection.contains("ZStack(alignment: .topLeading)"))
         #expect(sidebarSection.contains(".coordinateSpace(name: sidebarCoordinateSpace)"))
-        #expect(sidebarSection.contains("SidebarScrollFramePreferenceKey.self"))
+        #expect(sidebarSection.contains("SidebarScrollMinYPreferenceKey.self"))
         #expect(sidebarSection.contains("SidebarScrollPositionLine("))
         #expect(sidebarSection.contains("SidebarScrollMetricsPreferenceKey.self"))
         #expect(sidebarSection.contains("SidebarScrollViewportHeightPreferenceKey.self"))
@@ -517,7 +516,11 @@ struct ContentViewLayoutTests {
         #expect(scrollBridgeSection.contains("scrollView.hasVerticalScroller = false"))
         #expect(scrollBridgeSection.contains("scrollView.hasHorizontalScroller = false"))
         #expect(scrollBridgeSection.contains("scrollView.verticalScroller = nil"))
-        #expect(scrollBridgeSection.contains("scheduleScrollIndicatorHiding(from:"))
+        #expect(scrollBridgeSection.contains("final class Coordinator"))
+        #expect(scrollBridgeSection.contains("weak var configuredScrollView: NSScrollView?"))
+        #expect(scrollBridgeSection.contains("var isScheduling = false"))
+        #expect(scrollBridgeSection.contains("requestScrollIndicatorHiding(from:"))
+        #expect(scrollBridgeSection.contains("guard !context.coordinator.isScheduling else"))
         #expect(scrollBridgeSection.contains("nearestLeftAlignedScrollViewInWindow()"))
         #expect(scrollBridgeSection.contains("leftSidebarScrollViewsInWindow()"))
         #expect(scrollBridgeSection.contains("descendantScrollViews()"))
@@ -598,8 +601,8 @@ struct ContentViewLayoutTests {
         ))
         let tutorialSection = normalizeWhitespace(try extractSection(
             from: source,
-            start: "private var tutorialEntryCard: some View {",
-            end: "private func startCarouselTimer()"
+            start: "private struct TutorialEntryCard: View {",
+            end: "private struct SessionDetailView: View {"
         ))
         let statusSection = normalizeWhitespace(try extractSection(
             from: source,
@@ -620,6 +623,56 @@ struct ContentViewLayoutTests {
         for section in [firstRunSection, tutorialSection, statusSection, quickTipsSection, formatsSection] {
             #expect(section.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
         }
+    }
+
+    @Test
+    func welcomeCarouselKeepsHighFrequencyStateInsideItsOwnView() throws {
+        let source = try contentViewSource()
+        let welcomeSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct WelcomeDetailView: View {",
+            end: "private struct TutorialEntryCard: View {"
+        ))
+        let tutorialSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct TutorialEntryCard: View {",
+            end: "private struct SessionDetailView: View {"
+        ))
+
+        #expect(welcomeSection.contains("TutorialEntryCard("))
+        #expect(!welcomeSection.contains("@State private var tutorialPreviewChapterIndex"))
+        #expect(!welcomeSection.contains("@State private var tutorialCarouselTimer"))
+        #expect(tutorialSection.contains("@State private var tutorialPreviewChapterIndex = 0"))
+        #expect(tutorialSection.contains("@State private var carouselRestartToken = 0"))
+        #expect(tutorialSection.contains(".task(id: carouselRestartToken)"))
+        #expect(tutorialSection.contains("try await Task.sleep(for: .seconds(6))"))
+        #expect(!tutorialSection.contains("Timer.scheduledTimer"))
+    }
+
+    @Test
+    func welcomeViewReadsCachedAssociationStatusWithoutPublishingDuringBodyEvaluation() throws {
+        let source = try contentViewSource()
+        let welcomeSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "private struct WelcomeDetailView: View {",
+            end: "private struct TutorialEntryCard: View {"
+        ))
+
+        #expect(welcomeSection.contains("return model.formatAssociationStatus[normalizedCustomAssociationExtension] ?? false"))
+        #expect(!welcomeSection.contains("model.checkFormatAssociation(forExtension: normalizedCustomAssociationExtension)"))
+    }
+
+    @Test
+    func quickTipIdentityIsStableAcrossViewRecomputations() throws {
+        let source = normalizeWhitespace(try contentViewSource())
+        let quickTipSection = normalizeWhitespace(try extractSection(
+            from: source,
+            start: "struct QuickTip: Identifiable {",
+            end: "struct MessageCard: View {"
+        ))
+
+        #expect(quickTipSection.contains("var id: String { keys }"))
+        #expect(!quickTipSection.contains("UUID()"))
     }
 
     @Test
@@ -762,7 +815,7 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func sidebarModeChangesAnimateWidthContentAndFooterLayout() throws {
+    func sidebarModeChangesAreInstantAndAvoidWindowWideLayoutAnimation() throws {
         let source = try contentViewSource()
         let normalized = normalizeWhitespace(source)
         let sidebarSection = normalizeWhitespace(try extractSection(
@@ -781,17 +834,18 @@ struct ContentViewLayoutTests {
             end: "private struct EmptySidebarState: View {"
         ))
 
-        #expect(normalized.contains(".animation(sidebarLayoutAnimation, value: model.isSidebarCollapsed)"))
-        #expect(sidebarSection.contains(".animation(listAnimation, value: model.isSidebarCollapsed)"))
-        #expect(sidebarSection.contains(".transition(sidebarModeTransition)"))
-        #expect(headerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
+        #expect(!normalized.contains(".animation(sidebarLayoutAnimation, value: model.isSidebarCollapsed)"))
+        #expect(!sidebarSection.contains(".animation(listAnimation, value: model.isSidebarCollapsed)"))
+        #expect(!sidebarSection.contains("sidebarModeTransition"))
+        #expect(!headerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
+        #expect(!headerSection.contains("expandedDetailsTransition"))
         #expect(footerSection.contains("AnyLayout(VStackLayout(spacing: 18))"))
         #expect(footerSection.contains("AnyLayout(HStackLayout(spacing: 18))"))
-        #expect(footerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
+        #expect(!footerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
     }
 
     @Test
-    func sidebarHeaderDetailsDoNotSlideDuringCollapse() throws {
+    func sidebarHeaderDetailsDoNotAnimateDuringCollapse() throws {
         let source = try contentViewSource()
         let headerSection = normalizeWhitespace(try extractSection(
             from: source,
@@ -799,10 +853,9 @@ struct ContentViewLayoutTests {
             end: "private struct SidebarFooter: View {"
         ))
 
-        #expect(headerSection.contains("private var expandedDetailsTransition: AnyTransition"))
-        #expect(headerSection.contains("insertion: .opacity.animation("))
-        #expect(headerSection.contains("removal: .identity"))
-        #expect(headerSection.contains(".transition(expandedDetailsTransition)"))
+        #expect(!headerSection.contains("expandedDetailsTransition"))
+        #expect(!headerSection.contains(".transition("))
+        #expect(!headerSection.contains(".animation(layoutAnimation, value: model.isSidebarCollapsed)"))
         #expect(!headerSection.contains(".move(edge: .leading)"))
     }
 

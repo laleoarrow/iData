@@ -163,8 +163,11 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         }
 
         func writeToTerminalDisplay(_ data: Data) {
-            let payload = data.base64EncodedString()
-            evaluate(functionCall: "window.iDataWriteBase64(\(quotedJavaScriptString(payload)));")
+            evaluate(functionCall: Self.terminalWriteJavaScript(for: data))
+        }
+
+        static func terminalWriteJavaScript(for data: Data) -> String {
+            "window.iDataWriteBase64(\"\(data.base64EncodedString())\");"
         }
 
         func focusTerminalDisplay() {
@@ -228,13 +231,6 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             }
 
             session?.markDisplayReady()
-        }
-
-        private func quotedJavaScriptString(_ value: String) -> String {
-            let payload = [value]
-            let data = try? JSONSerialization.data(withJSONObject: payload)
-            let json = data.flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
-            return String(json.dropFirst().dropLast())
         }
     }
 }
