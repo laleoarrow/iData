@@ -30,6 +30,7 @@ notarization_configured() {
 }
 
 "$ROOT_DIR/scripts/build_app.sh"
+"$ROOT_DIR/scripts/smoke_test_app.sh" "$APP_DIR"
 
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then
   if notarization_configured; then

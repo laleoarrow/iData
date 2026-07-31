@@ -29,3 +29,6 @@ jobs:
 
       - name: Build installable app bundle
         run: ./scripts/build_app.sh
+
+      - name: Smoke launch installable app bundle
+        run: ./scripts/smoke_test_app.sh

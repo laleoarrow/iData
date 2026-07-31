@@ -34,7 +34,8 @@ If you modify release packaging, asset names, `docs/appcast.xml`, notarization i
 
 1. Re-read the relevant workflow under `.github/workflows/` and confirm the changed filenames, digests, tags, and branch assumptions still match the automation.
 2. For Homebrew sync changes, explicitly verify `.github/workflows/sync-homebrew-cask.yml` still resolves the same asset name and digest shape that `package_release.sh` publishes.
-3. Before tagging or publishing, confirm `git status --short` is clean except for the intended release edits.
+3. Run `./scripts/smoke_test_app.sh` against the final bundle; static signature validation alone does not prove that dyld can load embedded frameworks.
+4. Before tagging or publishing, confirm `git status --short` is clean except for the intended release edits.
 
 Optional signing and notarization inputs:
 
@@ -106,7 +107,7 @@ The iData website at `https://laleoarrow.github.io/iData/` serves the `appcast.x
 
 ## Distribution notes
 
-- Without Apple credentials, the app is ad-hoc signed for bundle integrity but is not Developer ID signed or notarized
+- Without Apple credentials, the app is ad-hoc signed without Hardened Runtime so embedded Sparkle code can load without a Team ID; it is not Developer ID signed or notarized
 - `package_release.sh` supports Developer ID signing/notarization when the required Apple env vars are configured
 - Local installs from the working tree can be copied directly into `/Applications`
 - Users who download from GitHub may need to approve the app in macOS security settings

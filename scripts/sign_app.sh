@@ -16,43 +16,36 @@ fi
 
 sign_target() {
   local target=$1
+  shift
+  local -a sign_arguments=(
+    --force
+    --sign "$IDENTITY"
+  )
+
+  if [[ "$IDENTITY" != "-" ]]; then
+    sign_arguments+=(
+      --timestamp
+      --options runtime
+    )
+  fi
+  sign_arguments+=("$@")
+
   echo "Signing $target"
-  codesign \
-    --force \
-    --sign "$IDENTITY" \
-    --timestamp \
-    --options runtime \
-    "$target"
+  codesign "${sign_arguments[@]}" "$target"
 }
 
-while IFS= read -r target; do
-  [[ -n "$target" ]] || continue
-  sign_target "$target"
-done < <(
-  python3 - "$APP_PATH" <<'PY'
-import os
-import sys
+SPARKLE_FRAMEWORK="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+SPARKLE_VERSION="$SPARKLE_FRAMEWORK/Versions/B"
 
-app_path = sys.argv[1]
-frameworks = os.path.join(app_path, "Contents", "Frameworks")
-if not os.path.isdir(frameworks):
-    sys.exit(0)
-
-targets = []
-for dirpath, dirnames, _ in os.walk(frameworks, followlinks=False):
-    for dirname in dirnames:
-        if dirname.endswith((".app", ".framework", ".xpc", ".bundle")):
-            targets.append(os.path.join(dirpath, dirname))
-
-seen = set()
-for path in sorted(targets, key=lambda item: (item.count(os.sep), item), reverse=True):
-    real = os.path.realpath(path)
-    if real in seen:
-        continue
-    seen.add(real)
-    print(path)
-PY
-)
+if [[ -d "$SPARKLE_FRAMEWORK" ]]; then
+  sign_target "$SPARKLE_VERSION/XPCServices/Installer.xpc"
+  sign_target \
+    "$SPARKLE_VERSION/XPCServices/Downloader.xpc" \
+    --preserve-metadata=entitlements
+  sign_target "$SPARKLE_VERSION/Autoupdate"
+  sign_target "$SPARKLE_VERSION/Updater.app"
+  sign_target "$SPARKLE_FRAMEWORK"
+fi
 
 sign_target "$APP_PATH"
 

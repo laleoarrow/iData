@@ -3,26 +3,23 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.16</title>
-            <pubDate>Fri, 31 Jul 2026 16:23:07 +0800</pubDate>
+            <title>0.2.17</title>
+            <pubDate>Fri, 31 Jul 2026 23:28:31 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>36</sparkle:version>
-            <sparkle:shortVersionString>0.2.16</sparkle:shortVersionString>
+            <sparkle:version>37</sparkle:version>
+            <sparkle:shortVersionString>0.2.17</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.16
+            <description sparkle:format="markdown"><![CDATA[## v0.2.17
 
-这次更新让设置、教程与会话切换更清楚、更稳定：
+这是一个启动修复版本，不改变现有 UI：
 
-- 自定义后缀改为明确的原生表单，不再把示例误看成固定内容。
-- 重新校准 VisiData 3.3 教程按键，帮助、搜索、排序、绘图与分析步骤均按真实行为说明。
-- 统一“同时按、依次按、任选”的按键记号，并避免跳过尚未完成的步骤。
-- 每次练习都会启动干净会话，教程样本不再进入最近文件。
-- 修复延迟启动错误被静默忽略、旧请求误触发新会话的边界情况。
-- 快速切换文件时，新会话输出不再等待旧会话积压。
-- 串行化进程与时序测试，消除 GitHub Actions 偶发失败。
-- 无证书构建也会完整签名并校验应用包，避免嵌入组件残留失效签名。
+- 修复 v0.2.16 因主程序与 Sparkle 的 Team ID 校验冲突而在启动时退出的问题。
+- 无证书构建不再错误启用 Hardened Runtime；Developer ID 构建仍保持完整运行时保护与时间戳。
+- CI 新增最终应用包的真实启动冒烟测试，避免“静态签名通过、实际无法启动”再次漏检。
+
+已安装 v0.2.16 的用户需要从 GitHub 或 Homebrew 手动安装本版本；旧版会在 Sparkle 启动前退出，无法自行更新。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.16/iData-v0.2.16-macos-universal.zip" length="4024301" type="application/octet-stream" sparkle:edSignature="I4gY5FkQ++I0NE1m49MlBqkRnHjhP+xxk7OlIydmgemowofrn6talAVyfFrKp8CY1SJxaiq3D4rCgoUS8ayXBg=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.17/iData-v0.2.17-macos-universal.zip" length="4024253" type="application/octet-stream" sparkle:edSignature="t8xBRuMm7ee7uU57vTGHLvCFQW0+rae/G82XYrryZc1E/hkIS1yBf88xDOoksyxn4tKU1m+xbyW6MPeAHRsxCQ=="/>
         </item>
     </channel>
 </rss>

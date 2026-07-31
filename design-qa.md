@@ -3,7 +3,7 @@
 ## Comparison setup
 
 - Appearance: Chinese, dark mode.
-- Build: Release `0.2.16` (build 36), installed at `/Applications/iData.app`.
+- Build: Release `0.2.17` (build 37), installed at `/Applications/iData.app`.
 - Source visual truth: `/var/folders/jc/p8qsvpfd6t71pngj51n4yvvh0000gn/T/codex-clipboard-9b454ea8-6dff-4271-8338-c9893ce38a06.png` (1366 × 997 px, annotated inactive state).
 - Focused implementation evidence: `/tmp/idata-open-button-hover.png` (304 × 136 px at 2×, 152 × 68 pt rendered hover state).
 - Source intent: the primary Open button needs a visible hover halo against its system-blue fill.

@@ -25,6 +25,7 @@ Result:
 
 - builds `iData.app`
 - applies and verifies an ad-hoc signature across the app and embedded Sparkle components
+- leaves Hardened Runtime disabled because ad-hoc signatures do not provide the Team ID required by library validation
 - creates `zip`, `dmg`, and `pkg`
 - updates `docs/appcast.xml`
 - prints explicit skip messages for Developer ID signing/notarization
@@ -119,4 +120,4 @@ xcrun stapler validate dist/iData-v0.1.8-macos-universal.pkg
 
 ## Important limitation
 
-If these environment variables are missing, the scripts apply a verifiable ad-hoc signature but skip Developer ID signing and notarization. This preserves bundle integrity for local packaging without implying Apple trust or Gatekeeper approval.
+If these environment variables are missing, the scripts apply a verifiable ad-hoc signature without Hardened Runtime, then run a real launch smoke test. They skip Developer ID signing and notarization, so this does not imply Apple trust or Gatekeeper approval. With a Developer ID identity, Hardened Runtime and secure timestamps remain enabled for notarization.
