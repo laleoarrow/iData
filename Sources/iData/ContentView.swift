@@ -1139,6 +1139,7 @@ private struct HoverAnimatedCircleSymbol: View {
 enum SidebarHoverGlowStyle: Equatable {
     case none
     case rounded(CGFloat)
+    case prominentRounded(CGFloat)
     case circle
 }
 
@@ -1165,6 +1166,8 @@ struct SidebarHoverGlow: View {
                 EmptyView()
             case let .rounded(cornerRadius):
                 glow(for: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            case let .prominentRounded(cornerRadius):
+                prominentGlow(for: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             case .circle:
                 glow(for: Circle())
             }
@@ -1181,6 +1184,37 @@ struct SidebarHoverGlow: View {
                 shape
                     .inset(by: 0.5)
                     .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            }
+    }
+
+    private func prominentGlow<S: InsettableShape>(for shape: S) -> some View {
+        shape
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.16),
+                        Color(red: 0.24, green: 0.78, blue: 1.0).opacity(0.13),
+                        Color(red: 0.50, green: 0.42, blue: 1.0).opacity(0.11),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                shape
+                    .inset(by: 0.75)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.58),
+                                Color(red: 0.34, green: 0.84, blue: 1.0).opacity(0.62),
+                                Color(red: 0.58, green: 0.50, blue: 1.0).opacity(0.48),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1.5
+                    )
             }
     }
 }
@@ -2046,7 +2080,7 @@ private struct WelcomeDetailView: View {
             Label(isChinese ? "打开…" : "Open…", systemImage: "tablecells")
         }
         .buttonStyle(.borderedProminent)
-        .quietInteractiveSurface(enabled: motionEnabled)
+        .quietInteractiveSurface(enabled: motionEnabled, glowStyle: .prominentRounded(8))
 
         if case .missing = model.visiDataDependencyState {
             Button {

@@ -3,21 +3,21 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.13</title>
-            <pubDate>Fri, 31 Jul 2026 11:08:31 +0800</pubDate>
+            <title>0.2.14</title>
+            <pubDate>Fri, 31 Jul 2026 11:28:17 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>33</sparkle:version>
-            <sparkle:shortVersionString>0.2.13</sparkle:shortVersionString>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>0.2.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.13
+            <description sparkle:format="markdown"><![CDATA[## v0.2.14
 
-这次更新补回侧边栏的精致交互：
+这次更新完善欢迎页的主操作反馈：
 
-- 设置、帮助和教程图标恢复各自的悬停动画。
-- 侧边栏按钮与最近文件恢复轻微的渐变光晕。
-- 光晕仅在指针进入时创建，不持续追踪鼠标，兼顾反馈与性能。
+- “打开…”按钮增加清晰的蓝紫渐变光晕。
+- 光晕针对系统蓝色按钮提高对比度，按钮尺寸与按压反馈保持不变。
+- 仍仅在指针进入时创建，不持续追踪鼠标。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.13/iData-v0.2.13-macos-universal.zip" length="3974598" type="application/octet-stream" sparkle:edSignature="3jZng1HxbIs/msAQ2S5IKwV18XgbHHkFn7Wqrw/CELMORA9dtEhQNm2aFs3TlJAq6QeoBf24usQejTO33S5eBA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.14/iData-v0.2.14-macos-universal.zip" length="3978702" type="application/octet-stream" sparkle:edSignature="GG8ER3dbR+2j9r5wR4PRHNhJr5FI1jTDtBSj5xN0Gth+CcONAYVraT6pGoTbk+6J+GHDJRbRDYPlBjekBD3tCA=="/>
         </item>
     </channel>
 </rss>

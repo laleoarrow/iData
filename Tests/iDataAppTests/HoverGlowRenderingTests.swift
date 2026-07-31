@@ -8,18 +8,23 @@ struct HoverGlowRenderingTests {
     @Test
     func visibleGlowRendersAColoredSurfaceWhileHiddenGlowStaysTransparent() throws {
         let visiblePixel = try centerPixel(isVisible: true)
+        let prominentPixel = try centerPixel(isVisible: true, style: .prominentRounded(8))
         let hiddenPixel = try centerPixel(isVisible: false)
 
         #expect(visiblePixel.alphaComponent > 0.03)
         #expect(visiblePixel.blueComponent > visiblePixel.redComponent)
+        #expect(prominentPixel.alphaComponent > visiblePixel.alphaComponent * 1.4)
         #expect(hiddenPixel.alphaComponent < 0.01)
     }
 
-    private func centerPixel(isVisible: Bool) throws -> NSColor {
+    private func centerPixel(
+        isVisible: Bool,
+        style: SidebarHoverGlowStyle = .rounded(8)
+    ) throws -> NSColor {
         let renderer = ImageRenderer(
             content: SidebarHoverGlow(
                 isVisible: isVisible,
-                style: .rounded(8)
+                style: style
             )
             .frame(width: 120, height: 44)
         )

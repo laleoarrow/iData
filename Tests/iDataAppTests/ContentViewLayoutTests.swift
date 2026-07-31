@@ -63,6 +63,7 @@ struct ContentViewLayoutTests {
         let welcome = try extractSection(from: source, start: "private struct WelcomeDetailView: View {", end: "private struct TutorialEntryCard")
 
         #expect(welcome.contains("Label(isChinese ? \"打开…\" : \"Open…\", systemImage: \"tablecells\")"))
+        #expect(welcome.contains(".quietInteractiveSurface(enabled: motionEnabled, glowStyle: .prominentRounded(8))"))
         #expect(welcome.contains("Text(isChinese ? \"更多\" : \"More\")"))
         #expect(welcome.contains(".menuStyle(.button)"))
         #expect(welcome.contains(".buttonStyle(.bordered)"))

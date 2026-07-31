@@ -3,8 +3,8 @@
 ## Comparison setup
 
 - Appearance: Chinese, dark mode.
-- Build: Release `0.2.13` (build 33), installed at `/Applications/iData.app`.
-- Source: the user report that the three footer animations and the gradient hover halo on sidebar controls and recent files disappeared after the earlier performance pass.
+- Build: Release `0.2.14` (build 34), installed at `/Applications/iData.app`.
+- Source: the user report that the primary Open button's hover halo was not visible against its system-blue fill.
 - Implementation: the installed Release app at the 680 × 460 pt minimum content size, expanded sidebar, and matching recent-file state.
 - The implementation was reviewed at both the 960 × 620 pt default content size and the new minimum size.
 - The temporary PNG evidence was removed after review so it does not ship in the repository.
@@ -32,6 +32,8 @@
   Resolution: applied the same shape-matched conditional gradient to each actionable sidebar surface.
 - Footer motion: Settings, Help, and Tutorial had been flattened to static symbols even though their lightweight motion helper remained available.
   Resolution: reconnected the existing one-shot gear rotation, help bounce, and tutorial-cap tilt without adding a timer or continuous pointer tracking.
+- Primary-action contrast: the shared low-opacity gradient was perceptible on dark and translucent controls but disappeared visually over the system-blue Open button.
+  Resolution: added a prominent variant with a brighter gradient rim and restrained translucent fill, without changing the native button size or pressed state.
 - Hover performance: the former implementation animated scale, offset, blur-like shadows, and persistent decorative layers.
   Resolution: the gradient layer now exists only while hovered, updates only on pointer enter/exit, and uses no continuous location tracking, blur, shadow, or layout-affecting transform.
 
@@ -41,6 +43,7 @@
 - Spacing: hero, divider, shortcut grid, and footer follow the selected concept without nested cards.
 - Color: the background capture shows the inactive native button state; the primary action uses the normal blue accent when the window is active.
 - Controls: Open and More remain compact native macOS controls with balanced heights and no oversized CTA.
+- Primary action: Open keeps its native prominent-button appearance and gains a clearly visible blue–cyan–violet rim only while hovered.
 - Hover: interactive controls receive one subtle, shape-matched gradient layer; read-only status remains static.
 - Footer icons: Settings rotates once, Help bounces, and Tutorial tilts when the pointer enters; all three return to their resting state when it leaves.
 - Narrow layout: the shortcut list switches to one column and remains accessible through the existing welcome-page scroll view.
