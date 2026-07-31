@@ -32,8 +32,6 @@ notarization_configured() {
 "$ROOT_DIR/scripts/build_app.sh"
 
 if [[ -n "$APP_SIGN_IDENTITY" ]]; then
-  "$ROOT_DIR/scripts/sign_app.sh" "$APP_DIR"
-
   if notarization_configured; then
     APP_NOTARY_ZIP="$ROOT_DIR/dist/.iData-v${VERSION}-notary.zip"
     rm -f "$APP_NOTARY_ZIP"
@@ -46,7 +44,7 @@ if [[ -n "$APP_SIGN_IDENTITY" ]]; then
     echo "Skipping app notarization: configure IDATA_NOTARY_KEYCHAIN_PROFILE or API key env vars"
   fi
 else
-  echo "Skipping app signing: IDATA_DEVELOPER_ID_APP is not set"
+  echo "Using verified ad-hoc app signature: IDATA_DEVELOPER_ID_APP is not set"
 fi
 
 "$ROOT_DIR/scripts/create_dmg.sh" "$VERSION"

@@ -3,25 +3,26 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.15</title>
-            <pubDate>Fri, 31 Jul 2026 12:53:48 +0800</pubDate>
+            <title>0.2.16</title>
+            <pubDate>Fri, 31 Jul 2026 16:23:07 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>35</sparkle:version>
-            <sparkle:shortVersionString>0.2.15</sparkle:shortVersionString>
+            <sparkle:version>36</sparkle:version>
+            <sparkle:shortVersionString>0.2.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.15
+            <description sparkle:format="markdown"><![CDATA[## v0.2.16
 
-这次更新进一步完善界面反馈，并降低后台开销：
+这次更新让设置、教程与会话切换更清楚、更稳定：
 
-- 欢迎页“打开…”按钮增加更清晰的蓝紫渐变光晕。
-- 统一侧栏按钮与历史记录的悬停反馈，恢复轻量的一次性图标动画。
-- 调整内嵌终端圆角，使内容与外层容器更贴合。
-- 进程退出改用单次内核等待，移除定时轮询与重复退出分支。
-- 减少终端尺寸检查、重复绑定和调试日志开销。
-- 默认停用终端调试消息桥，空闲时不再产生相关日志与唤醒。
-- 加强快速退出、终端布局与悬停效果的回归测试。
+- 自定义后缀改为明确的原生表单，不再把示例误看成固定内容。
+- 重新校准 VisiData 3.3 教程按键，帮助、搜索、排序、绘图与分析步骤均按真实行为说明。
+- 统一“同时按、依次按、任选”的按键记号，并避免跳过尚未完成的步骤。
+- 每次练习都会启动干净会话，教程样本不再进入最近文件。
+- 修复延迟启动错误被静默忽略、旧请求误触发新会话的边界情况。
+- 快速切换文件时，新会话输出不再等待旧会话积压。
+- 串行化进程与时序测试，消除 GitHub Actions 偶发失败。
+- 无证书构建也会完整签名并校验应用包，避免嵌入组件残留失效签名。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.15/iData-v0.2.15-macos-universal.zip" length="3981765" type="application/octet-stream" sparkle:edSignature="Mxqhu+k3KrIEkxK0ihD/LQoXMmJHYPZ9mY/643Bvp7GGQCeLccaT4PjA0W5wGwXjBhNuxGl41ybCwUEfr+Y6AA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.16/iData-v0.2.16-macos-universal.zip" length="4024301" type="application/octet-stream" sparkle:edSignature="I4gY5FkQ++I0NE1m49MlBqkRnHjhP+xxk7OlIydmgemowofrn6talAVyfFrKp8CY1SJxaiq3D4rCgoUS8ayXBg=="/>
         </item>
     </channel>
 </rss>

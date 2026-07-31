@@ -131,8 +131,16 @@ final class AppModel: ObservableObject {
     @Published var activeSession: VisiDataSessionController?
     @Published var recentFiles: [URL]
     @Published var lastOpenedFile: URL?
-    @Published var statusMessage: String?
+    @Published var statusMessage: String? {
+        didSet {
+            if tutorialStatusMessage != statusMessage {
+                tutorialStatusMessage = nil
+            }
+        }
+    }
     @Published var errorMessage: String?
+    @Published private(set) var tutorialErrorMessage: String?
+    @Published private(set) var tutorialStatusMessage: String?
     @Published var externalHandoffNotice: ExternalHandoffNotice?
     @Published var isHelpPresented = false
     @Published var isTutorialHubPresented = false
@@ -304,37 +312,37 @@ final class AppModel: ObservableObject {
                 TutorialStepDefinition(
                     id: "basic-move",
                     title: TutorialLocalizedText(english: "Move Around", chinese: "移动光标"),
-                    command: "← ↑ → ↓  /  h j k l",
+                    command: "← ↑ → ↓  |  h j k l",
                     instruction: TutorialLocalizedText(english: "Use arrow keys or `h j k l` to move around rows and columns.", chinese: "用方向键或 `h j k l` 在行列间移动。"),
                     detail: TutorialLocalizedText(english: "Arrow keys are fully supported. `h j k l` is just faster for power users.", chinese: "方向键完全可用；`h j k l` 只是熟练用户更高效。")
                 ),
                 TutorialStepDefinition(
                     id: "basic-search",
                     title: TutorialLocalizedText(english: "Search", chinese: "搜索"),
-                    command: "/  Tokyo  Enter",
-                    instruction: TutorialLocalizedText(english: "Press `/`, type `Tokyo`, then press Enter once to submit the search.", chinese: "按 `/`，输入 `Tokyo`，然后只按一次 Enter 提交搜索。"),
-                    detail: TutorialLocalizedText(english: "After the first Enter, use `n` / `N` for next/previous match. Don't press Enter twice.", chinese: "第一次 Enter 后，用 `n` / `N` 跳转下一条/上一条；不要连续按两次 Enter。")
+                    command: "city: / → Tokyo → Enter",
+                    instruction: TutorialLocalizedText(english: "Move to `city`, then press `/`, type `Tokyo`, and press Enter once.", chinese: "先移到 `city` 列，再按 `/`，输入 `Tokyo`，按一次 Enter。"),
+                    detail: TutorialLocalizedText(english: "Use `n` for the next match and `Shift+N` for the previous match.", chinese: "用 `n` 跳到下一处，`Shift+N` 回到上一处。")
                 ),
                 TutorialStepDefinition(
                     id: "basic-sort",
                     title: TutorialLocalizedText(english: "Sort", chinese: "排序"),
-                    command: "]  [",
-                    instruction: TutorialLocalizedText(english: "Move to `score`, then sort ascending with `]` and descending with `[`.", chinese: "先移动到 `score` 列，再按 `]` 升序、`[` 降序。"),
+                    command: "score: [ ↑  |  ] ↓",
+                    instruction: TutorialLocalizedText(english: "Move to `score`, then press `[` for ascending or `]` for descending.", chinese: "先移到 `score` 列；按 `[` 升序，按 `]` 降序。"),
                     detail: TutorialLocalizedText(english: "Sorting is column-scoped, so cursor location matters.", chinese: "排序作用在当前列，所以光标位置很关键。")
                 ),
                 TutorialStepDefinition(
                     id: "basic-select",
-                    title: TutorialLocalizedText(english: "Select Rows", chinese: "行选择"),
-                    command: "s  t  u",
+                    title: TutorialLocalizedText(english: "Select Rows", chinese: "选择行"),
+                    command: "s | t | u",
                     instruction: TutorialLocalizedText(english: "`s` means select current row. `t` only toggles: selected -> unselected, unselected -> selected. `u` always unselects current row.", chinese: "`s` 是把当前行设为已选；`t` 只是切换（已选变未选，未选变已选）；`u` 永远是取消当前行选择。"),
                     detail: TutorialLocalizedText(english: "If `t` feels confusing, use `s` for selecting and `u` for clearing until you are comfortable.", chinese: "如果 `t` 容易混淆，先只用 `s` 选择、`u` 取消，熟悉后再用切换。")
                 ),
                 TutorialStepDefinition(
                     id: "basic-help",
-                    title: TutorialLocalizedText(english: "Discover Commands", chinese: "命令发现"),
-                    command: "z  then  ?",
-                    instruction: TutorialLocalizedText(english: "Press `z`, then `?` (not together). No extra text input is needed; a command-help sheet opens directly.", chinese: "`z` 后再按 `?`。这不是组合键，也不用再输入文字。"),
-                    detail: TutorialLocalizedText(english: "If nothing appears, check that keyboard focus is inside the terminal and input method is English.", chinese: "如果没有反应，先确认焦点在终端内部，且输入法是英文。")
+                    title: TutorialLocalizedText(english: "Command Help", chinese: "命令帮助"),
+                    command: "z → Ctrl+H",
+                    instruction: TutorialLocalizedText(english: "Press `z` first, then press `Control` and `H` together. This opens the command list for the current sheet.", chinese: "先按 `z`，再同时按 `Control` 和 `H`，即可打开当前表的命令列表。"),
+                    detail: TutorialLocalizedText(english: "`z` is a prefix, so these are two sequential actions. `z?` is a different search command.", chinese: "`z` 是前缀键，这里要分两步按；`z?` 是另一条搜索命令。")
                 ),
             ]
         ),
@@ -347,22 +355,22 @@ final class AppModel: ObservableObject {
                 TutorialStepDefinition(
                     id: "typesort-float",
                     title: TutorialLocalizedText(english: "Convert To Float", chinese: "转为浮点数"),
-                    command: "% on population_m",
+                    command: "population_m: %",
                     instruction: TutorialLocalizedText(english: "Move to `population_m`, then press `%` to set the column type to float.", chinese: "把光标移到 `population_m`，按 `%` 将列类型设为浮点数。"),
                     detail: TutorialLocalizedText(english: "Use this when numeric values include decimals such as `24.9`.", chinese: "当数值包含小数（如 `24.9`）时，优先用这个类型。")
                 ),
                 TutorialStepDefinition(
                     id: "typesort-int",
                     title: TutorialLocalizedText(english: "Convert To Integer", chinese: "转为整数"),
-                    command: "# on score",
+                    command: "score: #",
                     instruction: TutorialLocalizedText(english: "Move to `score`, then press `#` to set the column type to integer.", chinese: "把光标移到 `score`，按 `#` 将列类型设为整数。"),
                     detail: TutorialLocalizedText(english: "Integer typing keeps numeric comparisons stable for rank-like columns.", chinese: "对分数或排名类列，用整数类型可避免文本比较导致的错序。")
                 ),
                 TutorialStepDefinition(
                     id: "typesort-sort",
                     title: TutorialLocalizedText(english: "Sort Numeric Column", chinese: "按数值排序"),
-                    command: "]  [",
-                    instruction: TutorialLocalizedText(english: "On the converted numeric column, press `]` for ascending and `[` for descending.", chinese: "在已转换的数值列上，按 `]` 升序，按 `[` 降序。"),
+                    command: "[ ↑  |  ] ↓",
+                    instruction: TutorialLocalizedText(english: "On the converted numeric column, press `[` for ascending or `]` for descending.", chinese: "在已转换的数值列上，按 `[` 升序，按 `]` 降序。"),
                     detail: TutorialLocalizedText(english: "If order looks wrong, check whether the column is still text and convert again.", chinese: "如果顺序看起来不对，先检查列是否仍是文本类型，再重新转换。")
                 ),
             ]
@@ -376,23 +384,23 @@ final class AppModel: ObservableObject {
                 TutorialStepDefinition(
                     id: "editing-cell",
                     title: TutorialLocalizedText(english: "Edit One Cell", chinese: "编辑单元格"),
-                    command: "e",
+                    command: "e → Enter",
                     instruction: TutorialLocalizedText(english: "On any cell, press `e`, edit the value, then press Enter once to accept.", chinese: "在任意单元格按 `e`，修改值后按一次 Enter 确认。"),
                     detail: TutorialLocalizedText(english: "If an editor prompt opens, Enter confirms the current input.", chinese: "若出现输入提示，Enter 表示确认当前输入。")
                 ),
                 TutorialStepDefinition(
                     id: "editing-select",
                     title: TutorialLocalizedText(english: "Mark Rows For Update", chinese: "标记待更新行"),
-                    command: "s  /  n",
-                    instruction: TutorialLocalizedText(english: "Select several rows (for example by searching and using `s`).", chinese: "先选择几行（例如搜索后用 `s` 逐条标记）。"),
+                    command: "s | u",
+                    instruction: TutorialLocalizedText(english: "Move between rows and press `s` on each row you want to update. Use `u` to undo a selection.", chinese: "在行间移动，对要修改的行按 `s`；选错时按 `u` 取消。"),
                     detail: TutorialLocalizedText(english: "Keep the selection active before running bulk edit commands.", chinese: "执行批量编辑命令前，保持这些行处于已选状态。")
                 ),
                 TutorialStepDefinition(
                     id: "editing-bulk",
                     title: TutorialLocalizedText(english: "Bulk Edit Selected", chinese: "批量编辑已选行"),
-                    command: "g e",
-                    instruction: TutorialLocalizedText(english: "Use `g e` to set values on selected rows in the current column.", chinese: "用 `g e` 对当前列中的已选行统一赋值。"),
-                    detail: TutorialLocalizedText(english: "This is safer than repeating single-cell edits row by row.", chinese: "比逐行单独编辑更稳定、更高效。")
+                    command: "g → e",
+                    instruction: TutorialLocalizedText(english: "Press `g`, then `e` to set the current column for all selected rows.", chinese: "先按 `g`，再按 `e`，统一修改当前列中的已选行。"),
+                    detail: TutorialLocalizedText(english: "The keys are sequential, not simultaneous.", chinese: "这两个键依次按，不是同时按。")
                 ),
             ]
         ),
@@ -405,20 +413,20 @@ final class AppModel: ObservableObject {
                 TutorialStepDefinition(
                     id: "plot-axis",
                     title: TutorialLocalizedText(english: "Prepare Axes", chinese: "准备坐标轴"),
-                    command: "on population_m: !  -> move to score",
-                    instruction: TutorialLocalizedText(english: "In this sample, move to numeric column `population_m` and press `!` to set x key, then move cursor to numeric column `score` as y.", chinese: "在当前示例里，先移动到数值列 `population_m` 并按 `!` 设为 x 键，再把光标移到数值列 `score` 作为 y。"),
-                    detail: TutorialLocalizedText(english: "If `population_m` is not treated as numeric, convert it first, then press `!` again so VisiData can use it as the x key column.", chinese: "如果 `population_m` 没被当成数值列，先把它转成 numeric，再按一次 `!`，这样 VisiData 才能把它当作 x 轴 key 列。")
+                    command: "population_m: % → ! → score: #",
+                    instruction: TutorialLocalizedText(english: "On `population_m`, press `%`, then press `!` once. Move to `score` and press `#`.", chinese: "在 `population_m` 列按 `%`，再按一次 `!`；移到 `score` 列，按 `#`。"),
+                    detail: TutorialLocalizedText(english: "`!` toggles the key marker. If the marker is already visible, do not press it again or the key will be removed.", chinese: "`!` 会切换键列状态；已经出现键列标记时不要再按，否则会取消。")
                 ),
                 TutorialStepDefinition(
                     id: "plot-open",
                     title: TutorialLocalizedText(english: "Open Plot", chinese: "打开图表"),
-                    command: "on score: .",
+                    command: "score: .",
                     instruction: TutorialLocalizedText(english: "With cursor on `score`, press `.` to plot y=`score` against x=`population_m`.", chinese: "把光标停在 `score` 列后按 `.`，会画出 y=`score` 对 x=`population_m`。"),
-                    detail: TutorialLocalizedText(english: "If you see `at least one numeric key col necessary for x-axis`: go back to `population_m`, press `!` again, then return to `score` and press `.`. If the warning still stays, make sure `population_m` is numeric instead of text. Only if the shortcut itself does not register should you switch to English input and retry.", chinese: "如果看到 `at least one numeric key col necessary for x-axis`：先回到 `population_m` 再按一次 `!`，然后回到 `score` 按 `.`。如果警告还在，说明 `population_m` 可能还是文本列，需要先转成 numeric。只有当快捷键本身没有被正确输入时，才需要切到英文输入法后再重试。")
+                    detail: TutorialLocalizedText(english: "If VisiData asks for a numeric key, verify that `population_m` shows both the float type and key marker, and that `score` is an integer.", chinese: "若提示缺少数值键列，请确认 `population_m` 已是浮点数且带键列标记，`score` 已是整数。")
                 ),
                 TutorialStepDefinition(
                     id: "plot-drill",
-                    title: TutorialLocalizedText(english: "Drill Back To Rows", chinese: "回钻到原始行"),
+                    title: TutorialLocalizedText(english: "View Source Rows", chinese: "查看原始行"),
                     command: "Enter",
                     instruction: TutorialLocalizedText(english: "In graph view, move to a point and press Enter to open source rows.", chinese: "在图表视图移动到某个点后，按 Enter 打开对应原始行。"),
                     detail: TutorialLocalizedText(english: "This is useful for tracing outliers from chart to data.", chinese: "可快速把图中异常点追溯回原始数据。")
@@ -432,18 +440,18 @@ final class AppModel: ObservableObject {
             icon: "waveform.path.ecg.text",
             steps: [
                 TutorialStepDefinition(
-                    id: "analysis-freq",
-                    title: TutorialLocalizedText(english: "Frequency Table", chinese: "频率表"),
-                    command: "Shift+F",
-                    instruction: TutorialLocalizedText(english: "On a categorical column, press `Shift+F` to open frequencies.", chinese: "在分类列按 `Shift+F` 打开频率统计表。"),
-                    detail: TutorialLocalizedText(english: "Great for quick distribution checks before deeper modeling.", chinese: "适合在深入建模前先看分布。")
-                ),
-                TutorialStepDefinition(
                     id: "analysis-describe",
                     title: TutorialLocalizedText(english: "Describe Numeric Columns", chinese: "数值列描述统计"),
-                    command: "Shift+I",
-                    instruction: TutorialLocalizedText(english: "Press `Shift+I` to generate a describe sheet for numeric columns.", chinese: "按 `Shift+I` 生成数值列描述统计表。"),
-                    detail: TutorialLocalizedText(english: "Review min/max/mean and spread to catch suspicious values.", chinese: "查看最值、均值和离散度，快速发现异常值。")
+                    command: "population_m: % → score: # → Shift+I",
+                    instruction: TutorialLocalizedText(english: "Set `population_m` to float and `score` to integer, then press `Shift+I`.", chinese: "先把 `population_m` 设为浮点数、`score` 设为整数，再按 `Shift+I`。"),
+                    detail: TutorialLocalizedText(english: "The describe sheet now summarizes both numeric columns.", chinese: "描述统计表会汇总这两个数值列。")
+                ),
+                TutorialStepDefinition(
+                    id: "analysis-freq",
+                    title: TutorialLocalizedText(english: "Frequency Table", chinese: "频率表"),
+                    command: "q → group: Shift+F",
+                    instruction: TutorialLocalizedText(english: "Press `q` to return to the sample, move to `group`, then press `Shift+F`.", chinese: "按 `q` 返回示例表，移到 `group` 列，再按 `Shift+F`。"),
+                    detail: TutorialLocalizedText(english: "This shows the distribution of values in a categorical column.", chinese: "频率表会显示分类值的分布。")
                 ),
             ]
         ),
@@ -963,10 +971,15 @@ final class AppModel: ObservableObject {
     }
 
     func presentTutorialHub() {
+        tutorialErrorMessage = nil
+        tutorialStatusMessage = nil
         isTutorialHubPresented = true
     }
 
     func startTutorial(chapterID: String = AppModel.defaultTutorialChapterID) {
+        tutorialErrorMessage = nil
+        tutorialStatusMessage = nil
+
         do {
             guard let chapter = tutorialChapters.first(where: { $0.id == chapterID }) else {
                 throw NSError(
@@ -981,16 +994,25 @@ final class AppModel: ObservableObject {
 
             let sampleURL = try makeTutorialSampleFile()
             tutorialSampleFileURL = sampleURL
-            openExternalFile(sampleURL)
+            removeTutorialSampleFromHistory(sampleURL)
+            let didOpenSample = openFileInIData(
+                sampleURL,
+                forceRestart: true,
+                recordInHistory: false,
+                launchPendingOpenImmediately: true
+            )
 
-            guard activeSession?.currentFileURL?.standardizedFileURL == sampleURL.standardizedFileURL else {
+            guard
+                didOpenSample,
+                activeSession?.currentFileURL?.standardizedFileURL == sampleURL.standardizedFileURL
+            else {
                 finishTutorial()
-                if errorMessage == nil {
-                    errorMessage = localized(
-                        english: "Could not start tutorial because the sample table failed to open. Check VisiData path in Preferences.",
-                        chinese: "示例表格无法打开。请在设置中检查 VisiData 路径。"
-                    )
-                }
+                let message = errorMessage ?? localized(
+                    english: "Could not start tutorial because the sample table failed to open. Check VisiData path in Preferences.",
+                    chinese: "示例表格无法打开。请在设置中检查 VisiData 路径。"
+                )
+                tutorialErrorMessage = message
+                errorMessage = message
                 return
             }
 
@@ -1004,10 +1026,12 @@ final class AppModel: ObservableObject {
         } catch {
             finishTutorial()
             statusMessage = nil
-            errorMessage = localized(
+            let message = localized(
                 english: "Could not prepare tutorial sample data: \(error.localizedDescription)",
                 chinese: "无法创建教程数据：\(error.localizedDescription)"
             )
+            tutorialErrorMessage = message
+            errorMessage = message
         }
     }
 
@@ -1042,7 +1066,11 @@ final class AppModel: ObservableObject {
         guard isTutorialActive, let chapter = tutorialCurrentChapter else {
             return
         }
-        tutorialStepIndex = min(max(index, 0), chapter.steps.count - 1)
+        let lastReachedIndex = min(
+            max(tutorialStepIndex, chapter.completedStepCount),
+            chapter.steps.count - 1
+        )
+        tutorialStepIndex = min(max(index, 0), lastReachedIndex)
     }
 
     func setTutorialCoachExpanded(_ expanded: Bool) {
@@ -1058,6 +1086,18 @@ final class AppModel: ObservableObject {
         isTutorialCoachExpanded = true
         tutorialSampleFileURL = nil
         activeTutorialChapterID = nil
+        tutorialErrorMessage = nil
+    }
+
+    func cancelTutorial() {
+        finishTutorial()
+        let message = localized(
+            english: "Tutorial ended.",
+            chinese: "已退出教程。"
+        )
+        tutorialStatusMessage = message
+        statusMessage = message
+        errorMessage = nil
     }
 
     func completeTutorial() {
@@ -1066,10 +1106,12 @@ final class AppModel: ObservableObject {
             markTutorialChapterCompleted(chapterID)
         }
         finishTutorial()
-        statusMessage = localized(
+        let message = localized(
             english: "Tutorial completed. Open any file to continue exploring with VisiData.",
             chinese: "教程完成。现在可以打开自己的文件了。"
         )
+        tutorialStatusMessage = message
+        statusMessage = message
         errorMessage = nil
     }
 
@@ -1081,6 +1123,16 @@ final class AppModel: ObservableObject {
         let fileURL = directoryURL.appendingPathComponent(Self.tutorialSampleFilename)
         try Self.tutorialSampleContents.write(to: fileURL, atomically: true, encoding: .utf8)
         return fileURL
+    }
+
+    private func removeTutorialSampleFromHistory(_ sampleURL: URL) {
+        recentFilesStore.remove(sampleURL)
+        unpinRecentFileIfNeeded(sampleURL)
+        refreshRecentFiles()
+
+        if lastOpenedFile?.standardizedFileURL == sampleURL.standardizedFileURL {
+            lastOpenedFile = nil
+        }
     }
 
     func openExternalFiles(_ urls: [URL]) {
@@ -1237,6 +1289,16 @@ final class AppModel: ObservableObject {
     }
 
     func openExternalFile(_ url: URL) {
+        _ = openFileInIData(url)
+    }
+
+    @discardableResult
+    private func openFileInIData(
+        _ url: URL,
+        forceRestart: Bool = false,
+        recordInHistory: Bool = true,
+        launchPendingOpenImmediately: Bool = false
+    ) -> Bool {
         guard Self.supportsTableFile(url) else {
             externalHandoffNotice = nil
             statusMessage = nil
@@ -1244,12 +1306,16 @@ final class AppModel: ObservableObject {
                 english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
                 chinese: "所选内容不是普通文件。iData 会直接打开大多数文件后缀，并对 .gz/.bgz 文件进行流式读取而不解压。"
             )
-            return
+            return false
         }
 
         externalHandoffNotice = nil
+        if tutorialSampleFileURL?.standardizedFileURL != url.standardizedFileURL {
+            tutorialStatusMessage = nil
+        }
 
         if
+            !forceRestart,
             let session = activeSession,
             session.currentFileURL?.standardizedFileURL == url.standardizedFileURL,
             session.isRunning,
@@ -1261,7 +1327,7 @@ final class AppModel: ObservableObject {
                 chinese: "\(url.lastPathComponent) 已经打开。"
             )
             errorMessage = nil
-            return
+            return true
         }
 
         do {
@@ -1269,15 +1335,20 @@ final class AppModel: ObservableObject {
             let session = activeSession ?? VisiDataSessionController()
             
             try session.open(fileURL: url, explicitVDPath: explicitPath)
+            if launchPendingOpenImmediately {
+                try session.launchPendingOpenImmediatelyIfNeeded()
+            }
             
             if activeSession !== session {
                 activeSession = session
             }
             
-            lastOpenedFile = url
-            performAnimatedMutation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
-                recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
-                refreshRecentFiles()
+            if recordInHistory {
+                lastOpenedFile = url
+                performAnimatedMutation(.spring(response: 0.34, dampingFraction: 0.84, blendDuration: 0.15)) {
+                    recentFilesStore.record(url, maxCount: Self.recentFilesLimit)
+                    refreshRecentFiles()
+                }
             }
             if isTutorialActive, let tutorialSampleFileURL, tutorialSampleFileURL.standardizedFileURL != url.standardizedFileURL {
                 finishTutorial()
@@ -1286,19 +1357,21 @@ final class AppModel: ObservableObject {
                     chinese: "已打开 \(url.lastPathComponent)，教程已结束。"
                 )
                 errorMessage = nil
-                return
+                return true
             }
             statusMessage = localized(
                 english: "Opened \(url.lastPathComponent) inside iData.",
                 chinese: "已打开 \(url.lastPathComponent)。"
             )
             errorMessage = nil
+            return true
         } catch {
             if isTutorialActive {
                 finishTutorial()
             }
             statusMessage = nil
             errorMessage = error.localizedDescription
+            return false
         }
     }
 

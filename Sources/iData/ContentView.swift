@@ -1486,11 +1486,11 @@ private struct HelpView: View {
 
     private var visiDataTips: [QuickTip] {
         [
-            QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "在行列间移动。")),
-            QuickTip(keys: "/ ? n N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward, then jump through matches.", chinese: "向前或向后搜索，并跳转匹配项。")),
-            QuickTip(keys: "[ ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "按当前列升序或降序。")),
+            QuickTip(keys: "← ↑ ↓ →  |  h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Navigate cells and columns without leaving the keyboard.", chinese: "在行列间移动。")),
+            QuickTip(keys: "/  ?  n  Shift+N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search forward or backward, then jump through matches.", chinese: "向前或向后搜索，并跳转匹配项。")),
+            QuickTip(keys: "[ ↑  |  ] ↓", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column ascending or descending.", chinese: "按当前列升序或降序。")),
             QuickTip(keys: "s t u", title: localizedText(isChinese, english: "Select", chinese: "选择"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows for later commands.", chinese: "选择、切换或取消选择行。")),
-            QuickTip(keys: "z?", title: localizedText(isChinese, english: "Command Help", chinese: "命令帮助"), detail: localizedText(isChinese, english: "Discover sheet-specific commands and see what VisiData can do on the current data.", chinese: "查看当前表格的可用命令。")),
+            QuickTip(keys: "z → Ctrl+H", title: localizedText(isChinese, english: "Command Help", chinese: "命令帮助"), detail: localizedText(isChinese, english: "Press `z`, then `Control+H` to view commands for the current sheet.", chinese: "先按 `z`，再按 `Control+H`，查看当前表的命令。")),
             QuickTip(keys: "q", title: localizedText(isChinese, english: "Back / Quit Sheet", chinese: "返回 / 退出表"), detail: localizedText(isChinese, english: "Go back from a derived sheet or quit the session when you are done.", chinese: "返回上层表格，或退出会话。")),
         ]
     }
@@ -1735,6 +1735,20 @@ private struct TutorialHubView: View {
                             .buttonStyle(.borderedProminent)
                         }
 
+                        if let errorMessage = model.tutorialErrorMessage {
+                            Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        Text(isChinese
+                            ? "记号：+ 表示同时按，→ 表示依次按，| 表示任选。每步完成后，请在引导卡中确认。"
+                            : "Notation: + means together, → means in sequence, and | means either. Confirm each step in the coach when done.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
                         Divider()
 
                         ForEach(chapter.steps, id: \.id) { step in
@@ -1786,7 +1800,7 @@ private struct TutorialHubView: View {
                     Text(isChinese ? "教程" : "Tutorial Checklist")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text(isChinese ? "选择章节开始练习；完成后会自动标记。" : "Choose a chapter to practice. Each launch starts from Step 1, and completed chapters remain checked.")
+                    Text(isChinese ? "选择章节开始练习；每一步由你确认完成。" : "Choose a chapter to practice and confirm each step as you finish it.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1917,11 +1931,11 @@ private struct WelcomeDetailView: View {
 
     private var quickTips: [QuickTip] {
         [
-            QuickTip(keys: "← ↑ ↓ → / h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Move quickly across rows and columns.", chinese: "在行列间移动。")),
-            QuickTip(keys: "/ ? n N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search and move between matches.", chinese: "搜索并切换匹配项。")),
+            QuickTip(keys: "← ↑ ↓ →  |  h j k l", title: localizedText(isChinese, english: "Move", chinese: "移动"), detail: localizedText(isChinese, english: "Move quickly across rows and columns.", chinese: "在行列间移动。")),
+            QuickTip(keys: "/  ?  n  Shift+N", title: localizedText(isChinese, english: "Search", chinese: "搜索"), detail: localizedText(isChinese, english: "Search and move between matches.", chinese: "搜索并切换匹配项。")),
             QuickTip(keys: "s t u", title: localizedText(isChinese, english: "Select Rows", chinese: "选择行"), detail: localizedText(isChinese, english: "Select, toggle, or unselect rows.", chinese: "选择、切换或取消选择行。")),
-            QuickTip(keys: "[ ]", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column up or down.", chinese: "按当前列升序或降序。")),
-            QuickTip(keys: "Ctrl + H", title: localizedText(isChinese, english: "Help", chinese: "帮助"), detail: localizedText(isChinese, english: "View commands and help.", chinese: "查看命令与帮助。"))
+            QuickTip(keys: "[ ↑  |  ] ↓", title: localizedText(isChinese, english: "Sort", chinese: "排序"), detail: localizedText(isChinese, english: "Sort the current column up or down.", chinese: "按当前列升序或降序。")),
+            QuickTip(keys: "z → Ctrl+H", title: localizedText(isChinese, english: "Help", chinese: "帮助"), detail: localizedText(isChinese, english: "View commands for the current sheet.", chinese: "查看当前表的命令。"))
         ]
     }
 
@@ -2579,19 +2593,19 @@ private struct SessionDetailView: View {
     private var sessionInfoHints: [String] {
         if isChinese {
             return [
-                "先按 z，再按 ?。这不是组合键。",
-                "搜索后按 Enter；再用 n/N 看下一个结果。",
+                "命令帮助：先按 z，再按 Ctrl+H。",
+                "搜索后按 Enter；n 到下一处，Shift+N 回到上一处。",
                 "方向键和 hjkl 都能移动，用顺手的就行。",
-                "当前列排序：] 升序，[ 降序。",
+                "当前列排序：[ 升序，] 降序。",
                 "不确定快捷键时，先打开教程看一眼。",
             ]
         }
 
         return [
-            "Tip: `z?` is sequential, press `z` then `?`, not simultaneously.",
-            "Tip: After `/` search input, press Enter once, then use `n` / `N`.",
+            "Tip: For command help, press `z`, then `Control+H`.",
+            "Tip: After `/` search, use `n` for next and `Shift+N` for previous.",
             "Tip: Arrow keys and `h j k l` both work for movement.",
-            "Tip: Sort current column with `]` (asc) and `[` (desc).",
+            "Tip: Sort the current column with `[` (asc) and `]` (desc).",
             "Tip: Replaying the tutorial checklist is the fastest way to build muscle memory.",
         ]
     }
@@ -2645,7 +2659,7 @@ private struct SessionDetailView: View {
                     message: errorMessage,
                     color: .red.opacity(0.12)
                 )
-            } else if let statusMessage = session.statusMessage ?? model.statusMessage {
+            } else if let statusMessage = model.tutorialStatusMessage ?? session.statusMessage ?? model.statusMessage {
                 StatusAndInputCard(
                     isChinese: isChinese,
                     statusMessage: statusMessage,
@@ -3259,7 +3273,7 @@ private struct TutorialCoachOverlay: View {
                 .help(model.isTutorialCoachExpanded ? (isChinese ? "收起引导层" : "Collapse tutorial coach") : (isChinese ? "展开引导层" : "Expand tutorial coach"))
 
                 Button {
-                    model.finishTutorial()
+                    model.cancelTutorial()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -3307,6 +3321,7 @@ private struct TutorialCoachOverlay: View {
                                 .frame(width: 8, height: 8)
                         }
                         .buttonStyle(.plain)
+                        .disabled(item.index > max(model.tutorialStepIndex, chapter.completedStepCount))
                         .help(localizedText(
                             isChinese,
                             english: "Jump to step \(item.index + 1)",
@@ -3329,14 +3344,14 @@ private struct TutorialCoachOverlay: View {
                     Spacer(minLength: 0)
 
                     if model.isTutorialLastStep {
-                        Button(isChinese ? "完成" : "Finish") {
+                        Button(isChinese ? "做完了，完成本章" : "Done — Finish Chapter") {
                             model.completeTutorial()
                         }
                         .buttonStyle(.borderedProminent)
                         .keyboardShortcut(.rightArrow, modifiers: [.command])
                         .help(isChinese ? "快捷键：⌘→" : "Shortcut: ⌘→")
                     } else {
-                        Button(isChinese ? "下一步" : "Next") {
+                        Button(isChinese ? "做完了，下一步" : "Done — Next") {
                             model.advanceTutorialStep()
                         }
                         .buttonStyle(.borderedProminent)

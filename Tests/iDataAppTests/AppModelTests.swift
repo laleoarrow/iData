@@ -1390,10 +1390,13 @@ struct AppModelTests {
     }
 
     @Test
-    func tutorialCommandsExplainSelectionHelpAndPlotAxisClearly() {
+    func tutorialCommandsUseCorrectBindingsAndExplicitSequences() {
         let model = AppModel(preferredLanguagesProvider: { ["en-US"] })
 
         let basic = model.tutorialChapters.first { $0.id == AppModel.defaultTutorialChapterID }
+        let move = basic?.steps.first { $0.id == "basic-move" }
+        let search = basic?.steps.first { $0.id == "basic-search" }
+        let sort = basic?.steps.first { $0.id == "basic-sort" }
         let select = basic?.steps.first { $0.id == "basic-select" }
         let help = basic?.steps.first { $0.id == "basic-help" }
         let types = model.tutorialChapters.first { $0.id == "typesort" }
@@ -1402,19 +1405,48 @@ struct AppModelTests {
         let plots = model.tutorialChapters.first { $0.id == "plots" }
         let axis = plots?.steps.first { $0.id == "plot-axis" }
         let open = plots?.steps.first { $0.id == "plot-open" }
+        let analysis = model.tutorialChapters.first { $0.id == "analysis" }
+        let describe = analysis?.steps.first { $0.id == "analysis-describe" }
+        let frequency = analysis?.steps.first { $0.id == "analysis-freq" }
 
+        #expect(move?.command == "← ↑ → ↓  |  h j k l")
+        #expect(search?.command == "city: / → Tokyo → Enter")
+        #expect(search?.detail.contains("`Shift+N` for the previous match") == true)
+        #expect(sort?.instruction.contains("press `[` for ascending or `]` for descending") == true)
+        #expect(sort?.command == "score: [ ↑  |  ] ↓")
         #expect(select?.instruction.contains("`s` means select current row") == true)
         #expect(select?.instruction.contains("`t` only toggles") == true)
-        #expect(help?.instruction.contains("Press `z`, then `?`") == true)
-        #expect(help?.instruction.contains("No extra text input is needed") == true)
+        #expect(help?.command == "z → Ctrl+H")
+        #expect(help?.instruction.contains("press `Control` and `H` together") == true)
+        #expect(help?.detail.contains("`z?` is a different search command") == true)
         #expect(floatConvert?.instruction.contains("`population_m`") == true)
         #expect(floatConvert?.instruction.contains("press `%`") == true)
-        #expect(numericSort?.instruction.contains("press `]` for ascending and `[` for descending") == true)
+        #expect(numericSort?.instruction.contains("press `[` for ascending or `]` for descending") == true)
+        #expect(axis?.command == "population_m: % → ! → score: #")
         #expect(axis?.instruction.contains("`population_m`") == true)
         #expect(axis?.instruction.contains("`score`") == true)
+        #expect(axis?.detail.contains("do not press it again") == true)
         #expect(open?.instruction.contains("y=`score` against x=`population_m`") == true)
-        #expect(open?.detail.contains("switch to English input") == true)
-        #expect(open?.detail.contains("make sure `population_m` is numeric") == true)
+        #expect(open?.detail.contains("both the float type and key marker") == true)
+        #expect(describe?.command == "population_m: % → score: # → Shift+I")
+        #expect(frequency?.command == "q → group: Shift+F")
+        #expect(analysis?.steps.map(\.id) == ["analysis-describe", "analysis-freq"])
+    }
+
+    @Test
+    func chineseTutorialCopyExplainsPrefixAndToggleKeysDirectly() {
+        let model = AppModel(preferredLanguagesProvider: { ["zh-Hans-CN"] })
+        let basic = model.tutorialChapters.first { $0.id == AppModel.defaultTutorialChapterID }
+        let help = basic?.steps.first { $0.id == "basic-help" }
+        let sort = basic?.steps.first { $0.id == "basic-sort" }
+        let axis = model.tutorialChapters
+            .first { $0.id == "plots" }?
+            .steps.first { $0.id == "plot-axis" }
+
+        #expect(help?.instruction.contains("先按 `z`，再同时按 `Control` 和 `H`") == true)
+        #expect(help?.detail.contains("`z?` 是另一条搜索命令") == true)
+        #expect(sort?.instruction.contains("按 `[` 升序，按 `]` 降序") == true)
+        #expect(axis?.detail.contains("已经出现键列标记时不要再按") == true)
     }
 
     @Test
@@ -1463,6 +1495,17 @@ struct AppModelTests {
         model.rewindTutorialStep()
         #expect(model.tutorialStepIndex == 0)
 
+        let lastStepIndex = (model.tutorialCurrentChapter?.steps.count ?? 1) - 1
+        model.jumpToTutorialStep(lastStepIndex)
+        #expect(model.tutorialStepIndex == 0)
+
+        model.advanceTutorialStep()
+        #expect(model.tutorialStepIndex == 1)
+        model.jumpToTutorialStep(0)
+        #expect(model.tutorialStepIndex == 0)
+        model.jumpToTutorialStep(lastStepIndex)
+        #expect(model.tutorialStepIndex == 1)
+
         for _ in 0..<20 {
             model.advanceTutorialStep()
         }
@@ -1510,6 +1553,43 @@ struct AppModelTests {
     }
 
     @Test
+    func cancellingTutorialClearsGuideAndPublishesAnExitStatus() {
+        let model = AppModel(preferredLanguagesProvider: { ["zh-Hans-CN"] })
+        model.beginTutorialGuide()
+        model.statusMessage = "教程已开始，请按引导操作。"
+
+        model.cancelTutorial()
+
+        #expect(!model.isTutorialActive)
+        #expect(model.tutorialCurrentStep == nil)
+        #expect(model.statusMessage == "已退出教程。")
+        #expect(model.tutorialStatusMessage == "已退出教程。")
+        #expect(model.errorMessage == nil)
+
+        model.statusMessage = "已复制文件路径。"
+
+        #expect(model.tutorialStatusMessage == nil)
+        #expect(model.statusMessage == "已复制文件路径。")
+    }
+
+    @Test
+    func tutorialHubOnlyShowsErrorsFromTutorialStartup() {
+        let model = AppModel(preferredLanguagesProvider: { ["zh-Hans-CN"] })
+        model.errorMessage = "其他页面留下的错误"
+
+        model.presentTutorialHub()
+
+        #expect(model.tutorialErrorMessage == nil)
+
+        model.startTutorial(chapterID: "missing-chapter")
+
+        #expect(model.isTutorialHubPresented)
+        #expect(!model.isTutorialActive)
+        #expect(model.tutorialErrorMessage?.contains("未找到所请求的教程章节") == true)
+        #expect(model.errorMessage == model.tutorialErrorMessage)
+    }
+
+    @Test
     func tutorialSampleFileIsGeneratedWithExpectedHeader() throws {
         let model = AppModel()
         let url = try model.makeTutorialSampleFile()
@@ -1517,6 +1597,70 @@ struct AppModelTests {
 
         #expect(content.contains("city\tcountry\tpopulation_m\tscore"))
         #expect(content.contains("Shanghai\tChina"))
+    }
+
+    @Test
+    func startingTutorialAlwaysReloadsFreshAndNeverRecordsItsSample() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-tutorial-fresh-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+
+        let store = RecentFilesStore(defaults: defaults)
+        let unrelatedURL = tempRoot.appendingPathComponent("unrelated.tsv")
+        try "id\tvalue\n1\tkeep\n".write(to: unrelatedURL, atomically: true, encoding: .utf8)
+
+        let sampleSeedModel = AppModel(defaults: defaults, recentFilesStore: store)
+        let staleSampleURL = try sampleSeedModel.makeTutorialSampleFile()
+        store.record(unrelatedURL, maxCount: AppModel.recentFilesLimit)
+        store.record(staleSampleURL, maxCount: AppModel.recentFilesLimit)
+
+        let model = AppModel(defaults: defaults, recentFilesStore: store)
+        model.vdExecutablePath = launcher.path
+        model.togglePinnedRecentFile(unrelatedURL)
+        model.togglePinnedRecentFile(staleSampleURL)
+        model.lastOpenedFile = unrelatedURL
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        model.startTutorial(chapterID: AppModel.defaultTutorialChapterID)
+        let session = try #require(model.activeSession)
+        let sampleURL = try #require(model.tutorialSampleFileURL)
+        let firstGeneration = session.outputGenerationForTesting
+        let firstPID = session.processIdentifierForTesting
+
+        #expect(firstPID > 0)
+        #expect(model.lastOpenedFile?.standardizedFileURL == unrelatedURL.standardizedFileURL)
+        #expect(model.recentFiles.contains { $0.standardizedFileURL == unrelatedURL.standardizedFileURL })
+        #expect(model.isPinnedRecentFile(unrelatedURL))
+        #expect(!model.recentFiles.contains { $0.standardizedFileURL == sampleURL.standardizedFileURL })
+        #expect(!model.isPinnedRecentFile(sampleURL))
+
+        model.startTutorial(chapterID: "typesort")
+        let secondPID = session.processIdentifierForTesting
+
+        #expect(model.activeSession === session)
+        #expect(session.outputGenerationForTesting > firstGeneration)
+        #expect(secondPID > 0)
+        #expect(secondPID != firstPID)
+        #expect(model.tutorialCurrentChapter?.id == "typesort")
+        #expect(model.tutorialStepIndex == 0)
+        #expect(model.lastOpenedFile?.standardizedFileURL == unrelatedURL.standardizedFileURL)
+        #expect(model.recentFiles.contains { $0.standardizedFileURL == unrelatedURL.standardizedFileURL })
+        #expect(model.isPinnedRecentFile(unrelatedURL))
+        #expect(!model.recentFiles.contains { $0.standardizedFileURL == sampleURL.standardizedFileURL })
     }
 
     @Test

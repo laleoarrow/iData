@@ -106,8 +106,8 @@ The iData website at `https://laleoarrow.github.io/iData/` serves the `appcast.x
 
 ## Distribution notes
 
-- The app is currently unsigned and not notarized
-- `package_release.sh` now supports optional signing/notarization when the required Apple env vars are configured
+- Without Apple credentials, the app is ad-hoc signed for bundle integrity but is not Developer ID signed or notarized
+- `package_release.sh` supports Developer ID signing/notarization when the required Apple env vars are configured
 - Local installs from the working tree can be copied directly into `/Applications`
 - Users who download from GitHub may need to approve the app in macOS security settings
 - Sparkle requires `docs/appcast.xml` to be published from GitHub Pages

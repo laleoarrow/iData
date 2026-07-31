@@ -13,7 +13,7 @@ You cannot complete this flow until you have:
 
 ## The two release modes
 
-### 1. Unsigned release
+### 1. Ad-hoc signed release
 
 Works today with no Apple credentials:
 
@@ -24,9 +24,10 @@ Works today with no Apple credentials:
 Result:
 
 - builds `iData.app`
+- applies and verifies an ad-hoc signature across the app and embedded Sparkle components
 - creates `zip`, `dmg`, and `pkg`
 - updates `docs/appcast.xml`
-- prints explicit skip messages for signing/notarization
+- prints explicit skip messages for Developer ID signing/notarization
 
 ### 2. Signed and notarized release
 
@@ -118,4 +119,4 @@ xcrun stapler validate dist/iData-v0.1.8-macos-universal.pkg
 
 ## Important limitation
 
-If these environment variables are missing, the scripts deliberately skip signing/notarization instead of guessing. That keeps local packaging usable even before Apple credentials exist.
+If these environment variables are missing, the scripts apply a verifiable ad-hoc signature but skip Developer ID signing and notarization. This preserves bundle integrity for local packaging without implying Apple trust or Gatekeeper approval.

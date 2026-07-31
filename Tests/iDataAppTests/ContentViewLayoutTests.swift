@@ -94,11 +94,31 @@ struct ContentViewLayoutTests {
     func tutorialUsesChapterNavigationAndFocusedDetail() throws {
         let source = try contentViewSource()
         let tutorial = try extractSection(from: source, start: "private struct TutorialHubView: View {", end: "private struct WelcomeDetailView")
+        let coach = try extractSection(from: source, start: "private struct TutorialCoachOverlay: View", end: "private struct CommandShortcutBadge")
 
         #expect(tutorial.contains("NavigationSplitView"))
         #expect(tutorial.contains("List(model.tutorialChapters, selection: $selectedChapterID)"))
         #expect(tutorial.contains("private var selectedChapter"))
         #expect(tutorial.contains("开始练习"))
+        #expect(tutorial.contains("if let errorMessage = model.tutorialErrorMessage"))
+        #expect(tutorial.contains("→ 表示依次按"))
+        #expect(tutorial.contains("| 表示任选"))
+        #expect(!tutorial.contains("完成后会自动标记"))
+        #expect(coach.contains("model.cancelTutorial()"))
+        #expect(coach.contains(".disabled(item.index > max(model.tutorialStepIndex, chapter.completedStepCount))"))
+        #expect(coach.contains("做完了，下一步"))
+        #expect(coach.contains("做完了，完成本章"))
+    }
+
+    @Test
+    func activeHelpAndSessionHintsUseVerifiedVisiDataBindings() throws {
+        let source = try contentViewSource()
+
+        #expect(source.contains("z → Ctrl+H"))
+        #expect(source.contains("当前列排序：[ 升序，] 降序。"))
+        #expect(source.contains("Sort the current column with `[` (asc) and `]` (desc)."))
+        #expect(!source.contains("先按 z，再按 ?"))
+        #expect(!source.contains("当前列排序：] 升序，[ 降序。"))
     }
 
     @Test

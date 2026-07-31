@@ -167,14 +167,22 @@ struct PreferencesView: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    TextField(".vcf", text: $customAssociationInput)
+                LabeledContent(isChinese ? "自定义后缀" : "Custom Suffix") {
+                    HStack(spacing: 8) {
+                        TextField(
+                            text: $customAssociationInput,
+                            prompt: Text(isChinese ? "例如 .bed" : "e.g. .bed")
+                        ) {
+                            Text(isChinese ? "文件扩展名" : "File Extension")
+                        }
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                         .font(.system(.body, design: .monospaced))
                         .onSubmit(setCustomAssociation)
 
-                    Button(customAssociationActionTitle, action: setCustomAssociation)
-                        .disabled(!canSubmitCustomAssociation)
+                        Button(customAssociationActionTitle, action: setCustomAssociation)
+                            .disabled(!canSubmitCustomAssociation)
+                    }
                 }
 
                 if !normalizedCustomAssociationExtension.isEmpty {

@@ -23,4 +23,11 @@ mkdir -p "$ROOT_DIR/dist"
 cp -R "$DERIVED_DATA_DIR/Build/Products/Release/iData.app" "$APP_DIR"
 
 plutil -lint "$APP_DIR/Contents/Info.plist"
+
+if [[ -n "${IDATA_DEVELOPER_ID_APP:-}" ]]; then
+  "$ROOT_DIR/scripts/sign_app.sh" "$APP_DIR"
+else
+  IDATA_DEVELOPER_ID_APP=- "$ROOT_DIR/scripts/sign_app.sh" "$APP_DIR"
+fi
+
 printf 'Built %s\n' "$APP_DIR"

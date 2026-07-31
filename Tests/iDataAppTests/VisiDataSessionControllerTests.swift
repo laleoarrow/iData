@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import iData
 
+@Suite(.serialized)
 @MainActor
 struct VisiDataSessionControllerTests {
     @Test
@@ -14,6 +15,109 @@ struct VisiDataSessionControllerTests {
         #expect(!source.contains("DispatchSourceProcess"))
         #expect(!source.contains("makeProcessSource"))
         #expect(!source.contains("scheduleEarlyExitSafetyCheck"))
+    }
+
+    @Test
+    func delayedLaunchFailuresArePublishedAndStaleFallbacksCannotLaunchNewRequests() throws {
+        let source = try visiDataSessionControllerSource()
+
+        #expect(!source.contains("try? self.launchPendingOpenIfPossible()"))
+        #expect(!source.contains("try? launchPendingOpenIfPossible()"))
+        #expect(source.contains("launchPendingOpenReportingFailure()"))
+        #expect(source.contains("pendingOpenRequest?.generation == scheduledGeneration"))
+        #expect(source.contains("errorMessage = error.localizedDescription"))
+    }
+
+    @Test
+    func fallbackLaunchFailurePublishesErrorAndStopsPendingSession() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-fallback-failure-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-failure.zsh")
+        try makeSleepLauncher(at: launcher, sleepSeconds: 120)
+
+        let session = VisiDataSessionController(
+            launchAttemptValidator: {
+                throw NSError(
+                    domain: "io.github.leoarrow.idata.tests",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "forced launch failure"]
+                )
+            },
+            displayMeasurementFallbackDelay: .milliseconds(10)
+        )
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        defer {
+            session.terminate()
+        }
+
+        try await waitForCondition(timeout: 1.0) {
+            !session.isRunning && session.errorMessage == "forced launch failure"
+        }
+
+        try session.launchPendingOpenImmediatelyIfNeeded()
+        #expect(session.statusMessage == nil)
+        #expect(session.processIdentifierForTesting == 0)
+    }
+
+    @Test
+    func staleFallbackCannotLaunchAReplacementRequest() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-stale-fallback-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let firstFile = tempRoot.appendingPathComponent("first.tsv")
+        let secondFile = tempRoot.appendingPathComponent("second.tsv")
+        try "id\tvalue\n1\tA\n".write(to: firstFile, atomically: true, encoding: .utf8)
+        try "id\tvalue\n1\tB\n".write(to: secondFile, atomically: true, encoding: .utf8)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-stale-fallback.zsh")
+        try makeSleepLauncher(at: launcher, sleepSeconds: 120)
+
+        let firstFallbackIsWaitingForMainActor = DispatchSemaphore(value: 0)
+        let fallbackEvaluationObserver = GenerationObserver()
+        let launchObserver = LaunchObserver()
+        let session = VisiDataSessionController(
+            launchObserver: launchObserver.record(cols:rows:),
+            fallbackReadyObserver: { _ in
+                firstFallbackIsWaitingForMainActor.signal()
+            },
+            fallbackEvaluationObserver: fallbackEvaluationObserver.record,
+            displayMeasurementFallbackDelay: .milliseconds(500)
+        )
+        defer {
+            session.terminate()
+        }
+
+        try session.open(fileURL: firstFile, explicitVDPath: launcher.path)
+        let firstGeneration = session.outputGenerationForTesting
+        #expect(waitSynchronously(for: firstFallbackIsWaitingForMainActor, timeout: 2.0))
+
+        try session.open(fileURL: secondFile, explicitVDPath: launcher.path)
+        try await waitForCondition(timeout: 1.0) {
+            fallbackEvaluationObserver.contains(firstGeneration)
+        }
+
+        #expect(launchObserver.isEmpty())
+        #expect(session.processIdentifierForTesting == 0)
+
+        try session.launchPendingOpenImmediatelyIfNeeded()
+        let launchedSize = try #require(launchObserver.firstRecord())
+
+        #expect(launchedSize.0 == 120)
+        #expect(launchedSize.1 == 32)
+        #expect(session.processIdentifierForTesting > 0)
+        #expect(session.currentFileURL?.standardizedFileURL == secondFile.standardizedFileURL)
     }
 
     @Test
@@ -461,6 +565,56 @@ struct VisiDataSessionControllerTests {
         #expect(sink.dataWrites == [expected])
     }
 
+    @Test
+    func currentGenerationOutputDoesNotWaitForAnOlderDeliveryTail() async throws {
+        var descriptors: [Int32] = [-1, -1]
+        #expect(pipe(&descriptors) == 0)
+        let readDescriptor = descriptors[0]
+        let writeDescriptor = descriptors[1]
+        defer {
+            if readDescriptor >= 0 {
+                close(readDescriptor)
+            }
+            if writeDescriptor >= 0 {
+                close(writeDescriptor)
+            }
+        }
+
+        let currentFlags = fcntl(readDescriptor, F_GETFL)
+        #expect(currentFlags >= 0)
+        #expect(fcntl(readDescriptor, F_SETFL, currentFlags | O_NONBLOCK) == 0)
+
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkBuffer()
+        session.bind(displaySink: sink)
+        session.markDisplayReady()
+
+        let blockedOldDelivery = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(10))
+        }
+        defer {
+            blockedOldDelivery.cancel()
+        }
+        session.installOutputDeliveryTailForTesting(
+            blockedOldDelivery,
+            generation: session.outputGenerationForTesting &+ 1
+        )
+
+        let expected = Data("NEW".utf8)
+        let bytesWritten = expected.withUnsafeBytes { buffer in
+            Darwin.write(writeDescriptor, buffer.baseAddress, buffer.count)
+        }
+        #expect(bytesWritten == expected.count)
+
+        session.drainOutputForTesting(
+            from: readDescriptor,
+            generation: session.outputGenerationForTesting
+        )
+        try await waitForSinkWrites(sink, count: 1, timeout: .milliseconds(250))
+
+        #expect(sink.dataWrites == [expected])
+    }
+
     private func makeFakeVDLauncher(at url: URL, childPIDFile: URL) throws {
         let escapedPIDPath = childPIDFile.path
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -505,6 +659,7 @@ struct VisiDataSessionControllerTests {
 
 private enum TestError: Error {
     case missingChildPIDFile(String)
+    case missingLaunchObservation
 }
 
 @MainActor
@@ -575,6 +730,23 @@ private final class LaunchObserver {
         lock.lock()
         defer { lock.unlock() }
         return records.isEmpty
+    }
+}
+
+private final class GenerationObserver: @unchecked Sendable {
+    private let lock = NSLock()
+    private var generations: Set<UInt64> = []
+
+    func record(_ generation: UInt64) {
+        lock.lock()
+        generations.insert(generation)
+        lock.unlock()
+    }
+
+    func contains(_ generation: UInt64) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return generations.contains(generation)
     }
 }
 
@@ -661,6 +833,13 @@ private func waitForCondition(timeout: TimeInterval, predicate: @escaping @Senda
     #expect(predicate())
 }
 
+private func waitSynchronously(
+    for semaphore: DispatchSemaphore,
+    timeout: TimeInterval
+) -> Bool {
+    semaphore.wait(timeout: .now() + timeout) == .success
+}
+
 @MainActor
 private func waitForSinkWrites(
     _ sink: TerminalDisplaySinkBuffer,
@@ -691,7 +870,7 @@ private func waitForLaunchRecord(_ observer: LaunchObserver, timeout: TimeInterv
         try await Task.sleep(for: .milliseconds(50))
     }
 
-    throw TestError.missingChildPIDFile("launch observer")
+    throw TestError.missingLaunchObservation
 }
 
 private func processExists(_ pid: pid_t) -> Bool {

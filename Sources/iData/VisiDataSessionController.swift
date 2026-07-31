@@ -217,6 +217,9 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let ptyWriteDriver: PTYWriteDriver
     private let signalSender: (_ pid: pid_t, _ signal: Int32) -> Int32
     private let launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)?
+    private let launchAttemptValidator: () throws -> Void
+    private let fallbackReadyObserver: ((UInt64) -> Void)?
+    private let fallbackEvaluationObserver: ((UInt64) -> Void)?
     private let displayMeasurementFallbackDelay: Duration
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
@@ -237,6 +240,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var childPID: pid_t = 0
     private var readSource: DispatchSourceRead?
     private var outputDeliveryTail: Task<Void, Never>?
+    private var outputDeliveryGeneration: UInt64?
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
     private var outputGeneration: UInt64 = 0
 
@@ -252,11 +256,17 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             Darwin.kill(pid, signal)
         },
         launchObserver: ((_ cols: UInt16, _ rows: UInt16) -> Void)? = nil,
+        launchAttemptValidator: @escaping () throws -> Void = {},
+        fallbackReadyObserver: ((UInt64) -> Void)? = nil,
+        fallbackEvaluationObserver: ((UInt64) -> Void)? = nil,
         displayMeasurementFallbackDelay: Duration = .milliseconds(900)
     ) {
         self.ptyWriteDriver = ptyWriteDriver
         self.signalSender = signalSender
         self.launchObserver = launchObserver
+        self.launchAttemptValidator = launchAttemptValidator
+        self.fallbackReadyObserver = fallbackReadyObserver
+        self.fallbackEvaluationObserver = fallbackEvaluationObserver
         self.displayMeasurementFallbackDelay = displayMeasurementFallbackDelay
     }
 
@@ -347,6 +357,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             if canLaunchWithExistingMeasurement {
                 try launchPendingOpenIfPossible()
             } else {
+                let scheduledGeneration = outputGeneration
                 pendingLaunchTask = Task.detached(priority: .userInitiated) { [weak self] in
                     guard let self else {
                         return
@@ -354,9 +365,16 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                     do {
                         try await Task.sleep(for: self.displayMeasurementFallbackDelay)
                         try Task.checkCancellation()
+                        self.fallbackReadyObserver?(scheduledGeneration)
                         await MainActor.run {
+                            defer {
+                                self.fallbackEvaluationObserver?(scheduledGeneration)
+                            }
+                            guard self.pendingOpenRequest?.generation == scheduledGeneration else {
+                                return
+                            }
                             terminalDebugTrace("session.open fallbackFire session=\(ObjectIdentifier(self))")
-                            try? self.launchPendingOpenIfPossible()
+                            self.launchPendingOpenReportingFailure()
                         }
                     } catch {
                         return
@@ -365,8 +383,17 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
                 terminalDebugTrace("session.open fallbackSchedule session=\(ObjectIdentifier(self))")
             }
         } catch {
-            pendingOpenRequest = nil
-            isRunning = false
+            recordPendingLaunchFailure(error)
+            throw error
+        }
+    }
+
+    @MainActor
+    func launchPendingOpenImmediatelyIfNeeded() throws {
+        do {
+            try launchPendingOpenIfPossible()
+        } catch {
+            recordPendingLaunchFailure(error)
             throw error
         }
     }
@@ -606,7 +633,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             return
         }
 
-        let precedingDelivery = outputDeliveryTail
+        let precedingDelivery = outputDeliveryGeneration == generation ? outputDeliveryTail : nil
         let delivery = Task { @MainActor [weak self, batch, precedingDelivery] in
             await precedingDelivery?.value
 
@@ -616,6 +643,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
             enqueueOutput(batch, generation: generation)
         }
+        outputDeliveryGeneration = generation
         outputDeliveryTail = delivery
     }
 
@@ -693,8 +721,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         launchedBeforeMeasuredDisplaySize = !hasMeasuredDisplaySize
         terminalDebugTrace("session.open launch session=\(ObjectIdentifier(self)) generation=\(pendingOpenRequest.generation) launchedBeforeMeasuredDisplaySize=\(launchedBeforeMeasuredDisplaySize)")
 
-        launchObserver?(lastKnownSize.cols, lastKnownSize.rows)
-
+        try launchAttemptValidator()
         try startProcess(
             visidataExecutable: pendingOpenRequest.vdURL,
             fileURL: pendingOpenRequest.fileURL,
@@ -703,6 +730,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
             generation: pendingOpenRequest.generation
         )
 
+        launchObserver?(lastKnownSize.cols, lastKnownSize.rows)
         self.pendingOpenRequest = nil
         isRunning = true
         statusMessage = AppModel.localized(
@@ -730,7 +758,26 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         pendingLaunchTask?.cancel()
         pendingLaunchTask = nil
-        try? launchPendingOpenIfPossible()
+        launchPendingOpenReportingFailure()
+    }
+
+    @MainActor
+    private func launchPendingOpenReportingFailure() {
+        do {
+            try launchPendingOpenIfPossible()
+        } catch {
+            recordPendingLaunchFailure(error)
+        }
+    }
+
+    @MainActor
+    private func recordPendingLaunchFailure(_ error: Error) {
+        pendingLaunchTask?.cancel()
+        pendingLaunchTask = nil
+        pendingOpenRequest = nil
+        isRunning = false
+        statusMessage = nil
+        errorMessage = error.localizedDescription
     }
 
     @MainActor
@@ -948,6 +995,19 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     @MainActor
     var outputGenerationForTesting: UInt64 {
         outputGeneration
+    }
+
+    @MainActor
+    var processIdentifierForTesting: pid_t {
+        childPID
+    }
+
+    func installOutputDeliveryTailForTesting(
+        _ task: Task<Void, Never>,
+        generation: UInt64
+    ) {
+        outputDeliveryGeneration = generation
+        outputDeliveryTail = task
     }
 
     @MainActor

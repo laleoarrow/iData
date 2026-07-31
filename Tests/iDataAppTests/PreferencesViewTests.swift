@@ -38,6 +38,9 @@ struct PreferencesViewTests {
         #expect(files.contains("model.clearPreferredSmallFileApplication()"))
         #expect(files.contains("FormatChip("))
         #expect(files.contains("customAssociationInput"))
+        #expect(files.contains("LabeledContent(isChinese ? \"自定义后缀\" : \"Custom Suffix\")"))
+        #expect(files.contains("prompt: Text(isChinese ? \"例如 .bed\" : \"e.g. .bed\")"))
+        #expect(!files.contains("TextField(\".vcf\", text: $customAssociationInput)"))
         #expect(files.contains("点击格式设为 iData；再次点击恢复原应用。"))
     }
 
