@@ -500,6 +500,11 @@ private struct SidebarHeaderCard: View {
                             )
                     )
 
+                if isHoveringCollapsedIcon {
+                    SidebarHoverGlow(isVisible: true, style: .circle)
+                        .transition(.opacity)
+                }
+
                 appIcon
             }
             .frame(width: 54, height: 54)
@@ -509,6 +514,9 @@ private struct SidebarHeaderCard: View {
         .help(localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏"))
         .accessibilityLabel(localizedText(isChinese, english: "Expand sidebar", chinese: "展开侧边栏"))
         .onHover { hovering in
+            guard hovering != isHoveringCollapsedIcon else {
+                return
+            }
             isHoveringCollapsedIcon = hovering
         }
         .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: isHoveringCollapsedIcon)
@@ -628,6 +636,10 @@ private struct EmptySidebarRailState: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08))
         )
+        .quietInteractiveSurface(
+            enabled: idataAnimationsEnabled && !accessibilityReduceMotion,
+            glowStyle: .rounded(10)
+        )
     }
 }
 
@@ -686,6 +698,12 @@ private struct RecentFileRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(isActive ? Color.accentColor.opacity(0.14) : (isHovering ? Color.primary.opacity(0.06) : Color.clear), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            if isHovering {
+                SidebarHoverGlow(isVisible: true, style: .rounded(8))
+                    .transition(.opacity)
+            }
+        }
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contextMenu {
             Button {
@@ -713,7 +731,11 @@ private struct RecentFileRow: View {
                 Label(localizedText(isChinese, english: "Remove from Recents", chinese: "从最近文件中移除"), systemImage: "trash")
             }
         }
+        .animation(motionEnabled ? .easeOut(duration: 0.16) : nil, value: isHovering)
         .onHover { hovering in
+            guard hovering != isHovering else {
+                return
+            }
             isHovering = hovering
         }
     }
@@ -838,6 +860,12 @@ private struct CollapsedRecentFileRow: View {
                 Circle()
                     .strokeBorder(isActive ? Color.accentColor.opacity(0.30) : Color.primary.opacity(0.08))
             )
+            .overlay {
+                if isHovering {
+                    SidebarHoverGlow(isVisible: true, style: .circle)
+                        .transition(.opacity)
+                }
+            }
             .contentShape(Circle())
             .contextMenu {
                 Button {
@@ -865,7 +893,11 @@ private struct CollapsedRecentFileRow: View {
                     Label(localizedText(isChinese, english: "Remove from Recents", chinese: "从最近文件中移除"), systemImage: "trash")
                 }
             }
+            .animation(motionEnabled ? .easeOut(duration: 0.16) : nil, value: isHovering)
             .onHover { hovering in
+                guard hovering != isHovering else {
+                    return
+                }
                 isHovering = hovering
             }
 
@@ -921,11 +953,21 @@ private struct SidebarCollapseToggleButton: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.08))
                 )
+                .overlay {
+                    if isHovering {
+                        SidebarHoverGlow(isVisible: true, style: .rounded(8))
+                            .transition(.opacity)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
         .help(localizedText(isChinese, english: "Collapse sidebar", chinese: "收起侧边栏"))
+        .animation(motionEnabled ? .easeOut(duration: 0.16) : nil, value: isHovering)
         .onHover { hovering in
+            guard hovering != isHovering else {
+                return
+            }
             isHovering = hovering
         }
     }
@@ -955,13 +997,27 @@ private struct SidebarFooterActionIcon: View {
     @State private var isHovering = false
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 17, weight: .semibold))
+        HoverAnimatedCircleSymbol(
+            symbol: symbol,
+            font: .system(size: 17, weight: .semibold),
+            motionEnabled: motionEnabled,
+            isHovering: isHovering
+        )
             .foregroundStyle(isHovering ? Color.accentColor : Color.secondary)
             .frame(width: 36, height: 36)
             .background(Color.primary.opacity(isHovering ? 0.09 : 0.04), in: Circle())
+            .overlay {
+                if isHovering {
+                    SidebarHoverGlow(isVisible: true, style: .circle)
+                        .transition(.opacity)
+                }
+            }
             .contentShape(Circle())
+            .animation(motionEnabled ? .easeOut(duration: 0.16) : nil, value: isHovering)
             .onHover { hovering in
+                guard hovering != isHovering else {
+                    return
+                }
                 isHovering = hovering
             }
     }

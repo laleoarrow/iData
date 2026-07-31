@@ -28,15 +28,18 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func recentRowsUseFlatSelectionAndOneActionMenu() throws {
+    func recentRowsKeepOneActionMenuAndEventDrivenHoverGlow() throws {
         let source = try contentViewSource()
         let row = try extractSection(from: source, start: "private struct RecentFileRow: View {", end: "private struct RecentFileActionButton")
 
         #expect(row.contains("Menu {"))
         #expect(row.contains(".menuStyle(.borderlessButton)"))
         #expect(row.contains("Color.accentColor.opacity(0.14)"))
+        #expect(row.contains("SidebarHoverGlow(isVisible: true, style: .rounded(8))"))
+        #expect(row.contains(".onHover { hovering in"))
+        #expect(row.contains("guard hovering != isHovering"))
+        #expect(!row.contains("onContinuousHover"))
         #expect(!row.contains(".shadow("))
-        #expect(!row.contains("SidebarHoverGlow("))
     }
 
     @Test
@@ -177,6 +180,77 @@ struct ContentViewLayoutTests {
         #expect(!glow.contains(".blur("))
         #expect(!glow.contains(".shadow("))
         #expect(!glow.contains("TimelineView"))
+    }
+
+    @Test
+    func sidebarControlsRestoreShapeMatchedHoverGlowWithoutContinuousTracking() throws {
+        let source = try contentViewSource()
+        let header = try extractSection(
+            from: source,
+            start: "private struct SidebarHeaderCard: View",
+            end: "private struct SidebarFooter: View"
+        )
+        let collapsedRow = try extractSection(
+            from: source,
+            start: "private struct CollapsedRecentFileRow: View",
+            end: "private struct SidebarCollapseToggleButton"
+        )
+        let collapseButton = try extractSection(
+            from: source,
+            start: "private struct SidebarCollapseToggleButton: View",
+            end: "private struct SidebarFooterIcon"
+        )
+
+        #expect(header.contains("SidebarHoverGlow(isVisible: true, style: .circle)"))
+        #expect(header.contains("guard hovering != isHoveringCollapsedIcon"))
+        #expect(collapsedRow.contains("SidebarHoverGlow(isVisible: true, style: .circle)"))
+        #expect(collapsedRow.contains("guard hovering != isHovering"))
+        #expect(collapseButton.contains("SidebarHoverGlow(isVisible: true, style: .rounded(8))"))
+        #expect(collapseButton.contains("guard hovering != isHovering"))
+
+        #expect(!header.contains("onContinuousHover"))
+        #expect(!collapsedRow.contains("onContinuousHover"))
+        #expect(!collapseButton.contains("onContinuousHover"))
+    }
+
+    @Test
+    func sidebarFooterKeepsThreeDistinctHoverAnimationsAndConditionalGlow() throws {
+        let source = try contentViewSource()
+        let footer = try extractSection(
+            from: source,
+            start: "private struct SidebarFooter: View",
+            end: "private struct EmptySidebarState"
+        )
+        let footerIcon = try extractSection(
+            from: source,
+            start: "private struct SidebarFooterActionIcon: View",
+            end: "private enum HoverAnimatedCircleSymbolKind"
+        )
+        let animatedSymbol = try extractSection(
+            from: source,
+            start: "private enum HoverAnimatedCircleSymbolKind",
+            end: "struct SidebarHoverGlow: View"
+        )
+
+        #expect(footer.contains("SidebarFooterActionIcon(symbol: \"gearshape.fill\""))
+        #expect(footer.contains("SidebarFooterActionIcon(symbol: \"questionmark.circle\""))
+        #expect(footer.contains("SidebarFooterActionIcon(symbol: \"graduationcap.fill\""))
+        #expect(footerIcon.contains("HoverAnimatedCircleSymbol("))
+        #expect(footerIcon.contains("SidebarHoverGlow(isVisible: true, style: .circle)"))
+        #expect(footerIcon.contains("guard hovering != isHovering"))
+        #expect(!footerIcon.contains("onContinuousHover"))
+        #expect(!footerIcon.contains(".blur("))
+        #expect(!footerIcon.contains(".shadow("))
+
+        #expect(animatedSymbol.contains("case \"gearshape.fill\", \"gearshape\":"))
+        #expect(animatedSymbol.contains("return .gearSpin"))
+        #expect(animatedSymbol.contains("case \"questionmark.circle\", \"questionmark.circle.fill\":"))
+        #expect(animatedSymbol.contains("return .helpBounce"))
+        #expect(animatedSymbol.contains("case \"graduationcap.fill\":"))
+        #expect(animatedSymbol.contains("return .tiltRight"))
+        #expect(animatedSymbol.contains("spinCycle += 1"))
+        #expect(animatedSymbol.contains("feedbackCycle += 1"))
+        #expect(animatedSymbol.contains("return isHovering ? 7 : 0"))
     }
 }
 

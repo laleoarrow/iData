@@ -3,8 +3,8 @@
 ## Comparison setup
 
 - Appearance: Chinese, dark mode.
-- Build: Release `0.2.12` (build 32), installed at `/Applications/iData.app`.
-- Source: the user report that the subtle gradient hover halo disappeared after the earlier performance pass.
+- Build: Release `0.2.13` (build 33), installed at `/Applications/iData.app`.
+- Source: the user report that the three footer animations and the gradient hover halo on sidebar controls and recent files disappeared after the earlier performance pass.
 - Implementation: the installed Release app at the 680 × 460 pt minimum content size, expanded sidebar, and matching recent-file state.
 - The implementation was reviewed at both the 960 × 620 pt default content size and the new minimum size.
 - The temporary PNG evidence was removed after review so it does not ship in the repository.
@@ -28,9 +28,12 @@
   Resolution: retained the approved two-column layout at normal widths and switched to one column automatically when space is limited.
 - Interactive hover feedback: the shared modifier had been reduced to an empty implementation, removing feedback from actionable controls.
   Resolution: restored a restrained blue–cyan–violet gradient on interactive controls only.
+- Sidebar coverage: the footer icons, collapse/expand controls, empty rail action, and recent-file rows were not all connected to the restored hover layer.
+  Resolution: applied the same shape-matched conditional gradient to each actionable sidebar surface.
+- Footer motion: Settings, Help, and Tutorial had been flattened to static symbols even though their lightweight motion helper remained available.
+  Resolution: reconnected the existing one-shot gear rotation, help bounce, and tutorial-cap tilt without adding a timer or continuous pointer tracking.
 - Hover performance: the former implementation animated scale, offset, blur-like shadows, and persistent decorative layers.
   Resolution: the gradient layer now exists only while hovered, updates only on pointer enter/exit, and uses no continuous location tracking, blur, shadow, or layout-affecting transform.
-- Settings and Tutorial were intentionally left unchanged.
 
 ## Visual review
 
@@ -39,14 +42,15 @@
 - Color: the background capture shows the inactive native button state; the primary action uses the normal blue accent when the window is active.
 - Controls: Open and More remain compact native macOS controls with balanced heights and no oversized CTA.
 - Hover: interactive controls receive one subtle, shape-matched gradient layer; read-only status remains static.
+- Footer icons: Settings rotates once, Help bounces, and Tutorial tilts when the pointer enters; all three return to their resting state when it leaves.
 - Narrow layout: the shortcut list switches to one column and remains accessible through the existing welcome-page scroll view.
 
 ## Verification scope
 
 - The annotated reference exposed a P2 window-sizing and resize-limit issue.
-- The installed `0.2.11` window reached the 680 × 460 pt minimum content size (680 × 492 pt including the title bar) without horizontal clipping.
+- The installed app window reached the 680 × 460 pt minimum content size (680 × 492 pt including the title bar) without horizontal clipping.
 - The hover layer was rendered directly in the test target and verified to produce colored output only while visible.
-- Verified that the hover path contains no continuous tracking, geometry reader, radial gradient, blur, shadow, scale, or offset; no P0, P1, or P2 visual differences remained.
+- Verified that sidebar hover state changes only at pointer boundaries and that the gradient path contains no continuous tracking, geometry reader, radial gradient, blur, or shadow.
 - Drag-and-drop was intentionally not tested at the user’s request.
 
 final result: passed

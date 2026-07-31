@@ -3,21 +3,21 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.12</title>
-            <pubDate>Thu, 30 Jul 2026 19:01:50 +0800</pubDate>
+            <title>0.2.13</title>
+            <pubDate>Fri, 31 Jul 2026 11:08:31 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>32</sparkle:version>
-            <sparkle:shortVersionString>0.2.12</sparkle:shortVersionString>
+            <sparkle:version>33</sparkle:version>
+            <sparkle:shortVersionString>0.2.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.12
+            <description sparkle:format="markdown"><![CDATA[## v0.2.13
 
-这次更新恢复并优化悬停反馈：
+这次更新补回侧边栏的精致交互：
 
-- 交互控件重新显示低调的蓝紫渐变光晕。
-- 光晕仅在鼠标进入控件时创建，离开后立即释放。
-- 移除连续坐标追踪、模糊阴影和缩放位移，降低悬停开销。
+- 设置、帮助和教程图标恢复各自的悬停动画。
+- 侧边栏按钮与最近文件恢复轻微的渐变光晕。
+- 光晕仅在指针进入时创建，不持续追踪鼠标，兼顾反馈与性能。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.12/iData-v0.2.12-macos-universal.zip" length="3962817" type="application/octet-stream" sparkle:edSignature="zaFHNWtn74+xpMKaUncDqCaMu9TL3+3oWA/0CPm7a7n0Bep9SFWY8B1D9fJ3b+4TH+J7qzlKFVQF2DVWHCvrBA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.13/iData-v0.2.13-macos-universal.zip" length="3974598" type="application/octet-stream" sparkle:edSignature="3jZng1HxbIs/msAQ2S5IKwV18XgbHHkFn7Wqrw/CELMORA9dtEhQNm2aFs3TlJAq6QeoBf24usQejTO33S5eBA=="/>
         </item>
     </channel>
 </rss>
