@@ -184,6 +184,14 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLOuterCornersMatchSwiftUIContainer() throws {
+        let html = try terminalHTML()
+
+        #expect(html.components(separatedBy: "border-radius: 10px;").count - 1 == 2)
+        #expect(!html.contains("border-radius: 24px;"))
+    }
+
+    @Test
     func terminalHTMLDisablesBrowserScrollbackForVisiData() throws {
         let html = try terminalHTML()
 
@@ -212,6 +220,15 @@ struct EmbeddedTerminalViewTests {
         #expect(!source.contains("Carbon.HIToolbox"))
         #expect(!source.contains("kTISNotifySelectedKeyboardInputSourceChanged"))
         #expect(!source.contains("handleInputSourceDidChange"))
+    }
+
+    @Test
+    func embeddedTerminalViewSkipsRedundantSwiftUIRebinding() throws {
+        let source = try embeddedTerminalViewSource()
+
+        #expect(source.contains("let webViewDidChange = self.webView !== webView"))
+        #expect(source.contains("guard sessionDidChange || webViewDidChange else"))
+        #expect(!source.contains("Logger("))
     }
 
     @Test
@@ -253,6 +270,42 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLPostsDebugMessagesOnlyWhenTraceIsEnabled() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await harness.clearMessages()
+
+        _ = try await harness.evaluate("window.iDataRefreshLayout();")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!(try await harness.messages()).contains { $0.type == "debug" })
+
+        try await harness.clearMessages()
+        _ = try await harness.evaluate("window.iDataDebugEnabled = true; window.iDataRefreshLayout();")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect((try await harness.messages()).contains { $0.type == "debug" })
+    }
+
+    @Test
+    func terminalHTMLAvoidsDebugOnlyWorkOnHotInteractionPaths() throws {
+        let html = try terminalHTML()
+
+        #expect(!html.contains("addEventListener('wheel'"))
+        #expect(html.contains("if (window.iDataDebugEnabled === true)"))
+    }
+
+    @Test
+    func embeddedTerminalInjectsTraceFlagAtDocumentStart() {
+        #expect(
+            EmbeddedTerminalView.terminalDebugConfigurationJavaScript(isEnabled: true)
+                == "window.iDataDebugEnabled = true;"
+        )
+        #expect(
+            EmbeddedTerminalView.terminalDebugConfigurationJavaScript(isEnabled: false)
+                == "window.iDataDebugEnabled = false;"
+        )
+    }
+
+    @Test
     func terminalHTMLRecoversFromDelayedTerminalMetrics() async throws {
         let harness = try TerminalHTMLHarness(initialCellWidth: 0, initialCellHeight: 0)
         try await harness.load()
@@ -288,6 +341,21 @@ struct EmbeddedTerminalViewTests {
         let settledMessages = try await harness.messages()
         let settledResize = settledMessages.last { $0.type == "resize" }
         #expect(settledResize?.rows == 35)
+    }
+
+    @Test
+    func terminalHTMLDoesNotRestartMetricPollingAfterInitialMeasurement() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(100))
+
+        _ = try await harness.evaluate("stopMetricSettlingChecks();")
+        #expect(try await harness.evaluate("String(metricSettleBudgetRemaining);") == "0")
+
+        _ = try await harness.evaluate("window.iDataRefreshLayout();")
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(try await harness.evaluate("String(metricSettleBudgetRemaining);") == "0")
     }
 
     @Test

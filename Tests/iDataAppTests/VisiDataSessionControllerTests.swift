@@ -6,6 +6,17 @@ import Testing
 @MainActor
 struct VisiDataSessionControllerTests {
     @Test
+    func processExitMonitoringUsesOneKernelWaitWithoutPolling() throws {
+        let source = try visiDataSessionControllerSource()
+
+        #expect(source.contains("private let processWaitQueue"))
+        #expect(source.contains("private func waitForProcessExit"))
+        #expect(!source.contains("DispatchSourceProcess"))
+        #expect(!source.contains("makeProcessSource"))
+        #expect(!source.contains("scheduleEarlyExitSafetyCheck"))
+    }
+
+    @Test
     func terminateAlsoStopsDescendantProcesses() async throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-session-tests-\(UUID().uuidString)", isDirectory: true)
@@ -33,6 +44,35 @@ struct VisiDataSessionControllerTests {
         #expect(childExited)
         if !childExited {
             _ = kill(childPID, SIGKILL)
+        }
+    }
+
+    @Test
+    func rapidShortLivedProcessesAlwaysPublishTheirExit() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-short-exit-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-short-exit.zsh")
+        try makeDelayedExitLauncher(at: launcher, delaySeconds: 0.01, exitCode: 7)
+
+        for _ in 0..<32 {
+            let session = VisiDataSessionController()
+            session.resize(cols: 120, rows: 32)
+            try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+
+            try await waitForCondition(timeout: 8.0) {
+                !session.isRunning
+            }
+
+            #expect(session.statusMessage?.contains("7") == true)
+            #expect(session.errorMessage?.contains("7") == true)
         }
     }
 
@@ -450,6 +490,17 @@ struct VisiDataSessionControllerTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
+    private func makeDelayedExitLauncher(at url: URL, delaySeconds: Double, exitCode: Int32) throws {
+        let script = """
+        #!/bin/zsh
+        sleep \(delaySeconds)
+        exit \(exitCode)
+        """
+
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
 }
 
 private enum TestError: Error {
@@ -662,4 +713,14 @@ private func waitForProcessExit(_ pid: pid_t, timeout: TimeInterval) async -> Bo
     }
 
     return !processExists(pid)
+}
+
+private func visiDataSessionControllerSource(filePath: StaticString = #filePath) throws -> String {
+    let testFileURL = URL(fileURLWithPath: "\(filePath)")
+    let repositoryRoot = testFileURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourceURL = repositoryRoot.appendingPathComponent("Sources/iData/VisiDataSessionController.swift")
+    return try String(contentsOf: sourceURL, encoding: .utf8)
 }

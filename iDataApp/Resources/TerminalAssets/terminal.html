@@ -12,7 +12,7 @@
       height: 100%;
       overflow: hidden;
       background: #0b1020;
-      border-radius: 24px;
+      border-radius: 10px;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
@@ -23,7 +23,7 @@
       box-sizing: border-box;
       padding: 14px;
       overflow: hidden;
-      border-radius: 24px;
+      border-radius: 10px;
       background:
         radial-gradient(circle at top left, rgba(59,130,246,0.18), transparent 30%),
         radial-gradient(circle at top right, rgba(168,85,247,0.14), transparent 24%),
@@ -78,12 +78,16 @@
     let deferredMeasureBudgetRemaining = 0;
     let metricSettleHandle = null;
     let metricSettleBudgetRemaining = 0;
+    let didScheduleMetricSettlingChecks = false;
 
     function post(message) {
       window.webkit?.messageHandlers?.idata?.postMessage(message);
     }
 
     function debug(message) {
+      if (window.iDataDebugEnabled !== true) {
+        return;
+      }
       post({ type: 'debug', message });
     }
 
@@ -141,11 +145,12 @@
     }
 
     function scheduleMetricSettlingChecks() {
-      metricSettleBudgetRemaining = Math.max(metricSettleBudgetRemaining, 8);
-
-      if (metricSettleHandle !== null) {
+      if (didScheduleMetricSettlingChecks) {
         return;
       }
+
+      didScheduleMetricSettlingChecks = true;
+      metricSettleBudgetRemaining = 8;
 
       const settle = () => {
         metricSettleHandle = null;
@@ -247,6 +252,7 @@
     function createTerminal(resetReadyState = false) {
       stopDeferredLayoutRecovery();
       stopMetricSettlingChecks();
+      didScheduleMetricSettlingChecks = false;
       disposeTerminalDisposables();
 
       if (term) {
@@ -364,9 +370,11 @@
 
       lastSentSize = sizeKey;
 
-      debug(
-        `measure force=${force} cell=${cellWidth}x${cellHeight} rect=${parentRect.width}x${parentRect.height} usable=${usableWidth}x${usableHeight} term=${term.cols}x${term.rows} next=${cols}x${rows} changed=${sizeChanged} termNeedsResize=${terminalNeedsResize}`
-      );
+      if (window.iDataDebugEnabled === true) {
+        debug(
+          `measure force=${force} cell=${cellWidth}x${cellHeight} rect=${parentRect.width}x${parentRect.height} usable=${usableWidth}x${usableHeight} term=${term.cols}x${term.rows} next=${cols}x${rows} changed=${sizeChanged} termNeedsResize=${terminalNeedsResize}`
+        );
+      }
 
       if (terminalNeedsResize) {
         term.resize(cols, rows);
@@ -495,10 +503,6 @@
     window.addEventListener('focus', () => {
       scheduleTerminalLayoutPasses({ forceResize: true });
     });
-
-    terminalRoot.addEventListener('wheel', () => {
-      debug(`wheel term=${term?.cols ?? 0}x${term?.rows ?? 0} last=${lastSentSize ?? 'nil'}`);
-    }, { passive: true });
 
     requestAnimationFrame(() => {
       scheduleTerminalLayoutPasses({ forceResize: true });

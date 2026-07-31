@@ -1159,6 +1159,18 @@ struct SidebarHoverGlow: View {
         )
     }
 
+    private var prominentStrokeGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.white.opacity(0.58),
+                Color(red: 0.34, green: 0.84, blue: 1.0).opacity(0.62),
+                Color(red: 0.58, green: 0.50, blue: 1.0).opacity(0.48),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     var body: some View {
         Group {
             switch style {
@@ -1203,18 +1215,12 @@ struct SidebarHoverGlow: View {
             .overlay {
                 shape
                     .inset(by: 0.75)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.58),
-                                Color(red: 0.34, green: 0.84, blue: 1.0).opacity(0.62),
-                                Color(red: 0.58, green: 0.50, blue: 1.0).opacity(0.48),
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1.5
-                    )
+                    .strokeBorder(prominentStrokeGradient, lineWidth: 1.5)
+            }
+            .background {
+                shape
+                    .stroke(prominentStrokeGradient, lineWidth: 8)
+                    .opacity(0.26)
             }
     }
 }

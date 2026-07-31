@@ -1,6 +1,5 @@
 import SwiftUI
 import WebKit
-import OSLog
 
 /// WKWebView subclass that prevents the terminal from eating the first mouse
 /// click when focus needs to move to a sibling SwiftUI control (e.g. sidebar).
@@ -27,6 +26,10 @@ final class TerminalWebView: WKWebView {
 struct EmbeddedTerminalView: NSViewRepresentable {
     @ObservedObject var session: VisiDataSessionController
 
+    static func terminalDebugConfigurationJavaScript(isEnabled: Bool) -> String {
+        "window.iDataDebugEnabled = \(isEnabled ? "true" : "false");"
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(session: session)
     }
@@ -35,6 +38,13 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         let contentController = WKUserContentController()
         contentController.add(context.coordinator, name: "idata")
+        contentController.addUserScript(
+            WKUserScript(
+                source: Self.terminalDebugConfigurationJavaScript(isEnabled: TerminalDebugLogger.isEnabled),
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+        )
         configuration.userContentController = contentController
 
         let webView = TerminalWebView(frame: .zero, configuration: configuration)
@@ -58,10 +68,6 @@ struct EmbeddedTerminalView: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, TerminalDisplaySink {
-        private let logger = Logger(
-            subsystem: Bundle.main.bundleIdentifier ?? "io.github.leoarrow.idata",
-            category: "TerminalLayout"
-        )
         private weak var webView: WKWebView?
         private weak var session: VisiDataSessionController?
         private var didFinishInitialNavigation = false
@@ -75,7 +81,11 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         func bind(session: VisiDataSessionController, webView: WKWebView) {
             let sessionDidChange = self.session !== session
-            logger.info("coordinator bind session=\(String(describing: ObjectIdentifier(session)), privacy: .public) sessionDidChange=\(sessionDidChange, privacy: .public)")
+            let webViewDidChange = self.webView !== webView
+            guard sessionDidChange || webViewDidChange else {
+                return
+            }
+
             terminalDebugTrace("coordinator.bind session=\(ObjectIdentifier(session)) sessionDidChange=\(sessionDidChange)")
             if self.session !== session {
                 self.session?.bind(displaySink: nil)
@@ -93,7 +103,6 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         func unbindCurrentSession() {
             if let session {
-                logger.info("coordinator unbind session=\(String(describing: ObjectIdentifier(session)), privacy: .public)")
                 terminalDebugTrace("coordinator.unbind session=\(ObjectIdentifier(session))")
             }
             session?.bind(displaySink: nil)
@@ -205,7 +214,6 @@ struct EmbeddedTerminalView: NSViewRepresentable {
                 }
             case "debug":
                 if let message = body["message"] as? String {
-                    logger.info("\(message, privacy: .public)")
                     terminalDebugTrace("js.debug \(message)")
                 }
             default:

@@ -19,6 +19,21 @@ struct TerminalDebugLoggerTests {
     }
 
     @Test
+    func disabledModeDoesNotBuildTraceMessages() {
+        TerminalDebugLogger.resetForTesting()
+        defer { TerminalDebugLogger.resetForTesting() }
+        TerminalDebugLogger.setEnabledOverrideForTesting(false)
+
+        var didBuildMessage = false
+        TerminalDebugLogger.log({
+            didBuildMessage = true
+            return "disabled-expensive-message"
+        }())
+
+        #expect(!didBuildMessage)
+    }
+
+    @Test
     func enabledModeAppendsMessagesInOrder() throws {
         let traceURL = temporaryTraceFileURL()
         TerminalDebugLogger.resetForTesting()

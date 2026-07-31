@@ -3,21 +3,25 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.14</title>
-            <pubDate>Fri, 31 Jul 2026 11:28:17 +0800</pubDate>
+            <title>0.2.15</title>
+            <pubDate>Fri, 31 Jul 2026 12:53:48 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>34</sparkle:version>
-            <sparkle:shortVersionString>0.2.14</sparkle:shortVersionString>
+            <sparkle:version>35</sparkle:version>
+            <sparkle:shortVersionString>0.2.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.14
+            <description sparkle:format="markdown"><![CDATA[## v0.2.15
 
-这次更新完善欢迎页的主操作反馈：
+这次更新进一步完善界面反馈，并降低后台开销：
 
-- “打开…”按钮增加清晰的蓝紫渐变光晕。
-- 光晕针对系统蓝色按钮提高对比度，按钮尺寸与按压反馈保持不变。
-- 仍仅在指针进入时创建，不持续追踪鼠标。
+- 欢迎页“打开…”按钮增加更清晰的蓝紫渐变光晕。
+- 统一侧栏按钮与历史记录的悬停反馈，恢复轻量的一次性图标动画。
+- 调整内嵌终端圆角，使内容与外层容器更贴合。
+- 进程退出改用单次内核等待，移除定时轮询与重复退出分支。
+- 减少终端尺寸检查、重复绑定和调试日志开销。
+- 默认停用终端调试消息桥，空闲时不再产生相关日志与唤醒。
+- 加强快速退出、终端布局与悬停效果的回归测试。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.14/iData-v0.2.14-macos-universal.zip" length="3978702" type="application/octet-stream" sparkle:edSignature="GG8ER3dbR+2j9r5wR4PRHNhJr5FI1jTDtBSj5xN0Gth+CcONAYVraT6pGoTbk+6J+GHDJRbRDYPlBjekBD3tCA=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.15/iData-v0.2.15-macos-universal.zip" length="3981765" type="application/octet-stream" sparkle:edSignature="Mxqhu+k3KrIEkxK0ihD/LQoXMmJHYPZ9mY/643Bvp7GGQCeLccaT4PjA0W5wGwXjBhNuxGl41ybCwUEfr+Y6AA=="/>
         </item>
     </channel>
 </rss>
