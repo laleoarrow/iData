@@ -120,11 +120,17 @@ struct PreferencesView: View {
     private var filesTab: some View {
         Form {
             Section {
+                Toggle(
+                    isChinese ? "转交小文件" : "Hand Off Small Files",
+                    isOn: $model.isSmallFileHandoffEnabled
+                )
+
                 LabeledContent(isChinese ? "转交给" : "Hand off to") {
                     Text(model.preferredSmallFileApplicationDisplayName)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                .disabled(!model.isSmallFileHandoffEnabled)
 
                 HStack {
                     Button(isChinese ? "选择应用…" : "Choose App…") {
@@ -142,12 +148,17 @@ struct PreferencesView: View {
                     }
                     .disabled(model.preferredSmallFileApplication == nil)
                 }
+                .disabled(!model.isSmallFileHandoffEnabled)
             } header: {
                 Text(isChinese ? "小文件" : "Small Files")
             } footer: {
-                Text(isChinese
-                    ? "从 Finder 打开的 CSV、TSV 和 Excel 文件不超过 \(AppModel.smallFileRoutingThresholdDisplay) 时转交；压缩文件仍由 iData 打开。"
-                    : "CSV, TSV, and Excel files opened from Finder are handed off up to \(AppModel.smallFileRoutingThresholdDisplay). Compressed files stay in iData.")
+                Text(model.isSmallFileHandoffEnabled
+                    ? (isChinese
+                        ? "从 Finder 打开的表格不超过 \(AppModel.smallFileRoutingThresholdDisplay) 时转交；压缩文件仍由 iData 打开。"
+                        : "Tables opened from Finder are handed off up to \(AppModel.smallFileRoutingThresholdDisplay). Compressed files stay in iData.")
+                    : (isChinese
+                        ? "从 Finder 打开的表格将直接留在 iData。"
+                        : "Tables opened from Finder stay in iData."))
             }
 
             Section {

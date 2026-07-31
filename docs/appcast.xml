@@ -3,23 +3,23 @@
     <channel>
         <title>iData</title>
         <item>
-            <title>0.2.17</title>
-            <pubDate>Fri, 31 Jul 2026 23:28:31 +0800</pubDate>
+            <title>0.2.18</title>
+            <pubDate>Sat, 01 Aug 2026 00:56:57 +0800</pubDate>
             <link>https://github.com/laleoarrow/iData</link>
-            <sparkle:version>37</sparkle:version>
-            <sparkle:shortVersionString>0.2.17</sparkle:shortVersionString>
+            <sparkle:version>38</sparkle:version>
+            <sparkle:shortVersionString>0.2.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[## v0.2.17
+            <description sparkle:format="markdown"><![CDATA[## v0.2.18
 
-这是一个启动修复版本，不改变现有 UI：
+这次更新修复教程中的表格输入问题，并补充小文件控制：
 
-- 修复 v0.2.16 因主程序与 Sparkle 的 Team ID 校验冲突而在启动时退出的问题。
-- 无证书构建不再错误启用 Hardened Runtime；Developer ID 构建仍保持完整运行时保护与时间戳。
-- CI 新增最终应用包的真实启动冒烟测试，避免“静态签名通过、实际无法启动”再次漏检。
-
-已安装 v0.2.16 的用户需要从 GitHub 或 Homebrew 手动安装本版本；旧版会在 Sparkle 启动前退出，无法自行更新。
+- 开始教程后，键盘焦点会正确回到 VisiData 表格。
+- 点击上一步、下一步、步骤圆点、收起或退出教程后，可以立即继续操作表格。
+- 终端焦点现在同时恢复 macOS 第一响应者和 xterm 输入状态，避免界面可见但快捷键无效。
+- 新增原生焦点回归测试，防止该问题再次出现。
+- “设置 → 文件”新增“转交小文件”开关；关闭后，从 Finder 打开的表格会直接留在 iData，便于测试或统一工作流。
 ]]></description>
-            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.17/iData-v0.2.17-macos-universal.zip" length="4024253" type="application/octet-stream" sparkle:edSignature="t8xBRuMm7ee7uU57vTGHLvCFQW0+rae/G82XYrryZc1E/hkIS1yBf88xDOoksyxn4tKU1m+xbyW6MPeAHRsxCQ=="/>
+            <enclosure url="https://github.com/laleoarrow/iData/releases/download/v0.2.18/iData-v0.2.18-macos-universal.zip" length="4032765" type="application/octet-stream" sparkle:edSignature="PNCDD6/Scm1rw+CZV5ghbv21gkyklyvgvK7XVwY3iRcxx6gnq5Txq4shCCraIox+QGq1+9wxZU7YdV1T1mCNDg=="/>
         </item>
     </channel>
 </rss>

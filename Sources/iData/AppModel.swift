@@ -163,6 +163,11 @@ final class AppModel: ObservableObject {
             preferredSmallFileApplicationStore.store(preferredSmallFileApplication)
         }
     }
+    @Published var isSmallFileHandoffEnabled: Bool {
+        didSet {
+            defaults.set(isSmallFileHandoffEnabled, forKey: Self.isSmallFileHandoffEnabledKey)
+        }
+    }
     @Published var reduceAnimations: Bool {
         didSet {
             defaults.set(reduceAnimations, forKey: Self.reduceAnimationsKey)
@@ -198,6 +203,7 @@ final class AppModel: ObservableObject {
     nonisolated static let lastOpenDirectoryKey = "lastOpenDirectory"
     nonisolated static let previousDefaultAppsByExtensionKey = "previousDefaultAppsByExtension"
     nonisolated static let preferredSmallFileApplicationKey = "preferredSmallFileApplication"
+    nonisolated static let isSmallFileHandoffEnabledKey = "isSmallFileHandoffEnabled"
     nonisolated static let tutorialProgressByChapterKey = "tutorialProgressByChapter"
     nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     nonisolated static let defaultTutorialChapterID = "basic"
@@ -506,6 +512,7 @@ final class AppModel: ObservableObject {
             rawValue: defaults.string(forKey: Self.appLanguagePreferenceKey) ?? ""
         ) ?? .system
         self.preferredSmallFileApplication = preferredSmallFileApplicationStore.load()
+        self.isSmallFileHandoffEnabled = defaults.object(forKey: Self.isSmallFileHandoffEnabledKey) as? Bool ?? true
         self.previousDefaultAppByExtension = formatAssociationRestoreStore.loadAll()
     }
 
@@ -1187,6 +1194,7 @@ final class AppModel: ObservableObject {
 
         let lookupExtension = Self.lookupExtension(for: url)
         if
+            isSmallFileHandoffEnabled,
             let fileSize = fileSizeProvider(url),
             fileSize <= Self.largeFileOpenThresholdBytes,
             !Self.compressionSuffixes.contains(lookupExtension)

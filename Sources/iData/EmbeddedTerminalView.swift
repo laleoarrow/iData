@@ -18,8 +18,11 @@ final class TerminalWebView: WKWebView {
     /// When another view claims first-responder (e.g. the user clicks the
     /// sidebar), blur the embedded xterm so key events stop going to it.
     override func resignFirstResponder() -> Bool {
-        evaluateJavaScript("window.iDataBlurTerminal && window.iDataBlurTerminal();")
-        return super.resignFirstResponder()
+        let didResign = super.resignFirstResponder()
+        if didResign {
+            evaluateJavaScript("window.iDataBlurTerminal && window.iDataBlurTerminal();")
+        }
+        return didResign
     }
 }
 
@@ -181,6 +184,9 @@ struct EmbeddedTerminalView: NSViewRepresentable {
 
         func focusTerminalDisplay() {
             terminalDebugTrace("terminal.focus")
+            if let webView {
+                _ = webView.window?.makeFirstResponder(webView)
+            }
             evaluate(functionCall: "window.iDataFocusTerminal();")
         }
 

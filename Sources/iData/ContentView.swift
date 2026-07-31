@@ -62,7 +62,13 @@ struct ContentView: View {
         .sheet(isPresented: $model.isHelpPresented) {
             HelpView(model: model)
         }
-        .sheet(isPresented: $model.isTutorialHubPresented) {
+        .sheet(isPresented: $model.isTutorialHubPresented, onDismiss: {
+            if model.isTutorialActive {
+                DispatchQueue.main.async {
+                    model.displayedSession?.focusTerminalDisplay()
+                }
+            }
+        }) {
             TutorialHubView(model: model)
         }
         .environment(\EnvironmentValues.idataAnimationsEnabled, model.animationsEnabled)
@@ -2639,7 +2645,14 @@ private struct SessionDetailView: View {
                     )
 
                 if model.isTutorialActive, model.tutorialCurrentStep != nil {
-                    TutorialCoachOverlay(model: model)
+                    TutorialCoachOverlay(
+                        model: model,
+                        returnFocusToTable: {
+                            DispatchQueue.main.async {
+                                session.focusTerminalDisplay()
+                            }
+                        }
+                    )
                         .padding(12)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
@@ -3242,6 +3255,7 @@ private struct SessionHintControlButton: View {
 
 private struct TutorialCoachOverlay: View {
     @ObservedObject var model: AppModel
+    let returnFocusToTable: () -> Void
     @Environment(\.idataAnimationsEnabled) private var idataAnimationsEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
@@ -3263,6 +3277,7 @@ private struct TutorialCoachOverlay: View {
 
                 Button {
                     model.setTutorialCoachExpanded(!model.isTutorialCoachExpanded)
+                    returnFocusToTable()
                 } label: {
                     Image(systemName: model.isTutorialCoachExpanded ? "chevron.up" : "chevron.down")
                         .font(.system(size: 11, weight: .bold))
@@ -3274,6 +3289,7 @@ private struct TutorialCoachOverlay: View {
 
                 Button {
                     model.cancelTutorial()
+                    returnFocusToTable()
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -3315,6 +3331,7 @@ private struct TutorialCoachOverlay: View {
                     ForEach(chapter.steps, id: \.id) { item in
                         Button {
                             model.jumpToTutorialStep(item.index)
+                            returnFocusToTable()
                         } label: {
                             Circle()
                                 .fill(item.index == model.tutorialStepIndex ? Color.accentColor : Color.white.opacity(0.22))
@@ -3333,6 +3350,7 @@ private struct TutorialCoachOverlay: View {
                 HStack(spacing: 8) {
                     Button(isChinese ? "上一步" : "Back") {
                         model.rewindTutorialStep()
+                        returnFocusToTable()
                     }
                     .buttonStyle(.bordered)
                     .disabled(model.tutorialStepIndex == 0)
@@ -3346,6 +3364,7 @@ private struct TutorialCoachOverlay: View {
                     if model.isTutorialLastStep {
                         Button(isChinese ? "做完了，完成本章" : "Done — Finish Chapter") {
                             model.completeTutorial()
+                            returnFocusToTable()
                         }
                         .buttonStyle(.borderedProminent)
                         .keyboardShortcut(.rightArrow, modifiers: [.command])
@@ -3353,6 +3372,7 @@ private struct TutorialCoachOverlay: View {
                     } else {
                         Button(isChinese ? "做完了，下一步" : "Done — Next") {
                             model.advanceTutorialStep()
+                            returnFocusToTable()
                         }
                         .buttonStyle(.borderedProminent)
                         .keyboardShortcut(.rightArrow, modifiers: [.command])

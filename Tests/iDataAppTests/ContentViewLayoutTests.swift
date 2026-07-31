@@ -105,9 +105,12 @@ struct ContentViewLayoutTests {
         #expect(tutorial.contains("| 表示任选"))
         #expect(!tutorial.contains("完成后会自动标记"))
         #expect(coach.contains("model.cancelTutorial()"))
+        #expect(coach.components(separatedBy: "returnFocusToTable()").count - 1 == 6)
         #expect(coach.contains(".disabled(item.index > max(model.tutorialStepIndex, chapter.completedStepCount))"))
         #expect(coach.contains("做完了，下一步"))
         #expect(coach.contains("做完了，完成本章"))
+        #expect(source.contains(".sheet(isPresented: $model.isTutorialHubPresented, onDismiss:"))
+        #expect(source.contains("model.displayedSession?.focusTerminalDisplay()"))
     }
 
     @Test

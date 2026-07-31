@@ -32,6 +32,10 @@ struct PreferencesViewTests {
         let source = try preferencesViewSource()
         let files = try extractSection(from: source, start: "private var filesTab", end: "private var runtimeTab")
 
+        #expect(files.contains("Toggle("))
+        #expect(files.contains("isChinese ? \"转交小文件\" : \"Hand Off Small Files\""))
+        #expect(files.contains("isOn: $model.isSmallFileHandoffEnabled"))
+        #expect(files.components(separatedBy: ".disabled(!model.isSmallFileHandoffEnabled)").count - 1 == 2)
         #expect(files.contains("model.preferredSmallFileApplicationDisplayName"))
         #expect(files.contains("model.choosePreferredSmallFileApplication()"))
         #expect(files.contains("testSmallFileHandoff()"))

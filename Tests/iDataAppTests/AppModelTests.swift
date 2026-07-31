@@ -62,6 +62,71 @@ struct AppModelTests {
     }
 
     @Test
+    func smallFileHandoffDefaultsOnAndPersistsWhenDisabled() {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults)
+        #expect(model.isSmallFileHandoffEnabled)
+
+        model.isSmallFileHandoffEnabled = false
+
+        let reloadedModel = AppModel(defaults: defaults)
+        #expect(!reloadedModel.isSmallFileHandoffEnabled)
+    }
+
+    @Test
+    func disabledSmallFileHandoffKeepsSmallFilesInsideIData() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-small-handoff-disabled-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+        let target = tempRoot.appendingPathComponent("small.tsv")
+        try Data("column\nvalue\n".utf8).write(to: target)
+        let alternateApp = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "Numbers.app",
+            bundleIdentifier: "com.apple.Numbers",
+            displayName: "Numbers"
+        )
+        let opener = RecordingExternalFileOpener()
+        var resolverCallCount = 0
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: opener,
+            alternateApplicationResolver: { _, _, _ in
+                resolverCallCount += 1
+                return alternateApp
+            },
+            fileSizeProvider: { _ in 10 }
+        )
+        model.vdExecutablePath = launcher.path
+        model.isSmallFileHandoffEnabled = false
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .openedInIData)
+        #expect(resolverCallCount == 0)
+        #expect(opener.openedFileURL == nil)
+        #expect(opener.openedApplicationURL == nil)
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == target.standardizedFileURL)
+    }
+
+    @Test
     func smallSupportedFileForwardsToAlternateApplication() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

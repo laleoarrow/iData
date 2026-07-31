@@ -8,6 +8,65 @@ import WebKit
 @MainActor
 struct EmbeddedTerminalViewTests {
     @Test
+    func focusingTerminalClaimsTheNativeFirstResponder() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = TerminalWebView(frame: .init(x: 0, y: 0, width: 640, height: 420))
+        let tutorialButton = NSButton(title: "Next", target: nil, action: nil)
+        let container = NSView(frame: webView.frame)
+        let window = NSWindow(
+            contentRect: container.frame,
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+
+        container.addSubview(webView)
+        container.addSubview(tutorialButton)
+        window.contentView = container
+        coordinator.bind(session: session, webView: webView)
+
+        #expect(window.makeFirstResponder(tutorialButton))
+        #expect(window.firstResponder === tutorialButton)
+
+        coordinator.focusTerminalDisplay()
+
+        #expect(window.firstResponder === webView)
+    }
+
+    @Test
+    func deferredTerminalFocusWinsAfterAButtonAction() async {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = TerminalWebView(frame: .init(x: 0, y: 0, width: 640, height: 420))
+        let tutorialButton = NSButton(title: "Next", target: nil, action: nil)
+        let container = NSView(frame: webView.frame)
+        let window = NSWindow(
+            contentRect: container.frame,
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        container.addSubview(webView)
+        container.addSubview(tutorialButton)
+        window.contentView = container
+        coordinator.bind(session: session, webView: webView)
+
+        DispatchQueue.main.async {
+            coordinator.focusTerminalDisplay()
+        }
+        #expect(window.makeFirstResponder(tutorialButton))
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+
+        #expect(window.firstResponder === webView)
+    }
+
+    @Test
     func sessionOnlyBecomesReadyAfterNavigationTerminalReadyAndFirstResize() {
         let session = VisiDataSessionController()
         let coordinator = EmbeddedTerminalView.Coordinator(session: session)
