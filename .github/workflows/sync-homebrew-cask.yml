@@ -16,10 +16,12 @@ jobs:
       TAP_REPO: laleoarrow/homebrew-tap
       CASK_PATH: Casks/idata.rb
     steps:
-      - name: Skip when token is missing
-        if: ${{ env.GH_TOKEN == '' }}
+      - name: Validate Homebrew tap token
         run: |
-          echo "HOMEBREW_TAP_TOKEN is not set; skipping Homebrew tap sync."
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "HOMEBREW_TAP_TOKEN is not set; cannot sync the Homebrew cask." >&2
+            exit 1
+          fi
 
       - name: Skip for prerelease
         if: ${{ github.event_name == 'release' && github.event.release.prerelease }}
@@ -27,7 +29,7 @@ jobs:
           echo "Prerelease detected; skipping Homebrew cask sync."
 
       - name: Resolve release version and digest
-        if: ${{ env.GH_TOKEN != '' && (github.event_name != 'release' || !github.event.release.prerelease) }}
+        if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
         id: release
         run: |
           set -euo pipefail
@@ -53,39 +55,42 @@ jobs:
           echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
 
       - name: Update cask in tap repo
-        if: ${{ env.GH_TOKEN != '' && (github.event_name != 'release' || !github.event.release.prerelease) }}
+        if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
         run: |
           set -euo pipefail
 
           VERSION="${{ steps.release.outputs.version }}"
           SHA256="${{ steps.release.outputs.sha256 }}"
+          WORK_DIR=$(mktemp -d)
+          trap 'rm -rf "$WORK_DIR"' EXIT
+          CONTENT_PATH="$WORK_DIR/idata.rb"
+          UPDATED_PATH="$WORK_DIR/idata.updated.rb"
 
           JSON=$(gh api "repos/${TAP_REPO}/contents/${CASK_PATH}")
           FILE_SHA=$(printf '%s' "$JSON" | jq -r '.sha')
-          CONTENT_B64=$(printf '%s' "$JSON" | jq -r '.content' | tr -d '\n')
-          CONTENT=$(printf '%s' "$CONTENT_B64" | base64 -d)
+          printf '%s' "$JSON" | jq -r '.content' | base64 -d > "$CONTENT_PATH"
 
-          UPDATED=$(printf '%s' "$CONTENT" | perl -0777 -pe '
+          perl -0777 -pe '
             s/version\s+"[^"]+"/version "'"$VERSION"'"/;
             s/sha256\s+"[a-f0-9]{64}"/sha256 "'"$SHA256"'"/;
-          ')
+          ' "$CONTENT_PATH" > "$UPDATED_PATH"
 
-          # Command substitution drops trailing newlines; ensure cask keeps final newline.
-          if [[ "$UPDATED" != *$'\n' ]]; then
-            UPDATED="${UPDATED}"$'\n'
-          fi
-
-          if ! printf '%s' "$UPDATED" | grep -q 'iData-v#{version}-macos-universal.zip'; then
+          if ! grep -q 'iData-v#{version}-macos-universal.zip' "$UPDATED_PATH"; then
             echo "Cask URL template changed unexpectedly; refusing to update." >&2
             exit 1
           fi
 
-          if [[ "$CONTENT" == "$UPDATED" ]]; then
+          if ! grep -Fq "version \"${VERSION}\"" "$UPDATED_PATH" || ! grep -Fq "sha256 \"${SHA256}\"" "$UPDATED_PATH"; then
+            echo "Cask version or digest replacement failed; refusing to update." >&2
+            exit 1
+          fi
+
+          if cmp -s "$CONTENT_PATH" "$UPDATED_PATH"; then
             echo "No cask changes needed."
             exit 0
           fi
 
-          UPDATED_B64=$(printf '%s' "$UPDATED" | base64 | tr -d '\n')
+          UPDATED_B64=$(base64 < "$UPDATED_PATH" | tr -d '\n')
           MESSAGE="chore(cask): update idata to v${VERSION}"
 
           gh api -X PUT "repos/${TAP_REPO}/contents/${CASK_PATH}" \

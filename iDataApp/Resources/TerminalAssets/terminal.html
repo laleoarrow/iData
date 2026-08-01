@@ -79,6 +79,8 @@
     let metricSettleHandle = null;
     let metricSettleBudgetRemaining = 0;
     let didScheduleMetricSettlingChecks = false;
+    let initialPaintRefreshScheduled = false;
+    let activeDisplayGeneration = 0;
 
     function post(message) {
       window.webkit?.messageHandlers?.idata?.postMessage(message);
@@ -253,6 +255,7 @@
       stopDeferredLayoutRecovery();
       stopMetricSettlingChecks();
       didScheduleMetricSettlingChecks = false;
+      initialPaintRefreshScheduled = false;
       disposeTerminalDisposables();
 
       if (term) {
@@ -266,12 +269,13 @@
       term = new Terminal(makeTerminalOptions());
       term.open(terminalMount);
       term.focus();
+      const terminalDisplayGeneration = activeDisplayGeneration;
 
       terminalDisposables.push(term.onData((data) => {
-        post({ type: 'input', data });
+        post({ type: 'input', data, displayGeneration: terminalDisplayGeneration });
       }));
       terminalDisposables.push(term.onBinary((data) => {
-        post({ type: 'binary', data: btoa(data) });
+        post({ type: 'binary', data: btoa(data), displayGeneration: terminalDisplayGeneration });
       }));
 
       lastSentSize = null;
@@ -284,8 +288,8 @@
       }
     }
 
-    function writeBase64(base64Value) {
-      if (!term) {
+    function writeBase64(base64Value, displayGeneration = activeDisplayGeneration) {
+      if (!term || displayGeneration !== activeDisplayGeneration) {
         return;
       }
 
@@ -294,7 +298,27 @@
       for (let index = 0; index < binary.length; index += 1) {
         bytes[index] = binary.charCodeAt(index);
       }
-      term.write(bytes);
+      const currentTerm = term;
+      if (!initialPaintRefreshScheduled) {
+        initialPaintRefreshScheduled = true;
+        currentTerm.write(bytes, () => {
+          // SwiftUI may still be compositing the welcome-to-session
+          // transition when xterm consumes its first bytes. Refresh once on
+          // the settled layer instead of forcing every output batch to paint.
+          setTimeout(() => {
+            if (
+              term === currentTerm &&
+              displayGeneration === activeDisplayGeneration &&
+              currentTerm.rows > 0
+            ) {
+              currentTerm.refresh(0, Math.max(currentTerm.rows - 1, 0));
+              debug('initialPaintRefresh');
+            }
+          }, 220);
+        });
+      } else {
+        currentTerm.write(bytes);
+      }
 
       // Output streaming should not constantly trigger layout retries.
       // We only retry sizing if we do not yet have a stable terminal size.
@@ -381,7 +405,7 @@
       }
 
       if (sizeChanged || terminalNeedsResize) {
-        post({ type: 'resize', cols, rows, force });
+        post({ type: 'resize', cols, rows, force, displayGeneration: activeDisplayGeneration });
       }
 
       return true;
@@ -400,7 +424,7 @@
         return;
       }
       didPostTerminalReady = true;
-      post({ type: 'ready' });
+      post({ type: 'ready', displayGeneration: activeDisplayGeneration });
     }
 
     function scheduleTerminalLayoutPasses(options = {}) {
@@ -455,27 +479,47 @@
     }
 
     window.iDataWriteBase64 = writeBase64;
-    window.iDataSoftClearTerminal = function() {
+    window.iDataSoftClearTerminal = function(displayGeneration = activeDisplayGeneration) {
+      if (displayGeneration !== activeDisplayGeneration) {
+        return false;
+      }
       debug('softClearTerminal');
       term?.clearSelection();
       term?.scrollToTop();
       term?.clear();
+      return true;
     };
-    window.iDataClearTerminal = function() {
-      debug('clearTerminalDisplay');
+    window.iDataClearTerminal = function(displayGeneration) {
+      if (
+        !Number.isSafeInteger(displayGeneration) ||
+        displayGeneration < activeDisplayGeneration
+      ) {
+        return false;
+      }
+      activeDisplayGeneration = displayGeneration;
+      debug(`clearTerminalDisplay generation=${displayGeneration}`);
       createTerminal(true);
       scheduleTerminalLayoutPasses({ forceResize: true });
+      return true;
     };
-    window.iDataRefreshLayout = function() {
+    window.iDataRefreshLayout = function(displayGeneration = activeDisplayGeneration) {
+      if (displayGeneration !== activeDisplayGeneration) {
+        return false;
+      }
       debug('refreshLayout');
       lastSentSize = null;
       scheduleTerminalLayoutPasses({ forceResize: true });
+      return true;
     };
-    window.iDataFocusTerminal = function() {
+    window.iDataFocusTerminal = function(displayGeneration = activeDisplayGeneration) {
+      if (displayGeneration !== activeDisplayGeneration) {
+        return false;
+      }
       debug('focusTerminal');
       lastSentSize = null;
       term?.focus();
       scheduleTerminalLayoutPasses({ forceResize: true });
+      return true;
     };
     window.iDataBlurTerminal = function() {
       debug('blurTerminal');

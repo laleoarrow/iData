@@ -276,13 +276,36 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     @MainActor
     func bind(displaySink: TerminalDisplaySink?) {
+        let displaySinkDidChange = self.displaySink !== displaySink
         self.displaySink = displaySink
         if displaySink == nil {
             terminalDebugTrace("session.bind nil session=\(ObjectIdentifier(self))")
             isDisplayReady = false
         } else {
             terminalDebugTrace("session.bind sink session=\(ObjectIdentifier(self))")
+            if displaySinkDidChange {
+                isDisplayReady = false
+                if childPID > 0 {
+                    needsRedrawAfterDisplayReady = true
+                }
+            }
         }
+    }
+
+    @MainActor
+    func unbind(displaySink expectedDisplaySink: TerminalDisplaySink) {
+        guard displaySink === expectedDisplaySink else {
+            return
+        }
+
+        terminalDebugTrace("session.unbind sink session=\(ObjectIdentifier(self))")
+        displaySink = nil
+        isDisplayReady = false
+    }
+
+    @MainActor
+    func isBound(displaySink expectedDisplaySink: TerminalDisplaySink) -> Bool {
+        displaySink === expectedDisplaySink
     }
 
     @MainActor
@@ -300,6 +323,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
         hasPresentedDisplay = true
         displaySink?.focusTerminalDisplay()
+        sendPendingMeasuredDisplayRedrawIfReady()
         launchPendingOpenAfterDisplayReadyIfPossible()
     }
 
@@ -312,6 +336,9 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         terminalDebugTrace("session.invalidateDisplayReadinessForTerminalReset session=\(ObjectIdentifier(self))")
         isDisplayReady = false
         requiresDisplayReset = true
+        if childPID > 0 {
+            needsRedrawAfterDisplayReady = true
+        }
     }
 
     @MainActor
@@ -484,6 +511,17 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         )
     }
 
+    @MainActor
+    func reportTerminalDisplayFailure(english: String, chinese: String) {
+        pendingLaunchTask?.cancel()
+        pendingLaunchTask = nil
+        pendingOpenRequest = nil
+        stopCurrentProcessIfNeeded(reapSynchronously: true)
+        isRunning = false
+        statusMessage = nil
+        errorMessage = AppModel.localized(english: english, chinese: chinese)
+    }
+
     private func startProcess(
         visidataExecutable: URL,
         fileURL: URL,
@@ -592,8 +630,14 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
     private func configureReadSource(for fileDescriptor: Int32, generation: UInt64) {
         let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: ioQueue)
+        let writeQueue = self.writeQueue
         source.setEventHandler { [weak self] in
             self?.drainOutput(from: fileDescriptor, generation: generation)
+        }
+        source.setCancelHandler {
+            writeQueue.async {
+                close(fileDescriptor)
+            }
         }
         source.resume()
         readSource = source
@@ -686,7 +730,9 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
 
         terminalDebugTrace("session.replayTranscript session=\(ObjectIdentifier(self)) chunks=\(self.transcript.chunks.count)")
-        displaySink?.clearTerminalDisplay()
+        if !requiresDisplayReset {
+            displaySink?.clearTerminalDisplay()
+        }
         requiresDisplayReset = false
 
         for chunk in transcript.chunks {
@@ -739,13 +785,18 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         )
     }
 
+    @MainActor
     private func enqueuePTYWrite(_ data: Data) {
+        let fileDescriptor = masterFileDescriptor
+        guard fileDescriptor >= 0 else {
+            return
+        }
         writeQueue.async { [weak self] in
             guard let self else {
                 return
             }
-            _ = self.ptyWriteDriver.writeAll(data: data) { [weak self] in
-                self?.masterFileDescriptor ?? -1
+            _ = self.ptyWriteDriver.writeAll(data: data) {
+                fileDescriptor
             }
         }
     }
@@ -808,68 +859,63 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
             let capturedExitStatus = exitStatus
             self?.ioQueue.async { [weak self] in
-                self?.finalizeProcessExit(pid: pid, generation: generation, exitStatus: capturedExitStatus)
+                Task { @MainActor [weak self] in
+                    self?.finalizeProcessExit(pid: pid, generation: generation, exitStatus: capturedExitStatus)
+                }
             }
         }
     }
 
+    @MainActor
     private func finalizeProcessExit(pid: pid_t, generation: UInt64, exitStatus: Int32) {
-        guard generation == outputGeneration else {
+        guard generation == outputGeneration, childPID == pid else {
             return
         }
 
-        if childPID == pid {
-            childPID = 0
-        }
+        childPID = 0
         cleanupDescriptorsAndSources()
 
-        Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
-
-            if didExitNormally(exitStatus) {
-                let code = exitCode(from: exitStatus)
-                if code == 0 {
-                    self.statusMessage = AppModel.localized(
-                        english: "VisiData exited.",
-                        chinese: "VisiData 已退出。"
-                    )
-                    self.errorMessage = nil
-                } else {
-                    self.statusMessage = AppModel.localized(
-                        english: "VisiData exited with code \(code).",
-                        chinese: "VisiData 已退出，代码为 \(code)。"
-                    )
-                    let baseErrorMessage = AppModel.localized(
-                        english: "VisiData exited with code \(code).",
-                        chinese: "VisiData 已退出，代码为 \(code)。"
-                    )
-                    if let currentFileURL, let dependencyGuidance = AppModel.visiDataFormatDependencyGuidance(for: currentFileURL, language: AppModel.resolvedLanguage()) {
-                        self.errorMessage = "\(baseErrorMessage) \(dependencyGuidance)"
-                    } else {
-                        self.errorMessage = baseErrorMessage
-                    }
-                }
-            } else if didTerminateBySignal(exitStatus) {
-                let signal = terminatingSignal(from: exitStatus)
-                self.statusMessage = AppModel.localized(
-                    english: "VisiData terminated.",
-                    chinese: "VisiData 已终止。"
+        if didExitNormally(exitStatus) {
+            let code = exitCode(from: exitStatus)
+            if code == 0 {
+                statusMessage = AppModel.localized(
+                    english: "VisiData exited.",
+                    chinese: "VisiData 已退出。"
                 )
-                self.errorMessage = AppModel.localized(
-                    english: "VisiData was interrupted by signal \(signal).",
-                    chinese: "VisiData 被信号 \(signal) 中断。"
-                )
+                errorMessage = nil
             } else {
-                self.statusMessage = AppModel.localized(
-                    english: "VisiData ended.",
-                    chinese: "VisiData 已结束。"
+                statusMessage = AppModel.localized(
+                    english: "VisiData exited with code \(code).",
+                    chinese: "VisiData 已退出，代码为 \(code)。"
                 )
+                let baseErrorMessage = AppModel.localized(
+                    english: "VisiData exited with code \(code).",
+                    chinese: "VisiData 已退出，代码为 \(code)。"
+                )
+                if let currentFileURL, let dependencyGuidance = AppModel.visiDataFormatDependencyGuidance(for: currentFileURL, language: AppModel.resolvedLanguage()) {
+                    errorMessage = "\(baseErrorMessage) \(dependencyGuidance)"
+                } else {
+                    errorMessage = baseErrorMessage
+                }
             }
-
-            self.isRunning = false
+        } else if didTerminateBySignal(exitStatus) {
+            let signal = terminatingSignal(from: exitStatus)
+            statusMessage = AppModel.localized(
+                english: "VisiData terminated.",
+                chinese: "VisiData 已终止。"
+            )
+            errorMessage = AppModel.localized(
+                english: "VisiData was interrupted by signal \(signal).",
+                chinese: "VisiData 被信号 \(signal) 中断。"
+            )
+        } else {
+            statusMessage = AppModel.localized(
+                english: "VisiData ended.",
+                chinese: "VisiData 已结束。"
+            )
         }
+
+        isRunning = false
     }
 
     private func stopCurrentProcessIfNeeded(reapSynchronously: Bool) {
@@ -975,12 +1021,17 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     private func cleanupDescriptorsAndSources() {
-        readSource?.cancel()
+        let source = readSource
         readSource = nil
+        let fileDescriptor = masterFileDescriptor
+        masterFileDescriptor = -1
 
-        if masterFileDescriptor >= 0 {
-            close(masterFileDescriptor)
-            masterFileDescriptor = -1
+        if let source {
+            source.cancel()
+        } else if fileDescriptor >= 0 {
+            writeQueue.async {
+                close(fileDescriptor)
+            }
         }
     }
 
@@ -1000,6 +1051,16 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     @MainActor
     var processIdentifierForTesting: pid_t {
         childPID
+    }
+
+    @MainActor
+    var masterFileDescriptorForTesting: Int32 {
+        masterFileDescriptor
+    }
+
+    @MainActor
+    func finalizeProcessExitForTesting(pid: pid_t, generation: UInt64, exitStatus: Int32 = 0) {
+        finalizeProcessExit(pid: pid, generation: generation, exitStatus: exitStatus)
     }
 
     func installOutputDeliveryTailForTesting(

@@ -181,6 +181,42 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
+    func shortLivedProcessesAlwaysDeliverTheirFinalPTYOutput() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-final-output-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-final-output.zsh")
+        try makeFinalOutputLauncher(at: launcher, exitCode: 7)
+
+        for iteration in 0..<32 {
+            let sink = TerminalDisplaySinkBuffer()
+            let session = VisiDataSessionController()
+            session.bind(displaySink: sink)
+            try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+            session.resize(cols: 120, rows: 32)
+            session.markDisplayReady()
+
+            try await waitForCondition(timeout: 8.0) {
+                !session.isRunning
+            }
+            try await waitForSinkText(sink, containing: "FINAL_SENTINEL")
+
+            #expect(
+                sink.writes.joined().contains("FINAL_SENTINEL"),
+                "Missing final PTY bytes in iteration \(iteration)"
+            )
+            session.terminate()
+        }
+    }
+
+    @Test
     func staleOutputFromPreviousSessionGenerationIsIgnoredAfterTableSwitch() throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("idata-session-generation-\(UUID().uuidString)", isDirectory: true)
@@ -394,6 +430,67 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
+    func queuedPTYWritesKeepTheDescriptorCapturedForTheirSession() async throws {
+        let recorder = BlockingPTYDescriptorRecorder()
+        let driver = PTYWriteDriver(
+            writeCall: recorder.write(fileDescriptor:buffer:count:),
+            sleepCall: { _ in }
+        )
+        let session = VisiDataSessionController(ptyWriteDriver: driver)
+        let firstDescriptor = open("/dev/null", O_WRONLY)
+        let secondDescriptor = open("/dev/null", O_WRONLY)
+
+        #expect(firstDescriptor >= 0)
+        #expect(secondDescriptor >= 0)
+        #expect(firstDescriptor != secondDescriptor)
+
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: firstDescriptor)
+        session.sendInput("A")
+
+        try await waitForCondition(timeout: 2.0) {
+            recorder.recordedDescriptors.count == 1
+        }
+
+        session.sendInput("B")
+        session.terminate()
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: secondDescriptor)
+        session.sendInput("C")
+        recorder.releaseFirstWrite()
+
+        try await waitForCondition(timeout: 2.0) {
+            recorder.recordedDescriptors.count == 3
+        }
+
+        #expect(recorder.recordedDescriptors == [
+            firstDescriptor,
+            firstDescriptor,
+            secondDescriptor
+        ])
+
+        session.terminate()
+    }
+
+    @Test
+    func staleExitForDifferentPIDCannotCleanUpCurrentSession() {
+        let session = VisiDataSessionController()
+        let fileDescriptor = open("/dev/null", O_RDWR)
+        #expect(fileDescriptor >= 0)
+
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: fileDescriptor)
+        let currentGeneration = session.outputGenerationForTesting
+
+        session.finalizeProcessExitForTesting(
+            pid: 111_111,
+            generation: currentGeneration
+        )
+
+        #expect(session.processIdentifierForTesting == 999_999)
+        #expect(session.masterFileDescriptorForTesting == fileDescriptor)
+
+        session.terminate()
+    }
+
+    @Test
     func fallbackRedrawRunsAfterMeasuredResizeSignal() async throws {
         let eventRecorder = TerminalResizeEventRecorder()
         let driver = PTYWriteDriver(
@@ -425,9 +522,39 @@ struct VisiDataSessionControllerTests {
 
         #expect(eventRecorder.events == [
             .signal(SIGWINCH),
-            .signal(SIGWINCH),
             .write(Data("\u{0C}".utf8))
         ])
+    }
+
+    @Test
+    func runningSessionRedrawsOnceAfterDisplayIsRecreated() async throws {
+        let recorder = PTYWriteRecorder()
+        let driver = PTYWriteDriver(
+            writeCall: recorder.write(fileDescriptor:buffer:count:),
+            sleepCall: { _ in }
+        )
+        let session = VisiDataSessionController(ptyWriteDriver: driver)
+        let sink = TerminalDisplaySinkBuffer()
+        let fileDescriptor = open("/dev/null", O_WRONLY)
+        #expect(fileDescriptor >= 0)
+
+        session.bind(displaySink: sink)
+        session.simulateFallbackLaunchBeforeMeasurementForTesting(fileDescriptor: fileDescriptor)
+        session.markDisplayReady()
+        #expect(recorder.recordedData.isEmpty)
+
+        session.invalidateDisplayReadinessForTerminalReset()
+        session.markDisplayReady()
+
+        try await waitForCondition(timeout: 2.0) {
+            recorder.recordedData == Data("\u{0C}".utf8)
+        }
+
+        session.markDisplayReady()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(recorder.recordedData == Data("\u{0C}".utf8))
+
+        session.terminate()
     }
 
     @Test
@@ -476,9 +603,10 @@ struct VisiDataSessionControllerTests {
         #expect(sink.writes == ["FIRST\n"])
 
         session.invalidateDisplayReadinessForTerminalReset()
+        sink.resetTerminalDisplay()
         session.appendOutputForTesting(Data("SECOND\n".utf8))
 
-        #expect(sink.writes == ["FIRST\n"])
+        #expect(sink.writes.isEmpty)
 
         session.markDisplayReady()
 
@@ -655,6 +783,17 @@ struct VisiDataSessionControllerTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
+    private func makeFinalOutputLauncher(at url: URL, exitCode: Int32) throws {
+        let script = """
+        #!/bin/zsh
+        printf 'FINAL_SENTINEL\\n'
+        exit \(exitCode)
+        """
+
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
 }
 
 private enum TestError: Error {
@@ -771,6 +910,33 @@ private final class PTYWriteRecorder: @unchecked Sendable {
     }
 }
 
+private final class BlockingPTYDescriptorRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private let firstWriteGate = DispatchSemaphore(value: 0)
+    private var descriptors: [Int32] = []
+
+    var recordedDescriptors: [Int32] {
+        lock.withLock { descriptors }
+    }
+
+    func write(fileDescriptor: Int32, buffer _: UnsafeRawPointer, count: Int) -> Int {
+        let shouldBlock = lock.withLock {
+            descriptors.append(fileDescriptor)
+            return descriptors.count == 1
+        }
+
+        if shouldBlock {
+            firstWriteGate.wait()
+        }
+
+        return count
+    }
+
+    func releaseFirstWrite() {
+        firstWriteGate.signal()
+    }
+}
+
 private enum TerminalResizeEvent: Equatable {
     case signal(Int32)
     case write(Data)
@@ -852,6 +1018,24 @@ private func waitForSinkWrites(
     while sink.dataWrites.count < count {
         guard clock.now < deadline else {
             Issue.record("Timed out waiting for \(count) terminal writes; received \(sink.dataWrites.count).")
+            return
+        }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+}
+
+@MainActor
+private func waitForSinkText(
+    _ sink: TerminalDisplaySinkBuffer,
+    containing expectedText: String,
+    timeout: Duration = .seconds(1)
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+
+    while !sink.writes.joined().contains(expectedText) {
+        guard clock.now < deadline else {
+            Issue.record("Timed out waiting for terminal text: \(expectedText)")
             return
         }
         try await Task.sleep(for: .milliseconds(5))

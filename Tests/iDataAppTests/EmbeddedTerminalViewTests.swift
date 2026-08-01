@@ -5,6 +5,7 @@ import JavaScriptCore
 import WebKit
 @testable import iData
 
+@Suite(.serialized)
 @MainActor
 struct EmbeddedTerminalViewTests {
     @Test
@@ -70,7 +71,7 @@ struct EmbeddedTerminalViewTests {
     func sessionOnlyBecomesReadyAfterNavigationTerminalReadyAndFirstResize() {
         let session = VisiDataSessionController()
         let coordinator = EmbeddedTerminalView.Coordinator(session: session)
-        let webView = WKWebView(frame: .zero)
+        let webView = ScriptedTerminalWebView()
 
         coordinator.bind(session: session, webView: webView)
         coordinator.handleTerminalReady()
@@ -82,6 +83,21 @@ struct EmbeddedTerminalViewTests {
         #expect(!displayReadyFlag(for: session))
 
         coordinator.handleTerminalResize(cols: 120, rows: 32)
+
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func initialTerminalPageAcceptsTheHTMLGenerationZeroHandshake() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.loadTerminalPage()
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        coordinator.webView(webView, didFinish: nil)
 
         #expect(displayReadyFlag(for: session))
     }
@@ -213,7 +229,7 @@ struct EmbeddedTerminalViewTests {
     func resetTerminalDisplayRequiresFreshReadyAndResizeBeforeSessionBecomesReadyAgain() {
         let session = VisiDataSessionController()
         let coordinator = EmbeddedTerminalView.Coordinator(session: session)
-        let webView = WKWebView(frame: .zero)
+        let webView = ScriptedTerminalWebView()
 
         coordinator.bind(session: session, webView: webView)
         coordinator.webView(webView, didFinish: nil)
@@ -230,6 +246,462 @@ struct EmbeddedTerminalViewTests {
         #expect(!displayReadyFlag(for: session))
 
         coordinator.handleTerminalReady()
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func hardResetReadinessDoesNotSoftClearTheFreshTerminalBeforeReplay() {
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkSpy()
+
+        session.bind(displaySink: sink)
+        session.appendOutputForTesting(Data("VISIBLE".utf8))
+        session.markDisplayReady()
+
+        #expect(sink.clearCallCount == 0)
+        #expect(sink.writeCallCount == 1)
+
+        session.invalidateDisplayReadinessForTerminalReset()
+        session.markDisplayReady()
+
+        #expect(sink.clearCallCount == 0)
+        #expect(sink.writeCallCount == 2)
+    }
+
+    @Test
+    func staleTerminalGenerationCannotMakeLatestResetReady() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView(resetOutcomes: [.success, .success])
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        coordinator.resetTerminalDisplay()
+        coordinator.resetTerminalDisplay()
+
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 1)
+        coordinator.handleTerminalReady(displayGeneration: 1)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 2)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalReady(displayGeneration: 2)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func resetBeforeNavigationFinishesRejectsInitialTerminalMessages() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        for _ in 0..<50 {
+            coordinator.resetTerminalDisplay()
+        }
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        coordinator.handleTerminalReady(displayGeneration: 49)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 49)
+        coordinator.webView(webView, didFinish: nil)
+
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 50)
+        coordinator.handleTerminalReady(displayGeneration: 50)
+
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func failedTerminalResetEvaluationRetriesBeforeAcceptingTheNewGeneration() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView(resetOutcomes: [.failure, .success])
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        coordinator.resetTerminalDisplay()
+        #expect(!displayReadyFlag(for: session))
+
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(webView.resetEvaluationCallCount == 2)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalReady(displayGeneration: 2)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 2)
+
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func timedOutTerminalResetEvaluationRetriesInsteadOfStalling() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView(resetOutcomes: [.noCompletion, .success])
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        coordinator.resetTerminalDisplay()
+
+        try await Task.sleep(for: .milliseconds(3_700))
+
+        #expect(webView.resetEvaluationCallCount == 2)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalReady(displayGeneration: 2)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 2)
+
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func matchingHandshakeCompletesWhenJavaScriptCompletionIsLost() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView(resetOutcomes: [.noCompletion])
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        coordinator.resetTerminalDisplay()
+        coordinator.handleTerminalReady(displayGeneration: 1)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 1)
+
+        #expect(displayReadyFlag(for: session))
+
+        try await Task.sleep(for: .milliseconds(3_500))
+
+        #expect(webView.resetEvaluationCallCount == 1)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func repeatedTerminalResetEvaluationFailureReloadsTheBundledPage() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView(
+            resetOutcomes: [.failure, .failure, .failure, .failure]
+        )
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        coordinator.resetTerminalDisplay()
+        try await Task.sleep(for: .milliseconds(700))
+
+        #expect(webView.resetEvaluationCallCount == 4)
+        #expect(webView.pageLoadCallCount == 1)
+        #expect(!displayReadyFlag(for: session))
+    }
+
+    @Test
+    func persistentTerminalResetFailureStopsAfterTheReloadBudget() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView(
+            resetOutcomes: Array(repeating: .failure, count: 16)
+        )
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        coordinator.resetTerminalDisplay()
+        for expectedPageLoadCount in 1...3 {
+            try await Task.sleep(for: .milliseconds(700))
+            #expect(webView.pageLoadCallCount == expectedPageLoadCount)
+            coordinator.webView(webView, didFinish: nil)
+        }
+        try await Task.sleep(for: .milliseconds(700))
+
+        #expect(webView.resetEvaluationCallCount == 16)
+        #expect(webView.pageLoadCallCount == 3)
+        #expect(session.errorMessage != nil)
+        #expect(!displayReadyFlag(for: session))
+    }
+
+    @Test
+    func provisionalNavigationFailureSchedulesARecoveryLoad() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        coordinator.webView(
+            webView,
+            didFailProvisionalNavigation: nil,
+            withError: SimulatedTerminalJavaScriptError()
+        )
+
+        #expect(!displayReadyFlag(for: session))
+
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(webView.pageLoadCallCount == 1)
+    }
+
+    @Test
+    func cancelledNavigationDoesNotStartARecoveryLoop() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        coordinator.webView(
+            webView,
+            didFailProvisionalNavigation: nil,
+            withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
+        )
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(webView.pageLoadCallCount == 0)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func cancelledCurrentNavigationRecoversWhenNoReplacementStarts() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        coordinator.webView(webView, didStartProvisionalNavigation: nil)
+        coordinator.webView(
+            webView,
+            didFailProvisionalNavigation: nil,
+            withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
+        )
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(webView.pageLoadCallCount == 1)
+        #expect(!displayReadyFlag(for: session))
+    }
+
+    @Test
+    func initialGenerationReloadsWhenReadyAndResizeNeverArrive() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+
+        try await Task.sleep(for: .milliseconds(7_000))
+
+        #expect(webView.refreshEvaluationCallCount == 1)
+        #expect(webView.pageLoadCallCount == 1)
+        #expect(!displayReadyFlag(for: session))
+    }
+
+    @Test
+    func staleCoordinatorCannotUnbindReplacementDisplaySink() {
+        let session = VisiDataSessionController()
+        let staleSink = TerminalDisplaySinkSpy()
+        let replacementSink = TerminalDisplaySinkSpy()
+
+        session.bind(displaySink: staleSink)
+        session.appendOutputForTesting(Data("FIRST".utf8))
+        session.markDisplayReady()
+        session.bind(displaySink: replacementSink)
+        session.unbind(displaySink: staleSink)
+        session.appendOutputForTesting(Data("LATEST".utf8))
+        session.markDisplayReady()
+
+        #expect(staleSink.writeCallCount == 1)
+        #expect(replacementSink.clearCallCount == 1)
+        #expect(replacementSink.writeCallCount == 2)
+    }
+
+    @Test
+    func staleCoordinatorMessagesCannotReadyReplacementDisplay() {
+        let session = VisiDataSessionController()
+        let staleCoordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let replacementCoordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let staleWebView = WKWebView(frame: .zero)
+        let replacementWebView = WKWebView(frame: .zero)
+
+        staleCoordinator.bind(session: session, webView: staleWebView)
+        staleCoordinator.webView(staleWebView, didFinish: nil)
+        staleCoordinator.handleTerminalReady(displayGeneration: 0)
+        staleCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        replacementCoordinator.bind(session: session, webView: replacementWebView)
+        #expect(!displayReadyFlag(for: session))
+
+        staleCoordinator.handleTerminalReady(displayGeneration: 0)
+        staleCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(!displayReadyFlag(for: session))
+
+        replacementCoordinator.webView(replacementWebView, didFinish: nil)
+        replacementCoordinator.handleTerminalReady(displayGeneration: 0)
+        replacementCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func staleCoordinatorRecoveryCannotFailTheReplacementDisplay() async throws {
+        let session = VisiDataSessionController()
+        let staleCoordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let replacementCoordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let staleWebView = ScriptedTerminalWebView()
+        let replacementWebView = ScriptedTerminalWebView()
+
+        staleCoordinator.bind(session: session, webView: staleWebView)
+        staleCoordinator.webView(staleWebView, didFinish: nil)
+        staleCoordinator.handleTerminalReady(displayGeneration: 0)
+        staleCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        replacementCoordinator.bind(session: session, webView: replacementWebView)
+        replacementCoordinator.webView(replacementWebView, didFinish: nil)
+        replacementCoordinator.handleTerminalReady(displayGeneration: 0)
+        replacementCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        staleCoordinator.webViewWebContentProcessDidTerminate(staleWebView)
+        staleCoordinator.webView(
+            staleWebView,
+            didFailProvisionalNavigation: nil,
+            withError: SimulatedTerminalJavaScriptError()
+        )
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(staleWebView.pageLoadCallCount == 0)
+        #expect(session.errorMessage == nil)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func queuedStaleRecoveryCannotRunAfterReplacementDisplayBinds() async throws {
+        let session = VisiDataSessionController()
+        let staleCoordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let replacementCoordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let staleWebView = ScriptedTerminalWebView()
+        let replacementWebView = ScriptedTerminalWebView()
+
+        staleCoordinator.bind(session: session, webView: staleWebView)
+        staleCoordinator.webView(staleWebView, didFinish: nil)
+        staleCoordinator.handleTerminalReady(displayGeneration: 0)
+        staleCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        staleCoordinator.webView(
+            staleWebView,
+            didFailProvisionalNavigation: nil,
+            withError: SimulatedTerminalJavaScriptError()
+        )
+
+        replacementCoordinator.bind(session: session, webView: replacementWebView)
+        replacementCoordinator.webView(replacementWebView, didFinish: nil)
+        replacementCoordinator.handleTerminalReady(displayGeneration: 0)
+        replacementCoordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+
+        try await Task.sleep(for: .milliseconds(400))
+
+        #expect(staleWebView.pageLoadCallCount == 0)
+        #expect(session.errorMessage == nil)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func pendingResetResumesWhenTheCoordinatorRebindsToANewSession() {
+        let firstSession = VisiDataSessionController()
+        let secondSession = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: firstSession)
+        let webView = ScriptedTerminalWebView(resetOutcomes: [.noCompletion, .success])
+
+        coordinator.bind(session: firstSession, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        coordinator.resetTerminalDisplay()
+        #expect(!displayReadyFlag(for: firstSession))
+
+        coordinator.bind(session: secondSession, webView: webView)
+        coordinator.handleTerminalReady(displayGeneration: 2)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 2)
+
+        #expect(webView.resetEvaluationCallCount == 2)
+        #expect(!displayReadyFlag(for: firstSession))
+        #expect(displayReadyFlag(for: secondSession))
+    }
+
+    @Test
+    func navigationReloadRequiresFreshGenerationBeforeReplay() {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        coordinator.webView(webView, didStartProvisionalNavigation: nil)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(!displayReadyFlag(for: session))
+
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 1)
+        coordinator.handleTerminalReady(displayGeneration: 1)
+        #expect(displayReadyFlag(for: session))
+    }
+
+    @Test
+    func webContentTerminationReloadsAndRequiresFreshGeneration() async throws {
+        let session = VisiDataSessionController()
+        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let webView = ScriptedTerminalWebView()
+
+        coordinator.bind(session: session, webView: webView)
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalReady(displayGeneration: 0)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
+        #expect(displayReadyFlag(for: session))
+
+        coordinator.webViewWebContentProcessDidTerminate(webView)
+        #expect(!displayReadyFlag(for: session))
+
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(webView.pageLoadCallCount == 1)
+
+        coordinator.webView(webView, didFinish: nil)
+        coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 1)
+        coordinator.handleTerminalReady(displayGeneration: 1)
         #expect(displayReadyFlag(for: session))
     }
 
@@ -262,7 +734,7 @@ struct EmbeddedTerminalViewTests {
     func terminalHTMLForcesResizeWhenFocusReenters() throws {
         let html = try terminalHTML()
 
-        #expect(html.contains("window.iDataFocusTerminal = function()"))
+        #expect(html.contains("window.iDataFocusTerminal = function(displayGeneration = activeDisplayGeneration)"))
         #expect(html.contains("term?.focus();"))
         #expect(html.contains("scheduleTerminalLayoutPasses({ forceResize: true });"))
         #expect(html.contains("terminalRoot.addEventListener('focusin', () => {\n      scheduleTerminalLayoutPasses({ forceResize: true });\n    });"))
@@ -324,7 +796,7 @@ struct EmbeddedTerminalViewTests {
         #expect(!html.contains("layoutPassBudgetRemaining < 2"))
         #expect(html.contains("deferredMeasureHandle = setTimeout(retryDeferredMeasurement, 250);"))
         #expect(html.contains("deferredMeasureBudgetRemaining = Math.max(deferredMeasureBudgetRemaining, 8);"))
-        #expect(html.contains("window.iDataRefreshLayout = function() {"))
+        #expect(html.contains("window.iDataRefreshLayout = function(displayGeneration = activeDisplayGeneration) {"))
         #expect(html.contains("lastSentSize = null;"))
     }
 
@@ -436,6 +908,93 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLRejectsStaleResetWriteAndClearGenerations() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        try await Task.sleep(for: .milliseconds(100))
+
+        let result = try await harness.evaluate(
+            """
+            window.iDataClearTerminal(1);
+            window.iDataWriteBase64(btoa('OLD'), 1);
+            window.iDataClearTerminal(2);
+            window.iDataWriteBase64(btoa('LATEST'), 2);
+            window.iDataWriteBase64(btoa('STALE'), 1);
+            window.iDataSoftClearTerminal(1);
+            window.iDataClearTerminal(1);
+            JSON.stringify({
+              generation: activeDisplayGeneration,
+              bytes: term.__writtenBytes,
+              terminalCount: window.__terminalHarness.terminalCount
+            });
+            """
+        )
+
+        #expect(result == "{\"generation\":2,\"bytes\":[76,65,84,69,83,84],\"terminalCount\":3}")
+    }
+
+    @Test
+    func terminalHTMLRefreshesTheCanvasOnlyAfterTheFirstWritePerTerminal() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+
+        _ = try await harness.evaluate(
+            """
+            window.iDataWriteBase64(btoa('FIRST'), 0);
+            window.iDataWriteBase64(btoa('SECOND'), 0);
+            """
+        )
+        try await Task.sleep(for: .milliseconds(300))
+        let firstTerminalResult = try await harness.evaluate("String(term.__refreshCount);")
+        #expect(firstTerminalResult == "1")
+
+        _ = try await harness.evaluate(
+            """
+            window.iDataClearTerminal(1);
+            window.iDataWriteBase64(btoa('THIRD'), 1);
+            window.iDataWriteBase64(btoa('FOURTH'), 1);
+            """
+        )
+        try await Task.sleep(for: .milliseconds(300))
+        let replacementTerminalResult = try await harness.evaluate(
+            """
+            JSON.stringify({
+              refreshCount: term.__refreshCount,
+              terminalCount: window.__terminalHarness.terminalCount
+            });
+            """
+        )
+        #expect(replacementTerminalResult == "{\"refreshCount\":1,\"terminalCount\":2}")
+    }
+
+    @Test
+    func staleInitialPaintTimerCannotRefreshAReplacementTerminal() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+
+        _ = try await harness.evaluate(
+            """
+            window.iDataWriteBase64(btoa('OLD'), 0);
+            window.iDataClearTerminal(1);
+            window.iDataWriteBase64(btoa('LATEST'), 1);
+            """
+        )
+        try await Task.sleep(for: .milliseconds(300))
+
+        let result = try await harness.evaluate(
+            """
+            JSON.stringify({
+              staleRefreshCount: window.__terminalHarness.terminals[0].__refreshCount,
+              currentRefreshCount: window.__terminalHarness.terminals[1].__refreshCount,
+              currentBytes: term.__writtenBytes
+            });
+            """
+        )
+
+        #expect(result == "{\"staleRefreshCount\":0,\"currentRefreshCount\":1,\"currentBytes\":[76,65,84,69,83,84]}")
+    }
+
+    @Test
     func manualActualFixtureSnapshot() async throws {
         guard
             let fixturePath = ProcessInfo.processInfo.environment["IDATA_ACTUAL_FIXTURE_PATH"],
@@ -468,7 +1027,7 @@ struct EmbeddedTerminalViewTests {
 
         #expect(html.contains("term.clearSelection();"))
         #expect(html.contains("term.scrollToTop();"))
-        #expect(html.contains("window.iDataSoftClearTerminal = function()"))
+        #expect(html.contains("window.iDataSoftClearTerminal = function(displayGeneration = activeDisplayGeneration)"))
         #expect(html.contains("term?.clear();"))
     }
 
@@ -490,10 +1049,13 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
-    func terminalHTMLAvoidsHotPathForcedRefreshCalls() throws {
+    func terminalHTMLUsesOneInitialPaintRefreshInsteadOfHotPathRefreshes() throws {
         let html = try terminalHTML()
 
-        #expect(!html.contains("currentTerm.refresh(0, Math.max(currentTerm.rows - 1, 0));"))
+        #expect(html.contains("let initialPaintRefreshScheduled = false;"))
+        #expect(html.contains("if (!initialPaintRefreshScheduled) {"))
+        #expect(html.contains("initialPaintRefreshScheduled = true;"))
+        #expect(html.components(separatedBy: "currentTerm.refresh(0, Math.max(currentTerm.rows - 1, 0));").count - 1 == 1)
         #expect(!html.contains("term.refresh(0, Math.max(term.rows - 1, 0));"))
     }
 
@@ -571,6 +1133,69 @@ private final class TerminalDisplaySinkSpy: TerminalDisplaySink {
     }
 }
 
+@MainActor
+private final class ScriptedTerminalWebView: WKWebView {
+    enum ResetOutcome {
+        case success
+        case failure
+        case noCompletion
+    }
+
+    private var resetOutcomes: [ResetOutcome]
+    private(set) var resetEvaluationCallCount = 0
+    private(set) var refreshEvaluationCallCount = 0
+    private(set) var pageLoadCallCount = 0
+
+    init(resetOutcomes: [ResetOutcome] = []) {
+        self.resetOutcomes = resetOutcomes
+        super.init(frame: .zero, configuration: WKWebViewConfiguration())
+    }
+
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func evaluateJavaScript(
+        _ javaScriptString: String,
+        completionHandler: (@MainActor @Sendable (Any?, (any Error)?) -> Void)? = nil
+    ) {
+        guard javaScriptString.contains("iDataClearTerminal") else {
+            if javaScriptString.contains("iDataRefreshLayout") {
+                refreshEvaluationCallCount += 1
+            }
+            completionHandler?(true, nil)
+            return
+        }
+
+        resetEvaluationCallCount += 1
+        let outcome = resetOutcomes.isEmpty ? .success : resetOutcomes.removeFirst()
+        switch outcome {
+        case .success:
+            completionHandler?(true, nil)
+        case .failure:
+            completionHandler?(nil, SimulatedTerminalJavaScriptError())
+        case .noCompletion:
+            break
+        }
+    }
+
+    override func loadFileURL(_ URL: URL, allowingReadAccessTo readAccessURL: URL) -> WKNavigation? {
+        pageLoadCallCount += 1
+        return nil
+    }
+
+    override func loadHTMLString(_ string: String, baseURL: URL?) -> WKNavigation? {
+        pageLoadCallCount += 1
+        return nil
+    }
+}
+
+private struct SimulatedTerminalJavaScriptError: LocalizedError {
+    var errorDescription: String? {
+        "Simulated JavaScript failure"
+    }
+}
+
 private func terminalHTML(filePath: StaticString = #filePath) throws -> String {
     let fileURL = URL(fileURLWithPath: "\(filePath)")
     let repositoryRoot = fileURL
@@ -596,6 +1221,7 @@ private struct TerminalMessage: Decodable {
     let cols: Int?
     let rows: Int?
     let force: Bool?
+    let displayGeneration: Int?
 }
 
 @MainActor
@@ -618,7 +1244,9 @@ private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
             rectWidth: 960,
             rectHeight: 640,
             messages: [],
-            observers: []
+            observers: [],
+            terminalCount: 0,
+            terminals: []
           };
           window.webkit = {
             messageHandlers: {
@@ -658,12 +1286,16 @@ private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
           };
           window.Terminal = class {
             constructor(options) {
+              window.__terminalHarness.terminalCount += 1;
+              window.__terminalHarness.terminals.push(this);
               this.options = {
                 ...options,
                 scrollbar: { showScrollbar: true, width: 14 }
               };
               this.cols = 0;
               this.rows = 0;
+              this.__writtenBytes = [];
+              this.__refreshCount = 0;
               this._disposables = [];
             }
             get dimensions() {
@@ -690,12 +1322,21 @@ private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
             focus() {}
             clearSelection() {}
             scrollToTop() {}
+            clear() {
+              this.__writtenBytes = [];
+            }
             dispose() {}
             resize(cols, rows) {
               this.cols = cols;
               this.rows = rows;
             }
-            write() {}
+            write(bytes, callback) {
+              this.__writtenBytes.push(...bytes);
+              callback?.();
+            }
+            refresh() {
+              this.__refreshCount += 1;
+            }
           };
           window.__setCellMetrics = function(width, height) {
             window.__terminalHarness.cellWidth = width;
