@@ -333,8 +333,12 @@ struct EmbeddedTerminalViewTests {
         coordinator.resetTerminalDisplay()
         #expect(!displayReadyFlag(for: session))
 
-        try await Task.sleep(for: .milliseconds(400))
+        let didRetry = try await waitUntil {
+            webView.resetEvaluationCallCount >= 2
+        }
 
+        #expect(didRetry)
+        try await Task.sleep(for: .milliseconds(300))
         #expect(webView.resetEvaluationCallCount == 2)
         #expect(!displayReadyFlag(for: session))
 
@@ -357,8 +361,12 @@ struct EmbeddedTerminalViewTests {
 
         coordinator.resetTerminalDisplay()
 
-        try await Task.sleep(for: .milliseconds(3_700))
+        let didRetry = try await waitUntil {
+            webView.resetEvaluationCallCount >= 2
+        }
 
+        #expect(didRetry)
+        try await Task.sleep(for: .milliseconds(300))
         #expect(webView.resetEvaluationCallCount == 2)
         #expect(!displayReadyFlag(for: session))
 
@@ -405,8 +413,11 @@ struct EmbeddedTerminalViewTests {
         coordinator.handleTerminalResize(cols: 120, rows: 32, displayGeneration: 0)
 
         coordinator.resetTerminalDisplay()
-        try await Task.sleep(for: .milliseconds(700))
+        let didReload = try await waitUntil {
+            webView.pageLoadCallCount >= 1
+        }
 
+        #expect(didReload)
         #expect(webView.resetEvaluationCallCount == 4)
         #expect(webView.pageLoadCallCount == 1)
         #expect(!displayReadyFlag(for: session))
@@ -427,12 +438,21 @@ struct EmbeddedTerminalViewTests {
 
         coordinator.resetTerminalDisplay()
         for expectedPageLoadCount in 1...3 {
-            try await Task.sleep(for: .milliseconds(700))
+            let didReload = try await waitUntil {
+                webView.pageLoadCallCount >= expectedPageLoadCount
+            }
+            #expect(didReload)
+            guard didReload else {
+                return
+            }
             #expect(webView.pageLoadCallCount == expectedPageLoadCount)
             coordinator.webView(webView, didFinish: nil)
         }
-        try await Task.sleep(for: .milliseconds(700))
+        let didExhaustReloadBudget = try await waitUntil {
+            webView.resetEvaluationCallCount >= 16 && session.errorMessage != nil
+        }
 
+        #expect(didExhaustReloadBudget)
         #expect(webView.resetEvaluationCallCount == 16)
         #expect(webView.pageLoadCallCount == 3)
         #expect(session.errorMessage != nil)
@@ -459,8 +479,11 @@ struct EmbeddedTerminalViewTests {
 
         #expect(!displayReadyFlag(for: session))
 
-        try await Task.sleep(for: .milliseconds(400))
+        let didScheduleRecovery = try await waitUntil {
+            webView.pageLoadCallCount >= 1
+        }
 
+        #expect(didScheduleRecovery)
         #expect(webView.pageLoadCallCount == 1)
     }
 
@@ -503,8 +526,11 @@ struct EmbeddedTerminalViewTests {
             didFailProvisionalNavigation: nil,
             withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
         )
-        try await Task.sleep(for: .milliseconds(400))
+        let didScheduleRecovery = try await waitUntil {
+            webView.pageLoadCallCount >= 1
+        }
 
+        #expect(didScheduleRecovery)
         #expect(webView.pageLoadCallCount == 1)
         #expect(!displayReadyFlag(for: session))
     }
@@ -518,8 +544,11 @@ struct EmbeddedTerminalViewTests {
         coordinator.bind(session: session, webView: webView)
         coordinator.webView(webView, didFinish: nil)
 
-        try await Task.sleep(for: .milliseconds(7_000))
+        let didReload = try await waitUntil(timeout: .seconds(10)) {
+            webView.refreshEvaluationCallCount >= 1 && webView.pageLoadCallCount >= 1
+        }
 
+        #expect(didReload)
         #expect(webView.refreshEvaluationCallCount == 1)
         #expect(webView.pageLoadCallCount == 1)
         #expect(!displayReadyFlag(for: session))
@@ -696,7 +725,11 @@ struct EmbeddedTerminalViewTests {
         coordinator.webViewWebContentProcessDidTerminate(webView)
         #expect(!displayReadyFlag(for: session))
 
-        try await Task.sleep(for: .milliseconds(400))
+        let didReload = try await waitUntil {
+            webView.pageLoadCallCount >= 1
+        }
+
+        #expect(didReload)
         #expect(webView.pageLoadCallCount == 1)
 
         coordinator.webView(webView, didFinish: nil)
@@ -1106,6 +1139,24 @@ struct EmbeddedTerminalViewTests {
             .children
             .first { $0.label == "isDisplayReady" }?
             .value as? Bool ?? false
+    }
+
+    private func waitUntil(
+        timeout: Duration = .seconds(5),
+        pollInterval: Duration = .milliseconds(20),
+        _ condition: @escaping @MainActor () -> Bool
+    ) async throws -> Bool {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+
+        while clock.now < deadline {
+            if condition() {
+                return true
+            }
+            try await Task.sleep(for: pollInterval)
+        }
+
+        return condition()
     }
 }
 
