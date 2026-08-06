@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 @testable import iData
 import iDataCore
 
+@Suite(.serialized)
 @MainActor
 struct AppModelTests {
     @Test
@@ -196,6 +197,85 @@ struct AppModelTests {
         #expect(model.externalHandoffNotice?.fileURL.standardizedFileURL == target.standardizedFileURL)
         #expect(model.externalHandoffNotice?.applicationName == "WPS Office")
         #expect(model.externalHandoffNotice?.state == .opened)
+    }
+
+    @Test
+    func externalHandoffNoticeAutoDismissesAfterOneMinuteOfInactivity() async throws {
+        #expect(AppModel.externalHandoffNoticeAutoDismissDelay == .seconds(60))
+
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-handoff-auto-dismiss-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let target = URL(fileURLWithPath: "/tmp/auto-dismiss.xlsx")
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: RecordingExternalFileOpener(),
+            alternateApplicationResolver: { _, _, _ in wps },
+            fileSizeProvider: { _ in 10 },
+            externalHandoffNoticeAutoDismissDelay: .milliseconds(30)
+        )
+
+        let action = model.routeExternalFile(target)
+
+        #expect(action == .forwardedToAlternateApp(appName: "WPS Office"))
+        #expect(model.externalHandoffNotice?.fileURL.standardizedFileURL == target.standardizedFileURL)
+
+        try await waitForAppModelCondition(timeout: 1.0) {
+            model.externalHandoffNotice == nil
+        }
+    }
+
+    @Test
+    func staleAutoDismissTaskCannotHideANewerHandoffNotice() async throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-handoff-replacement-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let firstTarget = URL(fileURLWithPath: "/tmp/first-auto-dismiss.xlsx")
+        let secondTarget = URL(fileURLWithPath: "/tmp/second-auto-dismiss.xlsx")
+        let wps = try makeFakeApplicationHandler(
+            in: tempRoot,
+            appFolderName: "WPS Office.app",
+            bundleIdentifier: "cn.wps.Office",
+            displayName: "WPS Office"
+        )
+        let model = AppModel(
+            defaults: defaults,
+            externalFileOpener: RecordingExternalFileOpener(),
+            alternateApplicationResolver: { _, _, _ in wps },
+            fileSizeProvider: { _ in 10 },
+            externalHandoffNoticeAutoDismissDelay: .milliseconds(200)
+        )
+
+        _ = model.routeExternalFile(firstTarget)
+        try await Task.sleep(for: .milliseconds(120))
+        _ = model.routeExternalFile(secondTarget)
+        try await Task.sleep(for: .milliseconds(120))
+
+        #expect(model.externalHandoffNotice?.fileURL.standardizedFileURL == secondTarget.standardizedFileURL)
+
+        try await waitForAppModelCondition(timeout: 1.0) {
+            model.externalHandoffNotice == nil
+        }
     }
 
     @Test
@@ -1580,6 +1660,59 @@ struct AppModelTests {
     }
 
     @Test
+    func tutorialNavigationStressStaysBoundedAndResetsWithoutViewFocus() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let model = AppModel(defaults: defaults, preferredLanguagesProvider: { ["en-US"] })
+        let chapterIDs = model.tutorialChapters.map(\.id)
+        _ = try #require(chapterIDs.first)
+
+        for iteration in 0..<300 {
+            model.statusMessage = nil
+            model.beginTutorialGuide(chapterID: chapterIDs[iteration % chapterIDs.count])
+            let chapter = try #require(model.tutorialCurrentChapter)
+            let lastStepIndex = chapter.steps.count - 1
+
+            for _ in 0..<(chapter.steps.count + 3) {
+                model.advanceTutorialStep()
+            }
+            #expect(model.tutorialStepIndex == lastStepIndex)
+
+            model.setTutorialCoachExpanded(false)
+            for _ in 0..<(chapter.steps.count + 3) {
+                model.rewindTutorialStep()
+            }
+            #expect(model.tutorialStepIndex == 0)
+            #expect(!model.isTutorialCoachExpanded)
+
+            model.setTutorialCoachExpanded(true)
+            model.cancelTutorial()
+
+            #expect(!model.isTutorialActive)
+            #expect(model.tutorialStepIndex == 0)
+            #expect(model.isTutorialCoachExpanded)
+            #expect(model.activeTutorialChapterID == nil)
+            #expect(model.tutorialCurrentChapter == nil)
+            #expect(model.tutorialCurrentStep == nil)
+            #expect(model.tutorialSampleFileURL == nil)
+            #expect(model.tutorialErrorMessage == nil)
+            #expect(model.tutorialStatusMessage == "Tutorial ended.")
+
+            model.advanceTutorialStep()
+            model.rewindTutorialStep()
+            model.jumpToTutorialStep(Int.max)
+            model.setTutorialCoachExpanded(false)
+
+            #expect(model.tutorialStepIndex == 0)
+            #expect(model.isTutorialCoachExpanded)
+        }
+    }
+
+    @Test
     func beginTutorialGuideAlwaysStartsFromFirstStep() {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1665,7 +1798,7 @@ struct AppModelTests {
     }
 
     @Test
-    func startingTutorialAlwaysReloadsFreshAndNeverRecordsItsSample() throws {
+    func startingTutorialAlwaysReloadsFreshAndNeverRecordsItsSample() async throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
@@ -1714,6 +1847,10 @@ struct AppModelTests {
         #expect(!model.isPinnedRecentFile(sampleURL))
 
         model.startTutorial(chapterID: "typesort")
+        try await waitForAppModelCondition(timeout: 8.0) {
+            session.processIdentifierForTesting > 0
+                && session.processIdentifierForTesting != firstPID
+        }
         let secondPID = session.processIdentifierForTesting
 
         #expect(model.activeSession === session)
@@ -1762,7 +1899,73 @@ struct AppModelTests {
     }
 
     @Test
-    func largeTableOpenAndSwitchStressKeepsLatestSessionStable() throws {
+    func handleDroppedFilesStressSelectsFirstRegularFileAndClearsTutorialState() throws {
+        let suiteName = "AppModelTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-drop-stress-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
+        try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
+        let folder = tempRoot.appendingPathComponent("folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let first = tempRoot.appendingPathComponent("first.tsv")
+        let second = tempRoot.appendingPathComponent("second.tsv")
+        try Data("id\tvalue\n1\tfirst\n".utf8).write(to: first)
+        try Data("id\tvalue\n2\tsecond\n".utf8).write(to: second)
+
+        let model = AppModel(defaults: defaults, preferredLanguagesProvider: { ["en-US"] })
+        model.vdExecutablePath = launcher.path
+        defer {
+            model.activeSession?.terminate()
+        }
+
+        for iteration in 0..<200 {
+            #expect(!model.handleDroppedFiles([]))
+            #expect(model.errorMessage == nil)
+
+            #expect(!model.handleDroppedFiles([folder]))
+            #expect(model.statusMessage == nil)
+            #expect(model.errorMessage?.contains("Drop a regular file") == true)
+
+            let expected = iteration.isMultiple(of: 2) ? first : second
+            let trailing = iteration.isMultiple(of: 2) ? second : first
+            #expect(model.handleDroppedFiles([folder, expected, trailing]))
+            #expect(model.activeSession?.currentFileURL?.standardizedFileURL == expected.standardizedFileURL)
+            #expect(model.lastOpenedFile?.standardizedFileURL == expected.standardizedFileURL)
+            #expect(model.recentFiles.first?.standardizedFileURL == expected.standardizedFileURL)
+            #expect(model.errorMessage == nil)
+        }
+
+        model.startTutorial()
+        model.advanceTutorialStep()
+        model.setTutorialCoachExpanded(false)
+        #expect(model.isTutorialActive)
+        #expect(model.tutorialSampleFileURL != nil)
+
+        #expect(model.handleDroppedFiles([folder, second, first]))
+        #expect(model.activeSession?.currentFileURL?.standardizedFileURL == second.standardizedFileURL)
+        #expect(model.lastOpenedFile?.standardizedFileURL == second.standardizedFileURL)
+        #expect(model.errorMessage == nil)
+        #expect(model.statusMessage?.contains("Tutorial ended") == true)
+        #expect(!model.isTutorialActive)
+        #expect(model.tutorialStepIndex == 0)
+        #expect(model.isTutorialCoachExpanded)
+        #expect(model.activeTutorialChapterID == nil)
+        #expect(model.tutorialCurrentChapter == nil)
+        #expect(model.tutorialCurrentStep == nil)
+        #expect(model.tutorialSampleFileURL == nil)
+        #expect(model.tutorialErrorMessage == nil)
+        #expect(model.tutorialStatusMessage == nil)
+    }
+
+    @Test
+    func largeFileSessionRoutingStressKeepsLatestSelectionStable() throws {
         let suiteName = "AppModelTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
@@ -1779,6 +1982,7 @@ struct AppModelTests {
         let launcher = tempRoot.appendingPathComponent("fake-vd-long.zsh")
         try makeLongRunningLauncher(at: launcher, sleepSeconds: 120)
 
+        // This validates large-file session routing; the fake launcher does not render table rows.
         let largeA = tempRoot.appendingPathComponent("large-a.tsv")
         let largeB = tempRoot.appendingPathComponent("large-b.tsv")
         try writeLargeTSV(to: largeA, rows: 150_000, prefix: "A")
@@ -2282,4 +2486,22 @@ private func waitForSessionFailure(
     }
 
     return !session.isRunning && session.errorMessage != nil
+}
+
+@MainActor
+private func waitForAppModelCondition(
+    timeout: TimeInterval,
+    predicate: @escaping @MainActor () -> Bool
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: .seconds(timeout))
+
+    while clock.now < deadline {
+        if predicate() {
+            return
+        }
+        try await Task.sleep(for: .milliseconds(20))
+    }
+
+    #expect(predicate())
 }

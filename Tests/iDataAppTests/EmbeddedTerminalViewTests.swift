@@ -1093,6 +1093,76 @@ struct EmbeddedTerminalViewTests {
     }
 
     @Test
+    func terminalHTMLFeatureDetectsFastBase64DecodingAndKeepsFallback() throws {
+        let html = try terminalHTML()
+
+        #expect(html.contains("function decodeBase64(base64Value)"))
+        #expect(html.contains("if (typeof Uint8Array.fromBase64 === 'function')"))
+        #expect(html.contains("return Uint8Array.fromBase64(base64Value);"))
+        #expect(html.contains("const binary = atob(base64Value);"))
+        #expect(html.contains("bytes[index] = binary.charCodeAt(index);"))
+        #expect(html.contains("const bytes = decodeBase64(base64Value);"))
+    }
+
+    @Test
+    func terminalHTMLBase64FastPathAndFallbackPreserveAllByteValues() async throws {
+        let harness = try TerminalHTMLHarness()
+        try await harness.load()
+        let expectedBytes = Array(UInt8.min...UInt8.max)
+        let payload = Data(expectedBytes).base64EncodedString()
+        let byteLiteral = expectedBytes.map(String.init).joined(separator: ",")
+
+        let resultJSON = try await harness.evaluate(
+            """
+            (() => {
+              const originalDescriptor = Object.getOwnPropertyDescriptor(Uint8Array, 'fromBase64');
+              let fastPathCalls = 0;
+              try {
+                Object.defineProperty(Uint8Array, 'fromBase64', {
+                  configurable: true,
+                  writable: true,
+                  value: function() {
+                    fastPathCalls += 1;
+                    return new Uint8Array([\(byteLiteral)]);
+                  }
+                });
+                window.iDataWriteBase64("\(payload)", 0);
+                const fastPathBytes = term.__writtenBytes.slice();
+
+                term.clear();
+                Object.defineProperty(Uint8Array, 'fromBase64', {
+                  configurable: true,
+                  writable: true,
+                  value: undefined
+                });
+                window.iDataWriteBase64("\(payload)", 0);
+
+                return JSON.stringify({
+                  fastPathCalls,
+                  fastPathBytes,
+                  fallbackBytes: term.__writtenBytes
+                });
+              } finally {
+                if (originalDescriptor) {
+                  Object.defineProperty(Uint8Array, 'fromBase64', originalDescriptor);
+                } else {
+                  delete Uint8Array.fromBase64;
+                }
+              }
+            })();
+            """
+        )
+        let result = try JSONDecoder().decode(
+            TerminalBase64DecodeResult.self,
+            from: Data(resultJSON.utf8)
+        )
+
+        #expect(result.fastPathCalls == 1)
+        #expect(result.fastPathBytes == expectedBytes)
+        #expect(result.fallbackBytes == expectedBytes)
+    }
+
+    @Test
     func terminalHTMLDoesNotSendForcedResizeWhenSizeUnchanged() throws {
         let html = try terminalHTML()
 
@@ -1273,6 +1343,12 @@ private struct TerminalMessage: Decodable {
     let rows: Int?
     let force: Bool?
     let displayGeneration: Int?
+}
+
+private struct TerminalBase64DecodeResult: Decodable {
+    let fastPathCalls: Int
+    let fastPathBytes: [UInt8]
+    let fallbackBytes: [UInt8]
 }
 
 @MainActor

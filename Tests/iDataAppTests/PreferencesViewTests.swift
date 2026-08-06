@@ -19,7 +19,7 @@ struct PreferencesViewTests {
     @Test
     func generalTabKeepsOnlyGlobalPreferencesAndStatus() throws {
         let source = try preferencesViewSource()
-        let general = try extractSection(from: source, start: "private var generalTab", end: "private var filesTab")
+        let general = try extractSection(from: source, start: "private func generalTab", end: "private var filesTab")
 
         #expect(general.contains("Picker(isChinese ? \"语言\""))
         #expect(general.contains("Toggle(isChinese ? \"减少动画\""))
@@ -30,7 +30,7 @@ struct PreferencesViewTests {
     @Test
     func filesTabCombinesHandoffAndDefaultApplications() throws {
         let source = try preferencesViewSource()
-        let files = try extractSection(from: source, start: "private var filesTab", end: "private var runtimeTab")
+        let files = try extractSection(from: source, start: "private var filesTab", end: "private func runtimeTab")
 
         #expect(files.contains("Toggle("))
         #expect(files.contains("isChinese ? \"转交小文件\" : \"Hand Off Small Files\""))
@@ -51,14 +51,25 @@ struct PreferencesViewTests {
     @Test
     func runtimeAndUpdatesExposeDirectActions() throws {
         let source = try preferencesViewSource()
-        let runtime = try extractSection(from: source, start: "private var runtimeTab", end: "private var updatesTab")
-        let updates = try extractSection(from: source, start: "private var updatesTab", end: "private var visiDataStatusTitle")
+        let runtime = try extractSection(from: source, start: "private func runtimeTab", end: "private var updatesTab")
+        let updates = try extractSection(from: source, start: "private var updatesTab", end: "private func visiDataStatusTitle")
 
         #expect(runtime.contains("model.chooseVDExecutable()"))
         #expect(runtime.contains("model.vdExecutablePath = \"\""))
         #expect(runtime.contains("model.runVisiDataOneClickSetup()"))
         #expect(updates.contains("updater.checkForUpdates()"))
         #expect(updates.contains("updater.releasesURL"))
+    }
+
+    @Test
+    func dependencyStateIsResolvedOncePerBodyRecomputation() throws {
+        let source = try preferencesViewSource()
+
+        #expect(source.components(separatedBy: "model.visiDataDependencyState").count - 1 == 1)
+        #expect(source.contains("generalTab(dependencyState: dependencyState)"))
+        #expect(source.contains("runtimeTab(dependencyState: dependencyState)"))
+        #expect(source.contains("visiDataStatusTitle(for: dependencyState)"))
+        #expect(source.contains("model.visiDataDependencySummary(for: dependencyState)"))
     }
 
     @Test

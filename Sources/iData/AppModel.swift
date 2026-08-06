@@ -141,7 +141,7 @@ final class AppModel: ObservableObject {
     @Published var errorMessage: String?
     @Published private(set) var tutorialErrorMessage: String?
     @Published private(set) var tutorialStatusMessage: String?
-    @Published var externalHandoffNotice: ExternalHandoffNotice?
+    @Published private(set) var externalHandoffNotice: ExternalHandoffNotice?
     @Published var isHelpPresented = false
     @Published var isTutorialHubPresented = false
     @Published var isTutorialActive = false
@@ -194,6 +194,8 @@ final class AppModel: ObservableObject {
     private let alternateApplicationResolver: @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler?
     private let fileSizeProvider: @MainActor (URL) -> Int64?
     private let formatAssociationChecker: @MainActor (String) -> Bool
+    private let handoffNoticeAutoDismissDelay: Duration
+    private var externalHandoffNoticeAutoDismissTask: Task<Void, Never>?
 
     nonisolated static let vdExecutablePathKey = "vdExecutablePath"
     nonisolated static let pinnedRecentFilesKey = "pinnedRecentFiles"
@@ -208,6 +210,7 @@ final class AppModel: ObservableObject {
     nonisolated static let completedTutorialChapterIDsKey = "completedTutorialChapterIDs"
     nonisolated static let defaultTutorialChapterID = "basic"
     nonisolated static let smallFileHandoffTestFilename = "idata_handoff_test.csv"
+    nonisolated static let externalHandoffNoticeAutoDismissDelay: Duration = .seconds(60)
     nonisolated static let recentFilesLimit = 10
     static let largeFileOpenThresholdBytes: Int64 = 100 * 1024 * 1024
     static let smallFileRoutingThresholdDisplay = "100 MiB"
@@ -487,7 +490,8 @@ final class AppModel: ObservableObject {
         externalFileOpener: any ExternalFileOpening = WorkspaceExternalFileOpener(),
         alternateApplicationResolver: @escaping @MainActor (URL, String, [String: DefaultApplicationHandler]) -> DefaultApplicationHandler? = AppModel.resolveAlternateApplication(for:lookupExtension:storedPreviousDefaults:),
         fileSizeProvider: @escaping @MainActor (URL) -> Int64? = AppModel.fileSizeInBytes(for:),
-        formatAssociationChecker: @escaping @MainActor (String) -> Bool = FileTypeAssociation.isIDataDefaultApp(forExtension:)
+        formatAssociationChecker: @escaping @MainActor (String) -> Bool = FileTypeAssociation.isIDataDefaultApp(forExtension:),
+        externalHandoffNoticeAutoDismissDelay: Duration = AppModel.externalHandoffNoticeAutoDismissDelay
     ) {
         self.defaults = defaults
         self.recentFilesStore = recentFilesStore ?? RecentFilesStore(defaults: defaults)
@@ -500,6 +504,7 @@ final class AppModel: ObservableObject {
         self.alternateApplicationResolver = alternateApplicationResolver
         self.fileSizeProvider = fileSizeProvider
         self.formatAssociationChecker = formatAssociationChecker
+        self.handoffNoticeAutoDismissDelay = externalHandoffNoticeAutoDismissDelay
         let initialRecentFiles = (recentFilesStore ?? RecentFilesStore(defaults: defaults)).load()
         self.recentFiles = Self.orderedRecentFiles(
             initialRecentFiles,
@@ -814,7 +819,11 @@ final class AppModel: ObservableObject {
     }
 
     var visiDataDependencySummary: String {
-        switch visiDataDependencyState {
+        visiDataDependencySummary(for: visiDataDependencyState)
+    }
+
+    func visiDataDependencySummary(for dependencyState: VisiDataDependencyState) -> String {
+        switch dependencyState {
         case let .available(path):
             return localized(
                 english: "VisiData detected at \(path)",
@@ -907,7 +916,7 @@ final class AppModel: ObservableObject {
     }
 
     func dismissExternalHandoffNotice() {
-        externalHandoffNotice = nil
+        setExternalHandoffNotice(nil)
     }
 
     func returnExternalHandoffToIData() {
@@ -915,8 +924,38 @@ final class AppModel: ObservableObject {
             return
         }
 
-        externalHandoffNotice = nil
+        setExternalHandoffNotice(nil)
         openExternalFile(notice.fileURL)
+    }
+
+    private func setExternalHandoffNotice(_ notice: ExternalHandoffNotice?) {
+        externalHandoffNoticeAutoDismissTask?.cancel()
+        externalHandoffNoticeAutoDismissTask = nil
+        externalHandoffNotice = notice
+
+        guard let notice else {
+            return
+        }
+
+        let delay = handoffNoticeAutoDismissDelay
+        externalHandoffNoticeAutoDismissTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: delay)
+            } catch {
+                return
+            }
+
+            guard
+                !Task.isCancelled,
+                let self,
+                self.externalHandoffNotice?.id == notice.id
+            else {
+                return
+            }
+
+            self.externalHandoffNotice = nil
+            self.externalHandoffNoticeAutoDismissTask = nil
+        }
     }
 
     func choosePreferredSmallFileApplication() {
@@ -1183,7 +1222,7 @@ final class AppModel: ObservableObject {
 
     func routeExternalFile(_ url: URL) -> ExternalOpenAction {
         guard Self.supportsTableFile(url) else {
-            externalHandoffNotice = nil
+            setExternalHandoffNotice(nil)
             statusMessage = nil
             errorMessage = localized(
                 english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
@@ -1205,7 +1244,7 @@ final class AppModel: ObservableObject {
             )
 
             guard !candidateApplications.isEmpty else {
-                externalHandoffNotice = nil
+                setExternalHandoffNotice(nil)
                 statusMessage = nil
                 errorMessage = localized(
                     english: "Could not find a non-iData app to open \(url.lastPathComponent).",
@@ -1225,12 +1264,12 @@ final class AppModel: ObservableObject {
                 }
 
                 let noticeID = UUID()
-                externalHandoffNotice = ExternalHandoffNotice(
+                setExternalHandoffNotice(ExternalHandoffNotice(
                     id: noticeID,
                     fileURL: url,
                     applicationName: alternateApp.displayName,
                     state: .opening
-                )
+                ))
                 statusMessage = nil
                 errorMessage = nil
 
@@ -1243,21 +1282,21 @@ final class AppModel: ObservableObject {
                         }
 
                         if didOpen {
-                            self.externalHandoffNotice = ExternalHandoffNotice(
+                            self.setExternalHandoffNotice(ExternalHandoffNotice(
                                 id: noticeID,
                                 fileURL: url,
                                 applicationName: alternateApp.displayName,
                                 state: .opened
-                            )
+                            ))
                             self.statusMessage = nil
                             self.errorMessage = nil
                         } else {
-                            self.externalHandoffNotice = ExternalHandoffNotice(
+                            self.setExternalHandoffNotice(ExternalHandoffNotice(
                                 id: noticeID,
                                 fileURL: url,
                                 applicationName: alternateApp.displayName,
                                 state: .failed
-                            )
+                            ))
                             self.statusMessage = nil
                             self.errorMessage = self.externalHandoffFailureMessage(
                                 fileName: url.lastPathComponent,
@@ -1269,17 +1308,17 @@ final class AppModel: ObservableObject {
                     return .forwardedToAlternateApp(appName: alternateApp.displayName)
                 }
 
-                externalHandoffNotice = nil
+                setExternalHandoffNotice(nil)
             }
 
             if let lastAttemptedApp {
-                externalHandoffNotice = ExternalHandoffNotice(
+                setExternalHandoffNotice(ExternalHandoffNotice(
                     fileURL: url,
                     applicationName: lastAttemptedApp.displayName,
                     state: .failed
-                )
+                ))
             } else {
-                externalHandoffNotice = nil
+                setExternalHandoffNotice(nil)
             }
             statusMessage = nil
             errorMessage = externalHandoffFailureMessage(
@@ -1308,7 +1347,7 @@ final class AppModel: ObservableObject {
         launchPendingOpenImmediately: Bool = false
     ) -> Bool {
         guard Self.supportsTableFile(url) else {
-            externalHandoffNotice = nil
+            setExternalHandoffNotice(nil)
             statusMessage = nil
             errorMessage = localized(
                 english: "The selected item is not a regular file. iData opens most file suffixes directly and streams .gz/.bgz files without extracting.",
@@ -1317,7 +1356,7 @@ final class AppModel: ObservableObject {
             return false
         }
 
-        externalHandoffNotice = nil
+        setExternalHandoffNotice(nil)
         if tutorialSampleFileURL?.standardizedFileURL != url.standardizedFileURL {
             tutorialStatusMessage = nil
         }
@@ -1529,7 +1568,7 @@ final class AppModel: ObservableObject {
     }
 
     func shutdown() {
-        activeSession?.terminate()
+        activeSession?.terminate(waitForProcessExit: true)
         activeSession = nil
     }
 

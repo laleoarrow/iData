@@ -2,25 +2,6 @@ import AppKit
 import Carbon.HIToolbox
 import SwiftUI
 
-struct GlassCardModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    func body(content: Content) -> some View {
-        content
-            .padding(18)
-            .background(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-    }
-}
-
-extension View {
-    func glassCard() -> some View {
-        self.modifier(GlassCardModifier())
-    }
-}
-
 struct IDataAnimationsEnabledKey: EnvironmentKey {
     static let defaultValue = true
 }
@@ -71,8 +52,10 @@ final class InputSourceMonitor: NSObject, ObservableObject {
         }
 
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue() else {
-            displayName = localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知")
-            isLikelyEnglish = false
+            apply(
+                displayName: localizedText(appShellLanguage() == .chinese, english: "Unknown", chinese: "未知"),
+                isLikelyEnglish: false
+            )
             return
         }
 
@@ -80,8 +63,23 @@ final class InputSourceMonitor: NSObject, ObservableObject {
         let sourceID = Self.readInputSourceString(source: source, key: kTISPropertyInputSourceID) ?? ""
         let inputModeID = Self.readInputSourceString(source: source, key: kTISPropertyInputModeID) ?? ""
 
-        displayName = localizedName
-        isLikelyEnglish = Self.looksEnglish(sourceID: sourceID, inputModeID: inputModeID, localizedName: localizedName)
+        apply(
+            displayName: localizedName,
+            isLikelyEnglish: Self.looksEnglish(
+                sourceID: sourceID,
+                inputModeID: inputModeID,
+                localizedName: localizedName
+            )
+        )
+    }
+
+    private func apply(displayName: String, isLikelyEnglish: Bool) {
+        if self.displayName != displayName {
+            self.displayName = displayName
+        }
+        if self.isLikelyEnglish != isLikelyEnglish {
+            self.isLikelyEnglish = isLikelyEnglish
+        }
     }
 
     private static func readInputSourceString(source: TISInputSource, key: CFString) -> String? {
@@ -241,54 +239,6 @@ extension View {
                 glowStyle: glowStyle
             )
         )
-    }
-}
-
-struct VersionPill: View {
-    @ObservedObject var model: AppModel
-    let tint: Color
-    var icon: String? = "shippingbox"
-
-    var body: some View {
-        HStack(spacing: 7) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-            }
-
-            Text(model.appVersionSummary)
-                .font(.subheadline.weight(.semibold))
-        }
-        .lineLimit(1)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(tint, in: Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.white.opacity(0.04))
-        )
-        .quietInteractiveSurface(enabled: false)
-    }
-}
-
-struct StatusPill: View {
-    let title: String
-    let tint: Color
-    var icon: String? = nil
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
-            }
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(tint, in: Capsule())
     }
 }
 

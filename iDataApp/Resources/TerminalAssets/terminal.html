@@ -288,16 +288,24 @@
       }
     }
 
-    function writeBase64(base64Value, displayGeneration = activeDisplayGeneration) {
-      if (!term || displayGeneration !== activeDisplayGeneration) {
-        return;
+    function decodeBase64(base64Value) {
+      if (typeof Uint8Array.fromBase64 === 'function') {
+        return Uint8Array.fromBase64(base64Value);
       }
-
       const binary = atob(base64Value);
       const bytes = new Uint8Array(binary.length);
       for (let index = 0; index < binary.length; index += 1) {
         bytes[index] = binary.charCodeAt(index);
       }
+      return bytes;
+    }
+
+    function writeBase64(base64Value, displayGeneration = activeDisplayGeneration) {
+      if (!term || displayGeneration !== activeDisplayGeneration) {
+        return;
+      }
+
+      const bytes = decodeBase64(base64Value);
       const currentTerm = term;
       if (!initialPaintRefreshScheduled) {
         initialPaintRefreshScheduled = true;

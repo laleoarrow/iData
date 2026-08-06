@@ -41,8 +41,10 @@ struct PreferencesView: View {
     }
 
     var body: some View {
+        let dependencyState = model.visiDataDependencyState
+
         TabView(selection: $selectedTab) {
-            generalTab
+            generalTab(dependencyState: dependencyState)
                 .tabItem {
                     Label(isChinese ? "通用" : "General", systemImage: "gearshape")
                 }
@@ -54,7 +56,7 @@ struct PreferencesView: View {
                 }
                 .tag(PreferencesTab.files)
 
-            runtimeTab
+            runtimeTab(dependencyState: dependencyState)
                 .tabItem {
                     Label("VisiData", systemImage: "terminal")
                 }
@@ -81,7 +83,7 @@ struct PreferencesView: View {
         }
     }
 
-    private var generalTab: some View {
+    private func generalTab(dependencyState: AppModel.VisiDataDependencyState) -> some View {
         Form {
             Section {
                 Picker(isChinese ? "语言" : "Language", selection: $model.appLanguagePreference) {
@@ -104,12 +106,12 @@ struct PreferencesView: View {
 
                 LabeledContent("VisiData") {
                     Label(
-                        visiDataStatusTitle,
-                        systemImage: model.visiDataDependencyState.isAvailable
+                        visiDataStatusTitle(for: dependencyState),
+                        systemImage: dependencyState.isAvailable
                             ? "checkmark.circle.fill"
                             : "exclamationmark.triangle.fill"
                     )
-                    .foregroundStyle(model.visiDataDependencyState.isAvailable ? .green : .orange)
+                    .foregroundStyle(dependencyState.isAvailable ? .green : .orange)
                 }
             }
         }
@@ -223,7 +225,7 @@ struct PreferencesView: View {
         .padding()
     }
 
-    private var runtimeTab: some View {
+    private func runtimeTab(dependencyState: AppModel.VisiDataDependencyState) -> some View {
         Form {
             Section {
                 TextField("/opt/homebrew/bin/vd", text: $model.vdExecutablePath)
@@ -239,7 +241,7 @@ struct PreferencesView: View {
                         model.vdExecutablePath = ""
                     }
 
-                    if case .missing = model.visiDataDependencyState {
+                    if case .missing = dependencyState {
                         Button(isChinese ? "安装 VisiData" : "Install VisiData") {
                             model.runVisiDataOneClickSetup()
                         }
@@ -248,7 +250,7 @@ struct PreferencesView: View {
             } header: {
                 Text(isChinese ? "可执行文件" : "Executable")
             } footer: {
-                Text(model.visiDataDependencySummary)
+                Text(model.visiDataDependencySummary(for: dependencyState))
                     .textSelection(.enabled)
             }
         }
@@ -293,8 +295,8 @@ struct PreferencesView: View {
         .padding()
     }
 
-    private var visiDataStatusTitle: String {
-        switch model.visiDataDependencyState {
+    private func visiDataStatusTitle(for dependencyState: AppModel.VisiDataDependencyState) -> String {
+        switch dependencyState {
         case .available:
             isChinese ? "已就绪" : "Ready"
         case .missing:

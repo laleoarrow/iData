@@ -11,7 +11,11 @@ struct VisiDataSessionControllerTests {
         let source = try visiDataSessionControllerSource()
 
         #expect(source.contains("private let processWaitQueue"))
+        #expect(source.contains("private let processTeardownQueue"))
         #expect(source.contains("private func waitForProcessExit"))
+        #expect(source.contains("proc_listchildpids"))
+        #expect(!source.contains("/usr/bin/pgrep"))
+        #expect(!source.contains("process.waitUntilExit()"))
         #expect(!source.contains("DispatchSourceProcess"))
         #expect(!source.contains("makeProcessSource"))
         #expect(!source.contains("scheduleEarlyExitSafetyCheck"))
@@ -149,6 +153,140 @@ struct VisiDataSessionControllerTests {
         if !childExited {
             _ = kill(childPID, SIGKILL)
         }
+    }
+
+    @Test
+    func teardownEscalatesDetachedDescendantsThatIgnoreTERM() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-detached-descendants-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+
+        for iteration in 0..<3 {
+            let pidFile = tempRoot.appendingPathComponent("detached-\(iteration).pids")
+            let launcher = tempRoot.appendingPathComponent("fake-vd-detached-\(iteration).py")
+            try makeDetachedTERMResistantLauncher(at: launcher, pidFile: pidFile)
+
+            let session = VisiDataSessionController()
+            session.resize(cols: 120, rows: 32)
+            try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+
+            let processIdentifiers = try await waitForProcessIdentifiers(in: pidFile, count: 2, timeout: 3.0)
+            #expect(processIdentifiers.allSatisfy(processExists))
+
+            session.terminate()
+
+            for processIdentifier in processIdentifiers {
+                let didExit = await waitForProcessExit(processIdentifier, timeout: 3.0)
+                #expect(didExit, "Detached descendant \(processIdentifier) survived teardown iteration \(iteration)")
+                if !didExit {
+                    _ = kill(processIdentifier, SIGKILL)
+                }
+            }
+        }
+    }
+
+    @Test
+    func teardownCapturesEveryBranchOfAWideDetachedProcessTree() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-wide-descendants-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+        let pidFile = tempRoot.appendingPathComponent("wide.pids")
+        let launcher = tempRoot.appendingPathComponent("fake-vd-wide.py")
+        let branchCount = 8
+        try makeWideDetachedTERMResistantLauncher(
+            at: launcher,
+            pidFile: pidFile,
+            branchCount: branchCount
+        )
+
+        let session = VisiDataSessionController()
+        session.resize(cols: 120, rows: 32)
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+
+        let processIdentifiers = try await waitForProcessIdentifiers(
+            in: pidFile,
+            count: branchCount,
+            timeout: 3.0
+        )
+        #expect(processIdentifiers.allSatisfy(processExists))
+
+        session.terminate()
+
+        for processIdentifier in processIdentifiers {
+            let didExit = await waitForProcessExit(processIdentifier, timeout: 3.0)
+            #expect(didExit, "Detached branch \(processIdentifier) survived teardown")
+            if !didExit {
+                _ = kill(processIdentifier, SIGKILL)
+            }
+        }
+    }
+
+    @Test
+    func rapidTableSwitchKeepsOnlyTheLatestRequestWhileBackgroundTeardownRuns() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-background-teardown-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let firstFile = tempRoot.appendingPathComponent("first.tsv")
+        let secondFile = tempRoot.appendingPathComponent("second.tsv")
+        let thirdFile = tempRoot.appendingPathComponent("third.tsv")
+        try "id\tvalue\n1\tA\n".write(to: firstFile, atomically: true, encoding: .utf8)
+        try "id\tvalue\n1\tB\n".write(to: secondFile, atomically: true, encoding: .utf8)
+        try "id\tvalue\n1\tC\n".write(to: thirdFile, atomically: true, encoding: .utf8)
+
+        let launcher = tempRoot.appendingPathComponent("fake-vd-ignores-term.zsh")
+        try makeTERMResistantLauncher(at: launcher)
+
+        let teardownStarted = DispatchSemaphore(value: 0)
+        let allowTeardownToFinish = DispatchSemaphore(value: 0)
+        let launchObserver = LaunchObserver()
+        let session = VisiDataSessionController(
+            launchObserver: launchObserver.record(cols:rows:),
+            processTeardownWaitHook: { _ in
+                teardownStarted.signal()
+                allowTeardownToFinish.wait()
+            }
+        )
+        defer {
+            allowTeardownToFinish.signal()
+            session.terminate(waitForProcessExit: true)
+        }
+
+        session.resize(cols: 120, rows: 32)
+        try session.open(fileURL: firstFile, explicitVDPath: launcher.path)
+        #expect(launchObserver.recordCount == 1)
+        #expect(session.processIdentifierForTesting > 0)
+
+        try session.open(fileURL: secondFile, explicitVDPath: launcher.path)
+
+        #expect(waitSynchronously(for: teardownStarted, timeout: 1.0))
+        try session.open(fileURL: thirdFile, explicitVDPath: launcher.path)
+        #expect(launchObserver.recordCount == 1)
+        #expect(session.processIdentifierForTesting == 0)
+        #expect(session.currentFileURL?.standardizedFileURL == thirdFile.standardizedFileURL)
+
+        allowTeardownToFinish.signal()
+        try await waitForCondition(timeout: 2.0) {
+            launchObserver.recordCount == 2
+        }
+
+        #expect(session.processIdentifierForTesting > 0)
+        #expect(session.currentFileURL?.standardizedFileURL == thirdFile.standardizedFileURL)
     }
 
     @Test
@@ -304,6 +442,47 @@ struct VisiDataSessionControllerTests {
 
         session.resize(cols: 140, rows: 40)
         #expect(signalSpy.signalCount == 1)
+    }
+
+    @Test
+    func resizeStormSignalsOnlyDistinctValidSizes() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-session-resize-storm-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let inputFile = tempRoot.appendingPathComponent("input.tsv")
+        try "id\tvalue\n1\t2\n".write(to: inputFile, atomically: true, encoding: .utf8)
+        let launcher = tempRoot.appendingPathComponent("fake-vd-resize-storm.zsh")
+        try makeSleepLauncher(at: launcher, sleepSeconds: 120)
+
+        let signalSpy = SignalSenderSpy()
+        let session = VisiDataSessionController(signalSender: signalSpy.send)
+        session.resize(cols: 120, rows: 32)
+        try session.open(fileURL: inputFile, explicitVDPath: launcher.path)
+        defer {
+            session.terminate(waitForProcessExit: true)
+        }
+
+        for _ in 0..<2_500 {
+            session.resize(cols: 20, rows: 8)
+            session.resize(cols: 20, rows: 8)
+            session.resize(cols: 400, rows: 200)
+            session.resize(cols: 400, rows: 200)
+        }
+
+        #expect(signalSpy.signalCount == 5_000)
+
+        session.resize(cols: 0, rows: 200)
+        session.resize(cols: 400, rows: 0)
+        session.resize(cols: -1, rows: -1)
+        #expect(signalSpy.signalCount == 5_000)
+
+        session.resize(cols: Int.max, rows: Int.max)
+        session.resize(cols: Int.max, rows: Int.max)
+        #expect(signalSpy.signalCount == 5_001)
     }
 
     @Test
@@ -655,6 +834,52 @@ struct VisiDataSessionControllerTests {
     }
 
     @Test
+    func outputFloodPreservesAllBytesInBoundedFIFOChunks() async throws {
+        let byteCount = 16 * 1024 * 1024
+        var expected = Data(count: byteCount)
+        expected.withUnsafeMutableBytes { buffer in
+            for index in buffer.indices {
+                buffer[index] = UInt8(truncatingIfNeeded: index)
+            }
+        }
+
+        let temporaryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("idata-output-flood-\(UUID().uuidString)")
+        try expected.write(to: temporaryURL)
+        defer {
+            try? FileManager.default.removeItem(at: temporaryURL)
+        }
+
+        let fileDescriptor = open(temporaryURL.path, O_RDONLY)
+        #expect(fileDescriptor >= 0)
+        defer {
+            if fileDescriptor >= 0 {
+                close(fileDescriptor)
+            }
+        }
+
+        let session = VisiDataSessionController()
+        let sink = TerminalDisplaySinkBuffer()
+        session.bind(displaySink: sink)
+        session.markDisplayReady()
+
+        let expectedChunkCount = byteCount / (64 * 1024)
+        for _ in 0..<expectedChunkCount {
+            session.drainOutputForTesting(
+                from: fileDescriptor,
+                generation: session.outputGenerationForTesting
+            )
+        }
+
+        #expect(lseek(fileDescriptor, 0, SEEK_CUR) == byteCount)
+        try await waitForSinkWrites(sink, count: expectedChunkCount, timeout: .seconds(5))
+
+        #expect(sink.dataWrites.count == expectedChunkCount)
+        #expect(sink.dataWrites.allSatisfy { $0.count <= 64 * 1024 })
+        #expect(sink.dataWrites.reduce(into: Data()) { $0.append($1) } == expected)
+    }
+
+    @Test
     func drainingOutputDeliversSmallNonblockingReadImmediatelyAtEAGAIN() async throws {
         var descriptors: [Int32] = [-1, -1]
         #expect(pipe(&descriptors) == 0)
@@ -772,6 +997,100 @@ struct VisiDataSessionControllerTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
+    private func makeTERMResistantLauncher(at url: URL) throws {
+        let script = """
+        #!/bin/zsh
+        trap '' TERM INT HUP
+        while true; do
+            /bin/sleep 60
+        done
+        """
+
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    private func makeDetachedTERMResistantLauncher(at url: URL, pidFile: URL) throws {
+        let escapedPIDPath = pidFile.path
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = """
+        #!/usr/bin/python3
+        import os
+        import signal
+        import time
+
+        child_pid = os.fork()
+        if child_pid == 0:
+            os.setsid()
+            signal.signal(signal.SIGTERM, signal.SIG_IGN)
+            grandchild_pid = os.fork()
+            if grandchild_pid == 0:
+                signal.signal(signal.SIGTERM, signal.SIG_IGN)
+                while True:
+                    time.sleep(1)
+
+            with open("\(escapedPIDPath)", "w", encoding="utf-8") as pid_file:
+                pid_file.write(f"{os.getpid()} {grandchild_pid}")
+                pid_file.flush()
+
+            while True:
+                time.sleep(1)
+
+        while True:
+            time.sleep(1)
+        """
+
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    private func makeWideDetachedTERMResistantLauncher(
+        at url: URL,
+        pidFile: URL,
+        branchCount: Int
+    ) throws {
+        let escapedPIDPath = pidFile.path
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = """
+        #!/usr/bin/python3
+        import os
+        import signal
+        import time
+
+        ready_read, ready_write = os.pipe()
+        child_pids = []
+        for _ in range(\(branchCount)):
+            child_pid = os.fork()
+            if child_pid == 0:
+                os.close(ready_read)
+                signal.signal(signal.SIGTERM, signal.SIG_IGN)
+                os.setsid()
+                os.write(ready_write, b"1")
+                os.close(ready_write)
+                while True:
+                    time.sleep(1)
+            child_pids.append(child_pid)
+
+        os.close(ready_write)
+        ready_count = 0
+        while ready_count < \(branchCount):
+            ready_count += len(os.read(ready_read, \(branchCount) - ready_count))
+        os.close(ready_read)
+
+        with open("\(escapedPIDPath)", "w", encoding="utf-8") as pid_file:
+            pid_file.write(" ".join(str(pid) for pid in child_pids))
+            pid_file.flush()
+
+        while True:
+            time.sleep(1)
+        """
+
+        try script.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
     private func makeDelayedExitLauncher(at url: URL, delaySeconds: Double, exitCode: Int32) throws {
         let script = """
         #!/bin/zsh
@@ -849,7 +1168,7 @@ private final class SignalSenderSpy {
     }
 }
 
-private final class LaunchObserver {
+private final class LaunchObserver: @unchecked Sendable {
     private let lock = NSLock()
     private var records: [(Int, Int)] = []
 
@@ -863,6 +1182,10 @@ private final class LaunchObserver {
         lock.lock()
         defer { lock.unlock() }
         return records.first
+    }
+
+    var recordCount: Int {
+        lock.withLock { records.count }
     }
 
     func isEmpty() -> Bool {
@@ -981,6 +1304,28 @@ private func waitForChildPID(in fileURL: URL, timeout: TimeInterval) async throw
             return pid
         }
         try await Task.sleep(for: .milliseconds(50))
+    }
+
+    throw TestError.missingChildPIDFile(fileURL.path)
+}
+
+private func waitForProcessIdentifiers(
+    in fileURL: URL,
+    count: Int,
+    timeout: TimeInterval
+) async throws -> [pid_t] {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+        if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
+            let processIdentifiers = content
+                .split(whereSeparator: \.isWhitespace)
+                .compactMap { pid_t($0) }
+            if processIdentifiers.count == count {
+                return processIdentifiers
+            }
+        }
+        try await Task.sleep(for: .milliseconds(20))
     }
 
     throw TestError.missingChildPIDFile(fileURL.path)

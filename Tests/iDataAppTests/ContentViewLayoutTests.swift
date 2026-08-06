@@ -16,7 +16,7 @@ struct ContentViewLayoutTests {
     @Test
     func sidebarUsesNativeScrollingWithoutDecorativeScrollRail() throws {
         let source = try contentViewSource()
-        let sidebar = try extractSection(from: source, start: "private struct SidebarView: View {", end: "private struct FloatingSidebarRail")
+        let sidebar = try extractSection(from: source, start: "private struct SidebarView: View {", end: "private struct SidebarHeaderCard")
 
         #expect(sidebar.contains("ScrollView(.vertical)"))
         #expect(sidebar.contains(".scrollIndicators(.automatic)"))
@@ -28,9 +28,43 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func unreachableSidebarLegacyDeclarationsStayRemoved() throws {
+        let source = try contentViewSource()
+        let declarations = [
+            "@State private var recentFilesScrollMetrics",
+            "@State private var recentFilesMinY",
+            "@State private var recentFilesViewportHeight",
+            "private var listAnimation",
+            "private struct FloatingSidebarRail",
+            "private let sidebarCoordinateSpace",
+            "private let sidebarRecentFilesCoordinateSpace",
+            "private struct SidebarScrollMetrics:",
+            "private struct SidebarScrollMetricsPreferenceKey",
+            "private struct SidebarScrollViewportHeightPreferenceKey",
+            "private struct SidebarScrollMinYPreferenceKey",
+            "private struct SidebarScrollPositionLine",
+            "private struct HiddenScrollIndicatorsConfigurator",
+            "func nearestEnclosingScrollView()",
+            "func nearestLeftAlignedScrollViewInWindow()",
+            "func leftSidebarScrollViewsInWindow()",
+            "func descendantScrollViews()",
+            "private struct RecentFileActionButton",
+            "private struct SidebarFooterIcon",
+            "private struct SidebarHoverTrackingRegion",
+            "private final class HoverTrackingView",
+            "private struct AppSweepShimmer",
+        ]
+
+        for declaration in declarations {
+            #expect(!source.contains(declaration))
+        }
+    }
+
+    @Test
     func recentRowsKeepOneActionMenuAndEventDrivenHoverGlow() throws {
         let source = try contentViewSource()
-        let row = try extractSection(from: source, start: "private struct RecentFileRow: View {", end: "private struct RecentFileActionButton")
+        let row = try extractSection(from: source, start: "private struct RecentFileRow: View {", end: "private struct CollapsedRecentFileRow")
+        let collapsedRow = try extractSection(from: source, start: "private struct CollapsedRecentFileRow: View {", end: "private struct SidebarCollapseToggleButton")
 
         #expect(row.contains("Menu {"))
         #expect(row.contains(".menuStyle(.borderlessButton)"))
@@ -40,17 +74,27 @@ struct ContentViewLayoutTests {
         #expect(row.contains("guard hovering != isHovering"))
         #expect(!row.contains("onContinuousHover"))
         #expect(!row.contains(".shadow("))
+        #expect(!row.contains("private var backgroundStyle"))
+        #expect(!row.contains("private var borderColor"))
+        #expect(!collapsedRow.contains("private var backgroundStyle"))
+        #expect(!collapsedRow.contains("private var borderColor"))
     }
 
     @Test
     func welcomeFocusesOnOpeningData() throws {
         let source = try contentViewSource()
-        let welcome = try extractSection(from: source, start: "private struct WelcomeDetailView: View {", end: "private struct TutorialEntryCard")
-        let body = try extractSection(from: welcome, start: "var body: some View {", end: "private var heroCard")
+        let welcome = try extractSection(from: source, start: "private struct WelcomeDetailView: View {", end: "private struct SessionDetailView")
+        let body = try extractSection(from: welcome, start: "var body: some View {", end: "private func heroCard")
 
         #expect(body.contains("heroCard"))
         #expect(body.contains("quickTipsCard"))
         #expect(body.contains("systemStatusSection"))
+        #expect(body.contains("let dependencyState = model.visiDataDependencyState"))
+        #expect(body.components(separatedBy: "model.visiDataDependencyState").count - 1 == 1)
+        #expect(body.contains("heroCard(dependencyState: dependencyState)"))
+        #expect(body.contains("systemStatusSection(dependencyState: dependencyState)"))
+        #expect(welcome.contains("heroPrimaryActions(dependencyState: dependencyState)"))
+        #expect(welcome.contains("if case .missing = dependencyState"))
         #expect(!body.contains("tutorialEntryCard"))
         #expect(!body.contains("formatsCard"))
         #expect(welcome.contains("打开数据"))
@@ -60,7 +104,7 @@ struct ContentViewLayoutTests {
     @Test
     func welcomeUsesOnePrimaryActionAndAnOverflowMenu() throws {
         let source = try contentViewSource()
-        let welcome = try extractSection(from: source, start: "private struct WelcomeDetailView: View {", end: "private struct TutorialEntryCard")
+        let welcome = try extractSection(from: source, start: "private struct WelcomeDetailView: View {", end: "private struct SessionDetailView")
 
         #expect(welcome.contains("Label(isChinese ? \"打开…\" : \"Open…\", systemImage: \"tablecells\")"))
         #expect(welcome.contains(".quietInteractiveSurface(enabled: motionEnabled, glowStyle: .prominentRounded(8))"))
@@ -114,6 +158,57 @@ struct ContentViewLayoutTests {
     }
 
     @Test
+    func unreachableDetailAndSharedUIDeclarationsStayRemoved() throws {
+        let source = try contentViewSource()
+        let sharedSource = try sharedUISource()
+        let help = try extractSection(from: source, start: "private struct HelpView: View {", end: "private enum HelpTopic")
+        let tutorial = try extractSection(from: source, start: "private struct TutorialHubView: View {", end: "private struct WelcomeDetailView")
+
+        for declaration in [
+            "private var helpHero",
+            "private var header: some View",
+            "private func chapterCard(",
+            "@State private var customAssociationInput",
+            "private var normalizedCustomAssociationExtension",
+            "private var canSubmitCustomAssociation",
+            "private var isSettingCustomAssociation",
+            "private var isCustomAssociationDefault",
+            "private var customAssociationActionTitle",
+            "private var customAssociationActionIcon",
+            "private var displayedFormatExtensions",
+            "private var orderedSupportedFormats",
+            "private func refreshDisplayedFormatAssociationStatus",
+            "private var heroSecondaryActions",
+            "private var showsReadyDependencyPillInTitleRow",
+            "private var showsHeroMetadataRow",
+            "private var tutorialEntryCard",
+            "private var dependencyPill",
+            "private func systemStatusItem",
+            "private var formatsCard",
+            "private struct TutorialEntryCard",
+        ] {
+            #expect(!source.contains(declaration))
+        }
+
+        #expect(!help.contains("@Environment(\\.accessibilityReduceMotion)"))
+        #expect(!help.contains("private var motionEnabled"))
+        #expect(!tutorial.contains("@Environment(\\.accessibilityReduceMotion)"))
+        #expect(!tutorial.contains("private var motionEnabled"))
+
+        for declaration in [
+            "struct GlassCardModifier",
+            "func glassCard()",
+            "struct VersionPill",
+            "struct StatusPill",
+        ] {
+            #expect(!sharedSource.contains(declaration))
+        }
+
+        #expect(sharedSource.contains("struct FormatChip"))
+        #expect(sharedSource.contains("struct MessageCard"))
+    }
+
+    @Test
     func activeHelpAndSessionHintsUseVerifiedVisiDataBindings() throws {
         let source = try contentViewSource()
 
@@ -150,9 +245,12 @@ struct ContentViewLayoutTests {
     @Test
     func externalNoticeAndStatusBarUseCompactChrome() throws {
         let source = try contentViewSource()
+        let root = try extractSection(from: source, start: "struct ContentView: View {", end: "private struct SidebarView")
         let notice = try extractSection(from: source, start: "private struct ExternalHandoffNoticeBanner", end: "private struct StatusAndInputCard")
         let status = try extractSection(from: source, start: "private struct StatusAndInputCard", end: "private struct OrbButtonStyle")
 
+        #expect(root.contains(".transition(.move(edge: .top).combined(with: .opacity))"))
+        #expect(root.contains("value: model.externalHandoffNotice"))
         #expect(notice.contains(".frame(width: 380"))
         #expect(notice.contains("cornerRadius: 10"))
         #expect(!notice.contains("LinearGradient("))
@@ -161,13 +259,10 @@ struct ContentViewLayoutTests {
     }
 
     @Test
-    func sharedReadOnlyComponentsDoNotAnimateOnHover() throws {
+    func sharedMessageCardDoesNotAddDecorativeShadow() throws {
         let source = try sharedUISource()
-        let status = try extractSection(from: source, start: "struct StatusPill: View {", end: "struct FormatChip")
-        let message = try extractSection(from: source, start: "struct MessageCard: View {", end: "}")
+        let message = try extractSuffix(from: source, start: "struct MessageCard: View {")
 
-        #expect(!status.contains(".quietInteractiveSurface"))
-        #expect(!status.contains(".onHover"))
         #expect(!message.contains(".shadow("))
     }
 
@@ -183,7 +278,7 @@ struct ContentViewLayoutTests {
         let glow = try extractSection(
             from: contentSource,
             start: "struct SidebarHoverGlow: View",
-            end: "private struct SidebarHoverTrackingRegion"
+            end: "private struct SessionStageView"
         )
 
         #expect(modifier.contains("@State private var isHovering = false"))
@@ -222,7 +317,7 @@ struct ContentViewLayoutTests {
         let collapseButton = try extractSection(
             from: source,
             start: "private struct SidebarCollapseToggleButton: View",
-            end: "private struct SidebarFooterIcon"
+            end: "private struct SidebarFooterActionIcon"
         )
 
         #expect(header.contains("SidebarHoverGlow(isVisible: true, style: .circle)"))
@@ -310,4 +405,11 @@ private func extractSection(from source: String, start: String, end: String) thr
         throw NSError(domain: "ContentViewLayoutTests", code: 2)
     }
     return String(source[startRange.lowerBound..<endRange.lowerBound])
+}
+
+private func extractSuffix(from source: String, start: String) throws -> String {
+    guard let startRange = source.range(of: start) else {
+        throw NSError(domain: "ContentViewLayoutTests", code: 3)
+    }
+    return String(source[startRange.lowerBound...])
 }

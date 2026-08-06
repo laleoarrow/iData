@@ -86,21 +86,7 @@ struct ContentView: View {
 
 private struct SidebarView: View {
     @ObservedObject var model: AppModel
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var hoveredRecentFilePath: String?
-    @State private var recentFilesScrollMetrics = SidebarScrollMetrics()
-    @State private var recentFilesMinY: CGFloat = 0
-    @State private var recentFilesViewportHeight: CGFloat = 0
-
-    private var motionEnabled: Bool {
-        model.animationsEnabled && !accessibilityReduceMotion
-    }
-
-    private var listAnimation: Animation? {
-        motionEnabled
-            ? .spring(response: 0.32, dampingFraction: 0.90, blendDuration: 0.14)
-            : nil
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -182,246 +168,6 @@ private struct SidebarView: View {
                 }
             }
         )
-    }
-}
-
-private struct FloatingSidebarRail<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        content
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(Color.clear)
-    }
-}
-
-private let sidebarCoordinateSpace = "iDataSidebar"
-private let sidebarRecentFilesCoordinateSpace = "iDataSidebarRecentFilesScroll"
-
-private struct SidebarScrollMetrics: Equatable {
-    var contentHeight: CGFloat = 0
-    var contentMinY: CGFloat = 0
-}
-
-private struct SidebarScrollMetricsPreferenceKey: PreferenceKey {
-    static let defaultValue = SidebarScrollMetrics()
-
-    static func reduce(value: inout SidebarScrollMetrics, nextValue: () -> SidebarScrollMetrics) {
-        value = nextValue()
-    }
-}
-
-private struct SidebarScrollViewportHeightPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-private struct SidebarScrollMinYPreferenceKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
-private struct SidebarScrollPositionLine: View {
-    let metrics: SidebarScrollMetrics
-    let viewportHeight: CGFloat
-    let motionEnabled: Bool
-
-    private var isScrollable: Bool {
-        metrics.contentHeight > viewportHeight + 2
-    }
-
-    private var trackHeight: CGFloat {
-        max(44, viewportHeight - 10)
-    }
-
-    private var thumbHeight: CGFloat {
-        guard isScrollable else {
-            return trackHeight
-        }
-        let ratio = viewportHeight / max(metrics.contentHeight, 1)
-        return min(trackHeight, max(42, trackHeight * ratio))
-    }
-
-    private var scrollProgress: CGFloat {
-        guard isScrollable else {
-            return 0
-        }
-        let maxOffset = max(metrics.contentHeight - viewportHeight, 1)
-        return min(max(-metrics.contentMinY / maxOffset, 0), 1)
-    }
-
-    private var thumbOffset: CGFloat {
-        (trackHeight - thumbHeight) * scrollProgress
-    }
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Capsule()
-                .fill(Color.white.opacity(0.07))
-                .frame(width: 2, height: trackHeight)
-
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.78),
-                            Color.accentColor.opacity(0.94),
-                            Color.accentColor.opacity(0.58),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 4, height: thumbHeight)
-                .shadow(color: Color.accentColor.opacity(0.48), radius: 9, x: 0, y: 0)
-                .offset(y: thumbOffset)
-        }
-        .frame(width: 10, height: trackHeight)
-        .opacity(isScrollable ? 1 : 0)
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: scrollProgress)
-        .animation(motionEnabled ? .easeOut(duration: 0.18) : nil, value: thumbHeight)
-        .allowsHitTesting(false)
-    }
-}
-
-private struct HiddenScrollIndicatorsConfigurator: NSViewRepresentable {
-    final class Coordinator {
-        weak var configuredScrollView: NSScrollView?
-        var isScheduling = false
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
-
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        requestScrollIndicatorHiding(from: view, context: context)
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {
-        requestScrollIndicatorHiding(from: nsView, context: context)
-    }
-
-    private func requestScrollIndicatorHiding(from view: NSView, context: Context) {
-        if let configuredScrollView = context.coordinator.configuredScrollView,
-           configuredScrollView.window === view.window
-        {
-            return
-        }
-        guard !context.coordinator.isScheduling else {
-            return
-        }
-
-        context.coordinator.isScheduling = true
-        let delays = [0.0, 0.05, 0.25, 0.75]
-
-        for (index, delay) in delays.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak view, weak coordinator = context.coordinator] in
-                guard let view, let coordinator else {
-                    return
-                }
-                if let configuredScrollView = coordinator.configuredScrollView,
-                   configuredScrollView.window === view.window
-                {
-                    coordinator.isScheduling = false
-                    return
-                }
-                if let configuredScrollView = hideScrollIndicators(from: view) {
-                    coordinator.configuredScrollView = configuredScrollView
-                    coordinator.isScheduling = false
-                } else if index == delays.indices.last {
-                    coordinator.isScheduling = false
-                }
-            }
-        }
-    }
-
-    private func hideScrollIndicators(from view: NSView) -> NSScrollView? {
-        let directScrollView = view.nearestEnclosingScrollView() ?? view.nearestLeftAlignedScrollViewInWindow()
-        let scrollViews = ([directScrollView].compactMap { $0 } + view.leftSidebarScrollViewsInWindow())
-        var hiddenScrollViewIDs = Set<ObjectIdentifier>()
-
-        for scrollView in scrollViews where hiddenScrollViewIDs.insert(ObjectIdentifier(scrollView)).inserted {
-            scrollView.hasVerticalScroller = false
-            scrollView.hasHorizontalScroller = false
-            scrollView.verticalScroller = nil
-            scrollView.horizontalScroller = nil
-            scrollView.autohidesScrollers = true
-            scrollView.scrollerStyle = .overlay
-        }
-
-        return directScrollView ?? scrollViews.first
-    }
-}
-
-private extension NSView {
-    func nearestEnclosingScrollView() -> NSScrollView? {
-        var candidate: NSView? = self
-        while let current = candidate {
-            if let scrollView = current as? NSScrollView {
-                return scrollView
-            }
-            candidate = current.superview
-        }
-        return nil
-    }
-
-    func nearestLeftAlignedScrollViewInWindow() -> NSScrollView? {
-        guard let contentView = window?.contentView else {
-            return nil
-        }
-
-        let sourceRect = convert(bounds, to: nil).insetBy(dx: -4, dy: -4)
-        let scrollViews = contentView.descendantScrollViews()
-        let intersecting = scrollViews.filter { scrollView in
-            scrollView.convert(scrollView.bounds, to: nil).intersects(sourceRect)
-        }
-
-        if let nearestIntersecting = intersecting.min(by: { lhs, rhs in
-            let lhsRect = lhs.convert(lhs.bounds, to: nil)
-            let rhsRect = rhs.convert(rhs.bounds, to: nil)
-            return abs(lhsRect.midX - sourceRect.midX) < abs(rhsRect.midX - sourceRect.midX)
-        }) {
-            return nearestIntersecting
-        }
-
-        return scrollViews
-            .filter { scrollView in
-                scrollView.convert(scrollView.bounds, to: nil).midX < 360
-            }
-            .min { lhs, rhs in
-                lhs.convert(lhs.bounds, to: nil).minX < rhs.convert(rhs.bounds, to: nil).minX
-            }
-    }
-
-    func leftSidebarScrollViewsInWindow() -> [NSScrollView] {
-        guard let contentView = window?.contentView else {
-            return []
-        }
-
-        return contentView.descendantScrollViews().filter { scrollView in
-            let frame = scrollView.convert(scrollView.bounds, to: nil)
-            return frame.minX < 320 && frame.maxX < 340 && frame.height > 80
-        }
-    }
-
-    func descendantScrollViews() -> [NSScrollView] {
-        var result: [NSScrollView] = []
-        if let scrollView = self as? NSScrollView {
-            result.append(scrollView)
-        }
-        for subview in subviews {
-            result.append(contentsOf: subview.descendantScrollViews())
-        }
-        return result
     }
 }
 
@@ -745,85 +491,6 @@ private struct RecentFileRow: View {
             isHovering = hovering
         }
     }
-
-    private var backgroundStyle: some ShapeStyle {
-        if isActive {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [
-                        Color.accentColor.opacity(0.22),
-                        Color.white.opacity(0.08),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-        }
-
-        if isHovering {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.12),
-                        Color.accentColor.opacity(0.10),
-                        Color.white.opacity(0.05),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-        }
-
-        return AnyShapeStyle(.thinMaterial)
-    }
-
-    private var borderColor: Color {
-        if isActive {
-            return Color.accentColor.opacity(0.34)
-        }
-
-        if isHovering {
-            return Color.white.opacity(0.12)
-        }
-
-        return Color.white.opacity(0.06)
-    }
-}
-
-private struct RecentFileActionButton: View {
-    let symbol: String
-    let foregroundStyle: AnyShapeStyle
-    let backgroundFill: Color
-    let isVisible: Bool
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(foregroundStyle)
-                .frame(width: 24, height: 24)
-                .background(
-                    Circle()
-                        .fill(backgroundFill.opacity(isVisible ? (isHovering ? 1 : 0.88) : 0))
-                )
-                .overlay(
-                    Circle()
-                        .strokeBorder(Color.white.opacity(isVisible ? (isHovering ? 0.26 : 0.14) : 0), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .opacity(isVisible ? 1 : 0)
-        .allowsHitTesting(isVisible)
-        .contentShape(Circle())
-        .animation(.easeOut(duration: 0.16), value: isVisible)
-        .animation(.easeOut(duration: 0.16), value: isHovering)
-        .onHover { hovering in
-            isHovering = isVisible && hovering
-        }
-    }
 }
 
 private struct CollapsedRecentFileRow: View {
@@ -911,35 +578,6 @@ private struct CollapsedRecentFileRow: View {
         }
         .frame(maxWidth: .infinity)
     }
-
-    private var backgroundStyle: some ShapeStyle {
-        if isActive {
-            return AnyShapeStyle(
-                LinearGradient(
-                    colors: [
-                        Color.accentColor.opacity(0.18),
-                        Color.white.opacity(0.08),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-        }
-
-        if isHovering {
-            return AnyShapeStyle(.regularMaterial)
-        }
-
-        return AnyShapeStyle(.thinMaterial)
-    }
-
-    private var borderColor: Color {
-        if isActive {
-            return Color.accentColor.opacity(0.30)
-        }
-
-        return Color.white.opacity(isHovering ? 0.14 : 0.08)
-    }
 }
 
 private struct SidebarCollapseToggleButton: View {
@@ -976,23 +614,6 @@ private struct SidebarCollapseToggleButton: View {
             }
             isHovering = hovering
         }
-    }
-}
-
-private struct SidebarFooterIcon: View {
-    let symbol: String
-    let isHovering: Bool
-    let motionEnabled: Bool
-
-    var body: some View {
-        HoverAnimatedCircleSymbol(
-            symbol: symbol,
-            font: .system(size: 18, weight: .semibold),
-            motionEnabled: motionEnabled,
-            isHovering: isHovering
-        )
-            .frame(width: 24, height: 24)
-            .contentShape(Rectangle())
     }
 }
 
@@ -1231,157 +852,6 @@ struct SidebarHoverGlow: View {
     }
 }
 
-private struct SidebarHoverTrackingRegion: NSViewRepresentable {
-    let isEnabled: Bool
-    @Binding var isHovering: Bool
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(isHovering: $isHovering)
-    }
-
-    func makeNSView(context: Context) -> HoverTrackingView {
-        let view = HoverTrackingView()
-        view.hoverDidChange = context.coordinator.updateHoverState
-        view.isTrackingEnabled = isEnabled
-        return view
-    }
-
-    func updateNSView(_ nsView: HoverTrackingView, context: Context) {
-        nsView.hoverDidChange = context.coordinator.updateHoverState
-        nsView.isTrackingEnabled = isEnabled
-        nsView.syncHoverState()
-    }
-
-    final class Coordinator {
-        @Binding private var isHovering: Bool
-
-        init(isHovering: Binding<Bool>) {
-            _isHovering = isHovering
-        }
-
-        func updateHoverState(_ hovering: Bool) {
-            guard isHovering != hovering else {
-                return
-            }
-            isHovering = hovering
-        }
-    }
-}
-
-private final class HoverTrackingView: NSView {
-    var hoverDidChange: ((Bool) -> Void)?
-    var isTrackingEnabled = true {
-        didSet {
-            guard oldValue != isTrackingEnabled else {
-                return
-            }
-            refreshTrackingArea()
-            syncHoverState()
-        }
-    }
-
-    private var trackingAreaRef: NSTrackingArea?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = false
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        nil
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        refreshTrackingArea()
-    }
-
-    override func layout() {
-        super.layout()
-        syncHoverState()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        syncHoverState()
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        hoverDidChange?(true)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        hoverDidChange?(false)
-    }
-
-    func syncHoverState() {
-        guard isTrackingEnabled, let window else {
-            hoverDidChange?(false)
-            return
-        }
-
-        let location = convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        hoverDidChange?(bounds.insetBy(dx: -0.5, dy: -0.5).contains(location))
-    }
-
-    private func refreshTrackingArea() {
-        if let trackingAreaRef {
-            removeTrackingArea(trackingAreaRef)
-            self.trackingAreaRef = nil
-        }
-
-        guard isTrackingEnabled else {
-            return
-        }
-
-        let trackingAreaRef = NSTrackingArea(
-            rect: .zero,
-            options: [
-                .mouseEnteredAndExited,
-                .inVisibleRect,
-                .activeInActiveApp,
-                .enabledDuringMouseDrag,
-            ],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(trackingAreaRef)
-        self.trackingAreaRef = trackingAreaRef
-    }
-}
-
-private struct AppSweepShimmer: View {
-    let active: Bool
-
-    var body: some View {
-        GeometryReader { proxy in
-            LinearGradient(
-                colors: [
-                    .clear,
-                    Color.white.opacity(0.045),
-                    Color.accentColor.opacity(0.075),
-                    .clear,
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(width: max(180, proxy.size.width * 0.22))
-            .rotationEffect(.degrees(20))
-            .blur(radius: 16)
-            .offset(x: proxy.size.width * 0.34, y: -proxy.size.height * 0.18)
-            .blendMode(.plusLighter)
-            .opacity(active ? 1 : 0)
-        }
-        .allowsHitTesting(false)
-    }
-}
-
 private struct SessionStageView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
@@ -1415,12 +885,7 @@ private struct SessionStageView: View {
 private struct HelpView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var selectedTopic = HelpTopic.iData
-
-    private var motionEnabled: Bool {
-        !accessibilityReduceMotion
-    }
 
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
@@ -1576,76 +1041,6 @@ private struct HelpView: View {
         .padding(.vertical, 4)
     }
 
-    private var helpHero: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 18) {
-                Image(nsImage: NSApplication.shared.applicationIconImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 92, height: 92)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .shadow(color: .black.opacity(0.16), radius: 20, y: 8)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(localizedText(isChinese, english: "iData Help", chinese: "iData 帮助"))
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-
-                        Spacer(minLength: 0)
-
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 30, height: 30)
-                                .background(Color.white.opacity(0.10), in: Circle())
-                                .overlay(
-                                    Circle()
-                                        .strokeBorder(Color.white.opacity(0.10))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .quietInteractiveSurface(enabled: motionEnabled, glowStyle: .circle)
-                        .help(localizedText(isChinese, english: "Close Help", chinese: "关闭帮助"))
-                        .keyboardShortcut(.cancelAction)
-                    }
-
-                    Text(localizedText(
-                        isChinese,
-                        english: "iData is a native macOS shell around real VisiData. The outer app handles opening files, history, updates, and settings; the main table view remains genuine VisiData, so normal VisiData commands still apply inside the session.",
-                        chinese: "iData 负责文件与设置，表格操作由 VisiData 提供；所有 VisiData 命令均可使用。"
-                    ))
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 10) {
-                        StatusPill(title: localizedText(isChinese, english: "Native macOS shell", chinese: "macOS 原生界面"), tint: .white.opacity(0.12), icon: "macwindow")
-                        StatusPill(title: localizedText(isChinese, english: "Real VisiData core", chinese: "VisiData 核心"), tint: Color.accentColor.opacity(0.20), icon: "terminal")
-                    }
-                }
-            }
-        }
-        .padding(24)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.18),
-                    Color.white.opacity(0.05),
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
-        .shadow(color: .black.opacity(0.10), radius: 26, y: 10)
-    }
 }
 
 private enum HelpTopic: String, CaseIterable, Identifiable {
@@ -1686,12 +1081,7 @@ private enum HelpTopic: String, CaseIterable, Identifiable {
 private struct TutorialHubView: View {
     @ObservedObject var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var selectedChapterID: String?
-
-    private var motionEnabled: Bool {
-        model.animationsEnabled && !accessibilityReduceMotion
-    }
 
     private var isChinese: Bool {
         model.effectiveLanguage == .chinese
@@ -1798,134 +1188,12 @@ private struct TutorialHubView: View {
     private var selectedChapter: AppModel.TutorialChapter? {
         model.tutorialChapters.first { $0.id == selectedChapterID }
     }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(isChinese ? "教程" : "Tutorial Checklist")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-
-                    Text(isChinese ? "选择章节开始练习；每一步由你确认完成。" : "Choose a chapter to practice and confirm each step as you finish it.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Color.white.opacity(0.10), in: Circle())
-                        .overlay(
-                            Circle()
-                                .strokeBorder(Color.white.opacity(0.10))
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-
-            HStack(spacing: 10) {
-                StatusPill(
-                    title: isChinese ? "示例数据" : "Sample-data driven",
-                    tint: .white.opacity(0.12),
-                    icon: "tablecells"
-                )
-                StatusPill(
-                    title: model.appLanguageBadgeText,
-                    tint: Color.accentColor.opacity(0.22),
-                    icon: "character.book.closed"
-                )
-            }
-        }
-        .padding(24)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12))
-        )
-        .shadow(color: .black.opacity(0.14), radius: 22, y: 8)
-    }
-
-    @ViewBuilder
-    private func chapterCard(_ chapter: AppModel.TutorialChapter) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: chapter.icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 34, height: 34)
-                    .background(Color.accentColor.opacity(0.18), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 8) {
-                        Text(chapter.title)
-                            .font(.headline)
-
-                        if chapter.isCompleted {
-                            Label(isChinese ? "已完成" : "Completed", systemImage: "checkmark.seal.fill")
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.green.opacity(0.22), in: Capsule())
-                        }
-                    }
-
-                    Text(chapter.subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                Button(chapter.isCompleted ? (isChinese ? "重新练习" : "Practice Again") : (isChinese ? "开始" : "Start")) {
-                    model.startTutorial(chapterID: chapter.id)
-                }
-                .buttonStyle(.borderedProminent)
-                .quietInteractiveSurface(enabled: motionEnabled)
-            }
-
-            VStack(spacing: 7) {
-                ForEach(chapter.steps, id: \.id) { step in
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: step.index < chapter.completedStepCount ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(step.index < chapter.completedStepCount ? Color.green : Color.secondary.opacity(0.6))
-                            .font(.system(size: 13, weight: .semibold))
-                            .padding(.top, 2)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(step.title)
-                                .font(.subheadline.weight(.semibold))
-                            Text(step.command)
-                                .font(.system(.caption, design: .monospaced, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-        }
-        .padding(18)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.10))
-        )
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
-    }
 }
 
 private struct WelcomeDetailView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updater: AppUpdaterController
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @State private var customAssociationInput = ""
 
     private var motionEnabled: Bool {
         model.animationsEnabled && !accessibilityReduceMotion
@@ -1945,67 +1213,17 @@ private struct WelcomeDetailView: View {
         ]
     }
 
-    private var normalizedCustomAssociationExtension: String {
-        AppModel.associationExtension(for: customAssociationInput)
-    }
-
-    private var canSubmitCustomAssociation: Bool {
-        AppModel.canSetAssociationExtensionInput(customAssociationInput) && !model.isSettingFormatDefault
-    }
-
-    private var isSettingCustomAssociation: Bool {
-        guard model.isSettingFormatDefault else {
-            return false
-        }
-        return AppModel.associationExtension(for: model.settingFormatExtension ?? "") == normalizedCustomAssociationExtension
-            && !normalizedCustomAssociationExtension.isEmpty
-    }
-
-    private var isCustomAssociationDefault: Bool {
-        guard !normalizedCustomAssociationExtension.isEmpty else {
-            return false
-        }
-        return model.formatAssociationStatus[normalizedCustomAssociationExtension] ?? false
-    }
-
-    private var customAssociationActionTitle: String {
-        if isCustomAssociationDefault {
-            return localizedText(isChinese, english: "Restore Previous Default", chinese: "恢复原应用")
-        }
-        return localizedText(isChinese, english: "Set Default to iData", chinese: "设为 iData")
-    }
-
-    private var customAssociationActionIcon: String {
-        isCustomAssociationDefault ? "arrow.uturn.backward.circle.fill" : "checkmark.circle.fill"
-    }
-
-    private var displayedFormatExtensions: [String] {
-        AppModel.formatPanelFormats.map(\.fileExtension)
-    }
-
-    private var orderedSupportedFormats: [(format: AppModel.SupportedFormat, isDefault: Bool)] {
-        AppModel.formatPanelFormats.map { format in
-            let lookupExtension = AppModel.associationExtension(for: format.fileExtension)
-            let isDefault = model.formatAssociationStatus[lookupExtension]
-                ?? model.formatAssociationStatus[format.fileExtension]
-                ?? false
-            return (format: format, isDefault: isDefault)
-        }
-    }
-
-    private func refreshDisplayedFormatAssociationStatus() {
-        model.refreshFormatAssociationStatuses(forExtensions: displayedFormatExtensions)
-    }
-
     private let repositoryURL = URL(string: "https://github.com/laleoarrow/iData")!
 
     var body: some View {
+        let dependencyState = model.visiDataDependencyState
+
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                heroCard
+                heroCard(dependencyState: dependencyState)
                 Divider()
                 quickTipsCard
-                systemStatusSection
+                systemStatusSection(dependencyState: dependencyState)
 
                 if let errorMessage = model.errorMessage {
                     MessageCard(
@@ -2028,7 +1246,7 @@ private struct WelcomeDetailView: View {
         }
     }
 
-    private var heroCard: some View {
+    private func heroCard(dependencyState: AppModel.VisiDataDependencyState) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 16) {
                 Image(nsImage: NSApplication.shared.applicationIconImage)
@@ -2046,7 +1264,7 @@ private struct WelcomeDetailView: View {
                 }
             }
 
-            heroActions
+            heroActions(dependencyState: dependencyState)
 
             Text(isChinese ? "支持常见表格与 .gz / .bgz 压缩文件。" : "Supports common tables and .gz / .bgz compressed files.")
                 .font(.subheadline)
@@ -2055,9 +1273,9 @@ private struct WelcomeDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var heroActions: some View {
+    private func heroActions(dependencyState: AppModel.VisiDataDependencyState) -> some View {
         HStack(spacing: 10) {
-            heroPrimaryActions
+            heroPrimaryActions(dependencyState: dependencyState)
 
             Menu {
                 Button {
@@ -2099,7 +1317,7 @@ private struct WelcomeDetailView: View {
     }
 
     @ViewBuilder
-    private var heroPrimaryActions: some View {
+    private func heroPrimaryActions(dependencyState: AppModel.VisiDataDependencyState) -> some View {
         Button {
             model.openDocument()
         } label: {
@@ -2108,7 +1326,7 @@ private struct WelcomeDetailView: View {
         .buttonStyle(.borderedProminent)
         .quietInteractiveSurface(enabled: motionEnabled, glowStyle: .prominentRounded(8))
 
-        if case .missing = model.visiDataDependencyState {
+        if case .missing = dependencyState {
             Button {
                 model.runVisiDataOneClickSetup()
             } label: {
@@ -2119,74 +1337,12 @@ private struct WelcomeDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var heroSecondaryActions: some View {
-        Button {
-            updater.checkForUpdates()
-        } label: {
-            Label(isChinese ? "检查更新" : "Check for Updates", systemImage: "arrow.trianglehead.clockwise")
-        }
-        .buttonStyle(.bordered)
-        .quietInteractiveSurface(enabled: motionEnabled)
-
-        if let fileURL = model.lastOpenedFile {
-            Button {
-                model.revealInFinder(fileURL)
-            } label: {
-                Label(isChinese ? "在 Finder 中显示" : "Show in Finder", systemImage: "finder")
-            }
-            .buttonStyle(.bordered)
-            .quietInteractiveSurface(enabled: motionEnabled)
-        }
-
-        Link(destination: repositoryURL) {
-            Label("GitHub", systemImage: "link")
-        }
-        .buttonStyle(.bordered)
-        .quietInteractiveSurface(enabled: motionEnabled)
-        .help(isChinese ? "在 GitHub 查看 iData" : "View iData on GitHub")
-    }
-
-    private var showsReadyDependencyPillInTitleRow: Bool {
-        if case .available = model.visiDataDependencyState {
-            return true
-        }
-
-        return false
-    }
-
-    private var showsHeroMetadataRow: Bool {
-        if case .missing = model.visiDataDependencyState {
-            return true
-        }
-
-        return model.lastOpenedFile != nil
-    }
-
-    private var tutorialEntryCard: some View {
-        TutorialEntryCard(
-            chapters: model.tutorialChapters,
-            isChinese: isChinese,
-            motionEnabled: motionEnabled,
-            startAction: { model.presentTutorialHub() }
-        )
-    }
-
-    private var dependencyPill: some View {
-        switch model.visiDataDependencyState {
-        case .available:
-            return AnyView(StatusPill(title: localizedText(isChinese, english: "VisiData Ready", chinese: "VisiData 可用"), tint: .green.opacity(0.20), icon: "checkmark.circle.fill"))
-        case .missing:
-            return AnyView(StatusPill(title: localizedText(isChinese, english: "VisiData Missing", chinese: "未安装 VisiData"), tint: .orange.opacity(0.22), icon: "exclamationmark.triangle.fill"))
-        }
-    }
-
-    private var systemStatusSection: some View {
+    private func systemStatusSection(dependencyState: AppModel.VisiDataDependencyState) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: model.visiDataDependencyState.isAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(model.visiDataDependencyState.isAvailable ? .green : .orange)
+            Image(systemName: dependencyState.isAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(dependencyState.isAvailable ? .green : .orange)
 
-            Text(model.visiDataDependencyState.isAvailable
+            Text(dependencyState.isAvailable
                 ? (isChinese ? "VisiData 已就绪" : "VisiData Ready")
                 : (isChinese ? "需要安装 VisiData" : "VisiData Required"))
                 .font(.subheadline.weight(.semibold))
@@ -2199,29 +1355,6 @@ private struct WelcomeDetailView: View {
         }
         .padding(.vertical, 2)
         .frame(maxWidth: .infinity)
-    }
-
-    private func systemStatusItem(title: String, icon: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 30, alignment: .center)
-                .padding(.top, 1)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(title)
-                    .font(.title3.weight(.semibold))
-
-                Text(detail)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var quickTipsCard: some View {
@@ -2297,272 +1430,6 @@ private struct WelcomeDetailView: View {
         }
     }
 
-    private var formatsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
-                Text(localizedText(isChinese, english: "Supported Formats", chinese: "默认打开方式"))
-                    .font(.headline)
-                
-                Button {
-                    refreshDisplayedFormatAssociationStatus()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(6)
-                        .background(Color.accentColor.opacity(0.12), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(localizedText(isChinese, english: "Refresh system defaults", chinese: "刷新默认应用"))
-                .help(localizedText(isChinese, english: "Refresh system defaults", chinese: "刷新默认应用"))
-                
-                Spacer()
-                
-                SettingsLink {
-                    Label(localizedText(isChinese, english: "Handoff Rules", chinese: "小文件设置…"), systemImage: "gearshape.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .tint(.accentColor)
-                .quietInteractiveSurface(enabled: motionEnabled)
-            }
-
-            Text(localizedText(
-                isChinese,
-                english: "Tap a chip to toggle default handling: set iData, then tap again to restore another app.",
-                chinese: "点击格式，设为 iData 默认打开；再次点击可恢复。"
-            ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                ForEach(orderedSupportedFormats, id: \.format.fileExtension) { entry in
-                    FormatChip(
-                        title: entry.format.localizedDisplayName(for: model.effectiveLanguage),
-                        extensionText: entry.format.fileExtension,
-                        isDefault: entry.isDefault,
-                        isLoading: model.isSettingFormatDefault && model.settingFormatExtension == entry.format.fileExtension,
-                        isChinese: isChinese,
-                        onTap: {
-                            model.setFormatAsDefault(forExtension: entry.format.fileExtension)
-                        }
-                    )
-                }
-            }
-
-            Divider()
-                .overlay(Color.white.opacity(0.08))
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text(localizedText(isChinese, english: "Custom Suffix", chinese: "其他扩展名"))
-                    .font(.subheadline.weight(.semibold))
-
-                HStack(spacing: 10) {
-                    TextField(".vcf / vcf / my.ext", text: $customAssociationInput)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.subheadline, design: .monospaced))
-                        .autocorrectionDisabled()
-                        .onSubmit {
-                            if canSubmitCustomAssociation {
-                                model.setFormatAsDefault(forExtension: customAssociationInput)
-                            }
-                        }
-
-                    Button {
-                        model.setFormatAsDefault(forExtension: customAssociationInput)
-                    } label: {
-                        Label(customAssociationActionTitle, systemImage: customAssociationActionIcon)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
-                    .tint(.accentColor)
-                    .disabled(!canSubmitCustomAssociation)
-                    .quietInteractiveSurface(enabled: motionEnabled)
-                }
-
-                if !normalizedCustomAssociationExtension.isEmpty {
-                    HStack(spacing: 8) {
-                        Text(localizedText(
-                            isChinese,
-                            english: "Suffix: .\(normalizedCustomAssociationExtension)",
-                            chinese: "后缀：.\(normalizedCustomAssociationExtension)"
-                        ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        if isSettingCustomAssociation {
-                            ProgressView()
-                                .controlSize(.small)
-                            Text(localizedText(isChinese, english: "Setting...", chinese: "设置中…"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else if isCustomAssociationDefault {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                            Text(localizedText(isChinese, english: "Default: iData", chinese: "已设为 iData"))
-                                .font(.caption)
-                                .foregroundStyle(.green)
-                        }
-                    }
-                } else {
-                    Text(localizedText(
-                        isChinese,
-                        english: "Enter a suffix to set its default handler to iData.",
-                        chinese: "输入扩展名，如 .vcf。"
-                    ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
-        .onAppear {
-            refreshDisplayedFormatAssociationStatus()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            refreshDisplayedFormatAssociationStatus()
-        }
-        .onChange(of: normalizedCustomAssociationExtension) { _, newValue in
-            guard !newValue.isEmpty else {
-                return
-            }
-            model.refreshFormatAssociationStatuses(forExtensions: [newValue])
-        }
-    }
-}
-
-private struct TutorialEntryCard: View {
-    let chapters: [AppModel.TutorialChapter]
-    let isChinese: Bool
-    let motionEnabled: Bool
-    let startAction: () -> Void
-    @State private var tutorialPreviewChapterIndex = 0
-    @State private var carouselRestartToken = 0
-
-    private var currentPreviewChapter: AppModel.TutorialChapter? {
-        guard !chapters.isEmpty else {
-            return nil
-        }
-        return chapters[tutorialPreviewChapterIndex % chapters.count]
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(isChinese ? "教程" : "Interactive Tutorial")
-                        .font(.headline)
-
-                    Text(isChinese ? "用示例数据边学边练。" : "Learn VisiData with a sample dataset and a guided in-session coach.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-
-                Button(action: startAction) {
-                    Label(isChinese ? "开始" : "Start", systemImage: "play.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .tint(.accentColor)
-                .quietInteractiveSurface(enabled: motionEnabled)
-            }
-
-            if let chapter = currentPreviewChapter {
-                HStack(spacing: 8) {
-                    Image(systemName: chapter.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                    Text(chapter.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-                .id(chapter.id + "-header")
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-
-                VStack(spacing: 9) {
-                    ForEach(Array(chapter.steps.prefix(4)), id: \.id) { step in
-                        tutorialPreviewRow(step)
-                    }
-                }
-                .id(chapter.id + "-steps")
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                ))
-            }
-
-            if chapters.count > 1 {
-                HStack(spacing: 6) {
-                    Spacer()
-                    ForEach(Array(chapters.enumerated()), id: \.element.id) { index, _ in
-                        Circle()
-                            .fill(Color.white.opacity(index == (tutorialPreviewChapterIndex % chapters.count) ? 0.8 : 0.25))
-                            .frame(width: 6, height: 6)
-                            .scaleEffect(index == (tutorialPreviewChapterIndex % chapters.count) ? 1.15 : 1)
-                            .onTapGesture {
-                                withAnimation(.easeInOut(duration: 0.35)) {
-                                    tutorialPreviewChapterIndex = index
-                                }
-                                carouselRestartToken += 1
-                            }
-                    }
-                    Spacer()
-                }
-                .padding(.top, 2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
-        .animation(.easeInOut(duration: 0.4), value: tutorialPreviewChapterIndex)
-        .task(id: carouselRestartToken) {
-            await runCarousel()
-        }
-    }
-
-    @MainActor
-    private func runCarousel() async {
-        while !Task.isCancelled {
-            do {
-                try await Task.sleep(for: .seconds(6))
-            } catch {
-                return
-            }
-
-            guard chapters.count > 1 else {
-                continue
-            }
-            tutorialPreviewChapterIndex = (tutorialPreviewChapterIndex + 1) % chapters.count
-        }
-    }
-
-    @ViewBuilder
-    private func tutorialPreviewRow(_ step: AppModel.TutorialStep) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text("\(step.index + 1)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .frame(width: 24, height: 24)
-                .background(Color.accentColor.opacity(0.22), in: Circle())
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(step.title)
-                    .font(.subheadline.weight(.semibold))
-                Text(step.command)
-                    .font(.system(.caption, design: .monospaced, weight: .semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.08), in: Capsule())
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
 }
 
 private struct SessionDetailView: View {

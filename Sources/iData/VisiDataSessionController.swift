@@ -213,6 +213,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let preflight = VisiDataLaunchPrereflight()
     private let ioQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session")
     private let processWaitQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session.wait")
+    private let processTeardownQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session.teardown")
+    private let processTeardownGroup = DispatchGroup()
     private let writeQueue = DispatchQueue(label: "io.github.leoarrow.idata.visidata-session.write")
     private let ptyWriteDriver: PTYWriteDriver
     private let signalSender: (_ pid: pid_t, _ signal: Int32) -> Int32
@@ -220,6 +222,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private let launchAttemptValidator: () throws -> Void
     private let fallbackReadyObserver: ((UInt64) -> Void)?
     private let fallbackEvaluationObserver: ((UInt64) -> Void)?
+    private let processTeardownWaitHook: (@Sendable (pid_t) -> Void)?
     private let displayMeasurementFallbackDelay: Duration
     private weak var displaySink: TerminalDisplaySink?
     private var isDisplayReady = false
@@ -243,11 +246,20 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     private var outputDeliveryGeneration: UInt64?
     private var lastKnownSize: (cols: UInt16, rows: UInt16) = (120, 32)
     private var outputGeneration: UInt64 = 0
+    private var processTeardownGeneration: UInt64 = 0
+    private var activeProcessTeardownGeneration: UInt64?
+    private var shouldLaunchPendingOpenAfterTeardown = false
 
     private struct PendingOpenRequest {
         let fileURL: URL
         let vdURL: URL
         let generation: UInt64
+    }
+
+    private struct ProcessIdentity: Equatable, Sendable {
+        let processIdentifier: pid_t
+        let startTimeSeconds: UInt64
+        let startTimeMicroseconds: UInt64
     }
 
     init(
@@ -259,6 +271,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         launchAttemptValidator: @escaping () throws -> Void = {},
         fallbackReadyObserver: ((UInt64) -> Void)? = nil,
         fallbackEvaluationObserver: ((UInt64) -> Void)? = nil,
+        processTeardownWaitHook: (@Sendable (pid_t) -> Void)? = nil,
         displayMeasurementFallbackDelay: Duration = .milliseconds(900)
     ) {
         self.ptyWriteDriver = ptyWriteDriver
@@ -267,6 +280,7 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         self.launchAttemptValidator = launchAttemptValidator
         self.fallbackReadyObserver = fallbackReadyObserver
         self.fallbackEvaluationObserver = fallbackEvaluationObserver
+        self.processTeardownWaitHook = processTeardownWaitHook
         self.displayMeasurementFallbackDelay = displayMeasurementFallbackDelay
     }
 
@@ -353,9 +367,10 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         }
 
         let vdURL = try preflight.resolveExecutable(explicitVDPath: explicitVDPath)
-        stopCurrentProcessIfNeeded(reapSynchronously: true)
+        stopCurrentProcessIfNeeded(reapSynchronously: false)
         pendingLaunchTask?.cancel()
         pendingLaunchTask = nil
+        shouldLaunchPendingOpenAfterTeardown = false
 
         currentFileURL = fileURL
         errorMessage = nil
@@ -499,11 +514,12 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor
-    func terminate() {
+    func terminate(waitForProcessExit: Bool = false) {
         pendingLaunchTask?.cancel()
         pendingLaunchTask = nil
         pendingOpenRequest = nil
-        stopCurrentProcessIfNeeded(reapSynchronously: true)
+        shouldLaunchPendingOpenAfterTeardown = false
+        stopCurrentProcessIfNeeded(reapSynchronously: waitForProcessExit)
         isRunning = false
         statusMessage = AppModel.localized(
             english: "Session ended.",
@@ -516,7 +532,8 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         pendingLaunchTask?.cancel()
         pendingLaunchTask = nil
         pendingOpenRequest = nil
-        stopCurrentProcessIfNeeded(reapSynchronously: true)
+        shouldLaunchPendingOpenAfterTeardown = false
+        stopCurrentProcessIfNeeded(reapSynchronously: false)
         isRunning = false
         statusMessage = nil
         errorMessage = AppModel.localized(english: english, chinese: chinese)
@@ -758,6 +775,12 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         guard let pendingOpenRequest else {
             return
         }
+        guard activeProcessTeardownGeneration == nil else {
+            shouldLaunchPendingOpenAfterTeardown = true
+            return
+        }
+
+        shouldLaunchPendingOpenAfterTeardown = false
         pendingLaunchTask?.cancel()
         pendingLaunchTask = nil
 
@@ -926,61 +949,156 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
 
         if pid > 0 {
             childPID = 0
-            signalProcessTree(rootPID: pid, signal: SIGTERM)
+            let rootIdentity = Self.processIdentity(for: pid)
+            let descendantIdentities = Self.descendantProcessIdentities(of: pid)
+            Self.signalProcessTree(
+                rootPID: pid,
+                rootIdentity: rootIdentity,
+                descendantIdentities: descendantIdentities,
+                signal: SIGTERM
+            )
 
             if reapSynchronously {
-                var exitStatus: Int32 = 0
-                let deadline = Date().addingTimeInterval(0.5)
+                Self.reapTerminatedProcess(
+                    rootPID: pid,
+                    rootIdentity: rootIdentity,
+                    descendantIdentities: descendantIdentities
+                )
+            } else {
+                processTeardownGeneration &+= 1
+                let teardownGeneration = processTeardownGeneration
+                activeProcessTeardownGeneration = teardownGeneration
+                let teardownGroup = processTeardownGroup
+                let teardownWaitHook = processTeardownWaitHook
 
-                while true {
-                    let waitResult = waitpid(pid, &exitStatus, WNOHANG)
-                    if waitResult == pid || waitResult == -1 {
-                        break
+                teardownGroup.enter()
+                processTeardownQueue.async { [weak self] in
+                    teardownWaitHook?(pid)
+                    Self.reapTerminatedProcess(
+                        rootPID: pid,
+                        rootIdentity: rootIdentity,
+                        descendantIdentities: descendantIdentities
+                    )
+                    teardownGroup.leave()
+
+                    Task { @MainActor [weak self] in
+                        self?.finishProcessTeardown(generation: teardownGeneration)
                     }
-
-                    if Date() >= deadline {
-                        signalProcessTree(rootPID: pid, signal: SIGKILL)
-                        _ = waitpid(pid, &exitStatus, 0)
-                        break
-                    }
-
-                    usleep(20_000)
                 }
             }
+        } else if reapSynchronously {
+            processTeardownGroup.wait()
         }
 
         cleanupDescriptorsAndSources()
     }
 
-    private func signalProcessTree(rootPID: pid_t, signal: Int32) {
+    @MainActor
+    private func finishProcessTeardown(generation: UInt64) {
+        guard activeProcessTeardownGeneration == generation else {
+            return
+        }
+
+        activeProcessTeardownGeneration = nil
+        guard shouldLaunchPendingOpenAfterTeardown else {
+            return
+        }
+
+        shouldLaunchPendingOpenAfterTeardown = false
+        launchPendingOpenReportingFailure()
+    }
+
+    private static func reapTerminatedProcess(
+        rootPID: pid_t,
+        rootIdentity: ProcessIdentity?,
+        descendantIdentities: [ProcessIdentity]
+    ) {
+        var exitStatus: Int32 = 0
+        let deadline = DispatchTime.now() + .milliseconds(500)
+        var rootProcessExited = false
+
+        while true {
+            if !rootProcessExited {
+                let waitResult = waitpid(rootPID, &exitStatus, WNOHANG)
+                if waitResult == rootPID {
+                    rootProcessExited = true
+                } else if waitResult == -1 {
+                    if errno == EINTR {
+                        continue
+                    }
+                    rootProcessExited = true
+                }
+            }
+
+            let descendantsStillRunning = descendantIdentities.contains(where: processStillMatchesIdentity)
+            if rootProcessExited && !descendantsStillRunning {
+                return
+            }
+
+            if DispatchTime.now() >= deadline {
+                signalProcessTree(
+                    rootPID: rootPID,
+                    rootIdentity: rootProcessExited ? nil : rootIdentity,
+                    descendantIdentities: descendantIdentities,
+                    signal: SIGKILL
+                )
+                if !rootProcessExited {
+                    repeat {
+                        errno = 0
+                    } while waitpid(rootPID, &exitStatus, 0) == -1 && errno == EINTR
+                }
+
+                let descendantDeadline = DispatchTime.now() + .milliseconds(250)
+                while descendantIdentities.contains(where: processStillMatchesIdentity), DispatchTime.now() < descendantDeadline {
+                    usleep(5_000)
+                }
+                return
+            }
+
+            usleep(20_000)
+        }
+    }
+
+    private static func processStillMatchesIdentity(_ identity: ProcessIdentity) -> Bool {
+        processIdentity(for: identity.processIdentifier) == identity
+    }
+
+    private static func signalProcessTree(
+        rootPID: pid_t,
+        rootIdentity: ProcessIdentity?,
+        descendantIdentities: [ProcessIdentity],
+        signal: Int32
+    ) {
         guard rootPID > 0 else {
             return
         }
 
-        let descendantPIDs = descendantProcessIDs(of: rootPID)
-
-        if kill(-rootPID, signal) == 0 {
-            for descendantPID in descendantPIDs {
-                _ = kill(descendantPID, signal)
+        if let rootIdentity, processStillMatchesIdentity(rootIdentity), kill(-rootPID, signal) == 0 {
+            for descendantIdentity in descendantIdentities where processStillMatchesIdentity(descendantIdentity) {
+                _ = kill(descendantIdentity.processIdentifier, signal)
             }
             return
         }
 
-        for descendantPID in descendantPIDs {
-            _ = kill(descendantPID, signal)
+        for descendantIdentity in descendantIdentities where processStillMatchesIdentity(descendantIdentity) {
+            _ = kill(descendantIdentity.processIdentifier, signal)
         }
-        _ = kill(rootPID, signal)
+        if let rootIdentity, processStillMatchesIdentity(rootIdentity) {
+            _ = kill(rootPID, signal)
+        }
     }
 
-    private func descendantProcessIDs(of rootPID: pid_t) -> [pid_t] {
+    private static func descendantProcessIdentities(of rootPID: pid_t) -> [ProcessIdentity] {
         var visited = Set<pid_t>()
         var queue: [pid_t] = [rootPID]
-        var descendants: [pid_t] = []
+        var descendants: [ProcessIdentity] = []
 
         while let parentPID = queue.popLast() {
             for childPID in childProcessIDs(of: parentPID) where !visited.contains(childPID) {
                 visited.insert(childPID)
-                descendants.append(childPID)
+                if let identity = processIdentity(for: childPID) {
+                    descendants.append(identity)
+                }
                 queue.append(childPID)
             }
         }
@@ -988,36 +1106,44 @@ final class VisiDataSessionController: ObservableObject, @unchecked Sendable {
         return descendants
     }
 
-    private func childProcessIDs(of parentPID: pid_t) -> [pid_t] {
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
+    private static func processIdentity(for processIdentifier: pid_t) -> ProcessIdentity? {
+        var processInfo = proc_bsdinfo()
+        let infoSize = MemoryLayout<proc_bsdinfo>.size
+        let result = proc_pidinfo(
+            processIdentifier,
+            PROC_PIDTBSDINFO,
+            0,
+            &processInfo,
+            Int32(infoSize)
+        )
+        guard result == infoSize, processInfo.pbi_pid == UInt32(processIdentifier) else {
+            return nil
+        }
 
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-        process.arguments = ["-P", String(parentPID)]
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
+        return ProcessIdentity(
+            processIdentifier: processIdentifier,
+            startTimeSeconds: processInfo.pbi_start_tvsec,
+            startTimeMicroseconds: processInfo.pbi_start_tvusec
+        )
+    }
 
-        do {
-            try process.run()
-        } catch {
+    private static func childProcessIDs(of parentPID: pid_t) -> [pid_t] {
+        let requiredCount = proc_listchildpids(parentPID, nil, 0)
+        guard requiredCount > 0 else {
             return []
         }
 
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
+        var processIdentifiers = [pid_t](repeating: 0, count: Int(requiredCount))
+        let childCount = processIdentifiers.withUnsafeMutableBytes { buffer in
+            proc_listchildpids(parentPID, buffer.baseAddress, Int32(buffer.count))
+        }
+        guard childCount > 0 else {
             return []
         }
 
-        let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        guard let output = String(data: data, encoding: .utf8) else {
-            return []
-        }
-
-        return output
-            .split(whereSeparator: \.isWhitespace)
-            .compactMap { pid_t($0) }
+        return processIdentifiers
+            .prefix(min(Int(childCount), processIdentifiers.count))
+            .filter { $0 > 0 }
     }
 
     private func cleanupDescriptorsAndSources() {
