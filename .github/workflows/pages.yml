@@ -1,0 +1,128 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload GitHub Pages artifact
+        id: artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/github-script@v9
+        env:
+          ARTIFACT_ID: ${{ steps.artifact.outputs.artifact_id }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const buildVersion = context.sha;
+            const artifactId = Number(process.env.ARTIFACT_ID);
+
+            if (!Number.isSafeInteger(artifactId)) {
+              throw new Error(`Invalid Pages artifact ID: ${process.env.ARTIFACT_ID}`);
+            }
+
+            const deployment = await github.request(
+              'POST /repos/{owner}/{repo}/pages/deployments',
+              {
+                owner,
+                repo,
+                artifact_id: artifactId,
+                pages_build_version: buildVersion,
+                oidc_token: await core.getIDToken()
+              }
+            );
+            const deploymentId = deployment.data.id || buildVersion;
+            const finalFailures = new Set([
+              'deployment_failed',
+              'deployment_content_failed',
+              'deployment_cancelled',
+              'deployment_lost'
+            ]);
+            const deadline = Date.now() + 45 * 60 * 1000;
+            let consecutiveErrors = 0;
+            let lastStatus;
+
+            core.info(`Created Pages deployment ${deploymentId}.`);
+
+            while (Date.now() < deadline) {
+              await new Promise(resolve => setTimeout(resolve, 5000));
+
+              let status;
+              try {
+                const response = await github.request(
+                  'GET /repos/{owner}/{repo}/pages/deployments/{deploymentId}',
+                  { owner, repo, deploymentId }
+                );
+                status = response.data.status;
+                consecutiveErrors = 0;
+              } catch (error) {
+                consecutiveErrors += 1;
+                core.warning(`Pages status check failed (${consecutiveErrors}/10): ${error.message}`);
+                if (consecutiveErrors >= 10) {
+                  throw error;
+                }
+                continue;
+              }
+
+              if (status !== lastStatus) {
+                core.info(`Pages deployment status: ${status}`);
+                lastStatus = status;
+              }
+
+              if (status === 'succeed') {
+                const pages = await github.request('GET /repos/{owner}/{repo}/pages', {
+                  owner,
+                  repo
+                });
+                core.setOutput('page_url', pages.data.html_url);
+                return;
+              }
+
+              if (finalFailures.has(status)) {
+                throw new Error(`Pages deployment ended with status: ${status}`);
+              }
+            }
+
+            try {
+              await github.request(
+                'POST /repos/{owner}/{repo}/pages/deployments/{deploymentId}/cancel',
+                { owner, repo, deploymentId }
+              );
+            } catch (error) {
+              core.warning(`Could not cancel timed-out Pages deployment: ${error.message}`);
+            }
+            throw new Error('Pages deployment did not finish within 45 minutes.');
