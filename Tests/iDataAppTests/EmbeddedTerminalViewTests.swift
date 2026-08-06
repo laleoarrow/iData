@@ -538,13 +538,16 @@ struct EmbeddedTerminalViewTests {
     @Test
     func initialGenerationReloadsWhenReadyAndResizeNeverArrive() async throws {
         let session = VisiDataSessionController()
-        let coordinator = EmbeddedTerminalView.Coordinator(session: session)
+        let coordinator = EmbeddedTerminalView.Coordinator(
+            session: session,
+            initialHandshakeTimeout: 0.05
+        )
         let webView = ScriptedTerminalWebView()
 
         coordinator.bind(session: session, webView: webView)
         coordinator.webView(webView, didFinish: nil)
 
-        let didReload = try await waitUntil(timeout: .seconds(10)) {
+        let didReload = try await waitUntil {
             webView.refreshEvaluationCallCount >= 1 && webView.pageLoadCallCount >= 1
         }
 

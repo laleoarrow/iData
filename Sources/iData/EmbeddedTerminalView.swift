@@ -93,6 +93,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         private var navigationEpoch = 0
         private var activeNavigation: WKNavigation?
         private var navigationRecoveryWorkItem: DispatchWorkItem?
+        private let initialHandshakeTimeout: TimeInterval
 
         private static let resetHandshakeTimeout: TimeInterval = 3.2
         private static let resetRetryDelay: TimeInterval = 0.12
@@ -100,8 +101,12 @@ struct EmbeddedTerminalView: NSViewRepresentable {
         private static let resetReloadLimit = 3
         private static let navigationRecoveryLimit = 5
 
-        init(session: VisiDataSessionController) {
+        init(
+            session: VisiDataSessionController,
+            initialHandshakeTimeout: TimeInterval = 3.2
+        ) {
             self.session = session
+            self.initialHandshakeTimeout = initialHandshakeTimeout
             super.init()
         }
 
@@ -562,7 +567,7 @@ struct EmbeddedTerminalView: NSViewRepresentable {
             }
             initialHandshakeWorkItem = watchdog
             DispatchQueue.main.asyncAfter(
-                deadline: .now() + Self.resetHandshakeTimeout,
+                deadline: .now() + initialHandshakeTimeout,
                 execute: watchdog
             )
         }
