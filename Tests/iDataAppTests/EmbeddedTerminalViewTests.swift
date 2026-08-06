@@ -361,7 +361,7 @@ struct EmbeddedTerminalViewTests {
 
         coordinator.resetTerminalDisplay()
 
-        let didRetry = try await waitUntil {
+        let didRetry = try await waitUntil(timeout: .seconds(10)) {
             webView.resetEvaluationCallCount >= 2
         }
 
