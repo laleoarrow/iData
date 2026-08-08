@@ -1,63 +1,75 @@
-# iData UI design QA
+# iData landing page — design QA
 
-## Comparison setup
+**Source visual truth**
 
-- Appearance: Chinese, dark mode.
-- Build: Release `0.2.18` (build 38), installed at `/Applications/iData.app`.
-- Source visual truth: `/var/folders/jc/p8qsvpfd6t71pngj51n4yvvh0000gn/T/codex-clipboard-9b454ea8-6dff-4271-8338-c9893ce38a06.png` (1366 × 997 px, annotated inactive state).
-- Focused implementation evidence: `/tmp/idata-open-button-hover.png` (304 × 136 px at 2×, 152 × 68 pt rendered hover state).
-- Source intent: the primary Open button needs a visible hover halo against its system-blue fill.
-- Implementation: the installed Release app at the 680 × 460 pt minimum content size, expanded sidebar, and matching recent-file state.
-- The implementation was reviewed at both the 960 × 620 pt default content size and the new minimum size.
-- Density normalization: the source establishes full-view location and proportions; the focused 2× component render evaluates only the requested hover treatment at native button scale.
-- Interaction method: background launch and window-ID capture; the foreground app, pointer, and keyboard focus were not changed.
+- `/Users/leoarrow/.codex/generated_images/019fb5a3-a6c8-7a03-a937-f45c9e2f0a1c/exec-3071271a-693a-46bf-bba3-d49fe52e3ddb.png`
+- Source pixels: `944 × 1666` PNG. The generated concept has no browser CSS viewport or DPR metadata.
 
-## Findings and resolutions
+**Rendered implementation**
 
-- Welcome hierarchy: the selected concept uses one clear task, one primary Open action, and one compact overflow action.
-  Resolution: retained native button proportions and removed competing welcome-page cards.
-- Shortcut layout: the first implementation truncated the movement keys and wrapped the Select Rows description.
-  Resolution: used two explicit columns with column-specific key widths and a bounded scale-down for long key sequences.
-- Vertical balance: stretching the neutral state created an empty band between shortcuts and readiness.
-  Resolution: removed the viewport-filling spacer so readiness follows the shortcut section naturally.
-- Shortcut divider: the vertical separator inherited the stretched row height and continued through empty space.
-  Resolution: constrained the two-column shortcut row to its intrinsic content height.
-- Sidebar color: the fixed dark fill created an abrupt block against the shared window background.
-  Resolution: made the sidebar transparent and kept only a subtle one-pixel separator.
-- Window sizing: the 1180 × 760 pt default and 860 × 580 pt minimum made the welcome window consume too much screen space.
-  Resolution: reduced the default content size to 960 × 620 pt and the minimum to 680 × 460 pt.
-- Narrow-window shortcuts: the two-column shortcut grid could not remain legible at the new minimum width.
-  Resolution: retained the approved two-column layout at normal widths and switched to one column automatically when space is limited.
-- Interactive hover feedback: the shared modifier had been reduced to an empty implementation, removing feedback from actionable controls.
-  Resolution: restored a restrained blue–cyan–violet gradient on interactive controls only.
-- Sidebar coverage: the footer icons, collapse/expand controls, empty rail action, and recent-file rows were not all connected to the restored hover layer.
-  Resolution: applied the same shape-matched conditional gradient to each actionable sidebar surface.
-- Footer motion: Settings, Help, and Tutorial had been flattened to static symbols even though their lightweight motion helper remained available.
-  Resolution: reconnected the existing one-shot gear rotation, help bounce, and tutorial-cap tilt without adding a timer or continuous pointer tracking.
-- Primary-action contrast: the shared low-opacity gradient was perceptible on dark and translucent controls but disappeared visually over the system-blue Open button.
-  Resolution: added a prominent variant with a brighter inner rim, restrained translucent fill, and a low-opacity 4 pt outer gradient halo without changing the native button size or pressed state.
-- Hover performance: the former implementation animated scale, offset, blur-like shadows, and persistent decorative layers.
-  Resolution: the gradient layer now exists only while hovered, updates only on pointer enter/exit, and uses no continuous location tracking, blur, shadow, or layout-affecting transform.
+- Local route: `http://127.0.0.1:4173/`
+- Desktop screenshot: `/tmp/idata-page-desktop-reset.png`
+- Desktop viewport: `1280 × 720` CSS px; browser DPR `2`; full-page capture exported at CSS density as `1280 × 2217` px.
+- Responsive evidence: `/tmp/idata-page-mobile-final.png` at `390 × 844` CSS px, plus a measured tablet geometry pass at `820 × 1000` CSS px.
+- State: dark theme, English product UI, latest GitHub release resolved to `v0.2.20`, default page state.
 
-## Visual review
+**Normalization**
 
-- Typography: the selected title, subtitle, shortcut labels, status, and version hierarchy is preserved.
-- Spacing: hero, divider, shortcut grid, and footer follow the selected concept without nested cards.
-- Color: the background capture shows the inactive native button state; the primary action uses the normal blue accent when the window is active.
-- Controls: Open and More remain compact native macOS controls with balanced heights and no oversized CTA.
-- Primary action: Open keeps its native prominent-button appearance and gains a clearly visible blue–cyan–violet rim only while hovered.
-- Focused comparison: the rendered hover state preserves the compact 120 × 36 pt button body while the halo extends into the surrounding 16 pt evidence margin; no text, icon, or corner clipping is visible.
-- Hover: interactive controls receive one subtle, shape-matched gradient layer; read-only status remains static.
-- Footer icons: Settings rotates once, Help bounces, and Tutorial tilts when the pointer enters; all three return to their resting state when it leaves.
-- Narrow layout: the shortcut list switches to one column and remains accessible through the existing welcome-page scroll view.
+- The source and implementation full-page images were each normalized to `720` px width.
+- Source became `720 × 1271`; implementation became `720 × 1247` and was padded to `720 × 1271` with the page background.
+- Side-by-side full comparison: `/tmp/idata-design-qa-final-full.png` (`1440 × 1271`, source left, implementation right).
+- Focus comparison: `/tmp/idata-design-qa-final-focus.png` (`1440 × 900`, source left, implementation right), covering the header, hero, install command, product image, and annotation rail.
 
-## Verification scope
+**Findings**
 
-- The annotated reference exposed a P2 window-sizing and resize-limit issue.
-- The installed app window reached the 680 × 460 pt minimum content size (680 × 492 pt including the title bar) without horizontal clipping.
-- The hover layer was rendered directly in the test target and verified to produce colored output only while visible.
-- The focused implementation render confirms the halo extends beyond the blue fill; the hidden-state renderer remains transparent, so the full-view inactive layout is unchanged.
-- Verified that sidebar hover state changes only at pointer boundaries and that the gradient path contains no continuous tracking, geometry reader, radial gradient, blur, or shadow.
-- Drag-and-drop was intentionally not tested at the user’s request.
+- No actionable P0, P1, or P2 mismatch remains.
+- Fonts and typography: Inter and IBM Plex Mono reproduce the reference's editorial sans/technical mono hierarchy. The final headline keeps the intended two-line desktop composition, with controlled wrapping on smaller screens.
+- Spacing and layout rhythm: the final page preserves the reference's restrained header, large hero, stacked install actions, dominant product image, narrow annotation rail, two-column release block, and minimal footer. Border radii, rules, and spacing remain deliberately restrained.
+- Colors and visual tokens: near-black surfaces, cool white text, muted gray secondary text, blue actions, and fine gray dividers map cleanly to the source. Contrast remains readable without glass or decorative effects.
+- Image quality and asset fidelity: the implementation intentionally replaces the concept's generated product rendering with the real iData v0.2.20 app screenshot in English, as requested. The crop is sharp, fills the intended frame, and has no transparency halo or fake UI asset.
+- Copy and content: product claims are concise and grounded in the repository: native macOS shell, real VisiData workflow, compressed-file support, macOS requirement, current release, and Homebrew command.
+- Icons: one consistent Phosphor icon family is used for visible controls; the product logo and interface are real assets rather than CSS or SVG approximations.
+- Responsiveness: measured horizontal overflow is `0 px` at 1280, 820, and 390 CSS px. Product, annotation, release, and footer grids collapse without clipped controls or awkward overlap.
+- Accessibility: the page declares English, includes semantic navigation and headings, descriptive product-image alt text, a skip link, visible keyboard focus, practical mobile targets, and reduced-motion handling.
+
+**Open Questions**
+
+- None blocking. The header label is `Guide` instead of the concept's `Docs` because the destination is the repository README; this is an intentional content correction.
+
+**Comparison History**
+
+1. Pass 1 (`/tmp/idata-page-desktop-pass1.png`)
+   - P2: the second headline line wrapped to two lines, changing the reference's above-the-fold composition.
+   - P2: the real product screenshot retained too much outer padding, making the core product surface feel smaller than the reference.
+   - Fixes: removed the desktop headline width constraint, preserved the second line at desktop widths, and tightened the real screenshot crop with an explicit aspect ratio plus measured scale/translation.
+   - Post-fix evidence: `/tmp/idata-page-desktop-pass3.png` shows the two-line headline and a substantially larger, better-integrated product image.
+2. Pass 2 (`/tmp/idata-page-desktop-pass3.png`)
+   - P2: the download CTA and Homebrew command sat side by side, while the selected reference uses a clearer vertical install hierarchy.
+   - Fix: grouped download/compatibility and Homebrew label/command separately, then stacked both groups in `.hero-tools`.
+   - Post-fix evidence: `/tmp/idata-page-desktop-reset.png`, `/tmp/idata-design-qa-final-full.png`, and `/tmp/idata-design-qa-final-focus.png` show the corrected hierarchy with no new P0/P1/P2 issue.
+
+**Primary Interactions Tested**
+
+- Latest GitHub release metadata resolves to `v0.2.20` and the primary download link resolves to the direct universal DMG asset.
+- Homebrew copy buttons enter the copied state and show the `Homebrew command copied` live-status toast.
+- Header, guide, GitHub, release-note, and download link destinations were inspected.
+- Keyboard focus reaches the header links and renders the defined blue focus outline.
+- Desktop, tablet, and mobile breakpoint geometry was measured; mobile and desktop were visually captured.
+
+**Console Errors Checked**
+
+- Final browser pass: no warnings or errors.
+
+**Implementation Checklist**
+
+- [x] Use the selected black editorial design direction.
+- [x] Replace generated product UI with a real English iData screenshot.
+- [x] Preserve a two-line desktop headline and stacked install hierarchy.
+- [x] Bind release metadata and DMG URL to the GitHub release API with a static fallback.
+- [x] Verify responsive layout, focus styling, copy feedback, and console output.
+
+**Follow-up Polish**
+
+- No blocking polish remains. A future release could replace the static screenshot when the app's visible onboarding UI changes.
 
 final result: passed

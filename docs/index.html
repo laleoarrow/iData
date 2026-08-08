@@ -3,183 +3,185 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>iData</title>
+    <title>iData — VisiData in a native Mac window</title>
     <meta
       name="description"
-      content="A premium macOS wrapper for VisiData that makes large, compressed, and odd-format tables feel native, fast, and release-ready."
+      content="iData brings the real VisiData workflow into a native macOS window for large and compressed tables."
     />
+    <meta name="theme-color" content="#050607" />
+    <meta property="og:title" content="iData — VisiData in a native Mac window" />
+    <meta
+      property="og:description"
+      content="Open large tables and .gz/.bgz files with the real VisiData engine in a native macOS shell."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://laleoarrow.github.io/iData/" />
     <link rel="icon" type="image/png" href="./assets/app-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=Inter:wght@400;500;600;700;800&amp;display=swap"
       rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="global-shimmer" aria-hidden="true"></div>
-    <div class="site-shell">
-      <div class="ambient ambient-one"></div>
-      <div class="ambient ambient-two"></div>
+    <a class="skip-link" href="#content">Skip to content</a>
 
-      <header class="topbar">
-        <a class="brand" href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">
-          <img src="./assets/app-icon.png" alt="iData icon" class="brand-icon" />
-          <span>iData</span>
+    <header class="site-header">
+      <div class="frame header-inner">
+        <a class="brand" href="#top" aria-label="iData home">
+          <img src="./assets/app-icon.png" alt="" class="brand-icon" />
+          <span class="brand-name">iData</span>
+          <span class="brand-context">macOS / VisiData</span>
         </a>
-        <nav class="topbar-links" aria-label="Primary">
-          <a href="#capabilities">Capabilities</a>
-          <a href="#release">Release</a>
-          <a href="https://www.buymeacoffee.com/laleoarrow" target="_blank" rel="noreferrer">Support</a>
-          <a href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">GitHub</a>
+
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <a class="nav-link" href="https://github.com/laleoarrow/iData#readme" target="_blank" rel="noreferrer">Guide</a>
+          <a class="nav-link" href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">
+            GitHub
+            <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+          </a>
+          <a class="header-download" data-download-latest href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
+            Download
+          </a>
         </nav>
-      </header>
+      </div>
+    </header>
 
-      <main>
-        <section class="hero reveal">
-          <div class="hero-copy">
-            <span class="eyebrow">macOS • VisiData • Large tables</span>
-            <h1>Large tables, fast.</h1>
-            <p class="hero-text">
-              A native macOS shell for VisiData, built for opening big tabular files with clarity and speed.
-            </p>
+    <main id="content">
+      <section class="hero" id="top">
+        <div class="frame">
+          <p class="eyebrow">Native macOS shell · Real VisiData engine</p>
+          <h1>
+            <span>The real VisiData.</span>
+            <span>A native Mac window.</span>
+          </h1>
+          <p class="hero-copy">
+            Open large tables and compressed datasets without leaving macOS. iData keeps VisiData’s keyboard-first workflow intact.
+          </p>
 
-            <div class="hero-actions">
-              <a class="button button-primary" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
-                Download latest build
+          <div class="hero-tools">
+            <div class="hero-download-group">
+              <a class="button button-primary" data-download-latest href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
+                <i class="ph ph-download-simple" aria-hidden="true"></i>
+                Download iData
               </a>
-              <a class="button button-secondary" href="#release">See release details</a>
-              <a class="button button-support" href="https://www.buymeacoffee.com/laleoarrow" target="_blank" rel="noreferrer">
-                Support this project
-              </a>
+              <p class="compatibility">Universal DMG for macOS 14+ · Apple silicon and Intel</p>
             </div>
 
-            <div class="hero-meta">
-              <span id="release-badge">Fetching latest release…</span>
-              <span id="release-published">GitHub release feed</span>
-              <a href="./appcast.xml" target="_blank" rel="noreferrer">Sparkle appcast</a>
-            </div>
-
-          </div>
-
-          <div class="hero-visual reveal" aria-hidden="true">
-            <div class="visual-card glass-card">
-              <div class="visual-card-head">
-                <span class="visual-pill">Native macOS shell</span>
-                <span class="visual-pill visual-pill-accent">Real VisiData core</span>
-              </div>
-
-              <div class="signal-stage">
-                <div class="signal-grid"></div>
-                <div class="signal-line signal-line-one"></div>
-                <div class="signal-line signal-line-two"></div>
-                <div class="signal-line signal-line-three"></div>
-                <div class="signal-node signal-node-one"></div>
-                <div class="signal-node signal-node-two"></div>
-                <div class="signal-node signal-node-three"></div>
-
-                <div class="terminal-panel glass-subpanel">
-                  <div class="terminal-topbar">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                  <div class="terminal-lines">
-                    <span>open samples.tsv.gz</span>
-                    <span>schema inferred</span>
-                    <span>rows streaming immediately</span>
-                    <span>window stays native</span>
-                  </div>
-                </div>
+            <div class="hero-install-group">
+              <p class="hero-install-label">Install with Homebrew</p>
+              <div class="command" aria-label="Homebrew install command">
+                <span class="command-prompt" aria-hidden="true">$</span>
+                <code>brew install --cask laleoarrow/tap/idata</code>
+                <button
+                  class="copy-button"
+                  type="button"
+                  data-copy-text="brew install --cask laleoarrow/tap/idata"
+                  aria-label="Copy Homebrew command"
+                >
+                  <i class="ph ph-copy" aria-hidden="true"></i>
+                </button>
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section class="section-heading reveal" id="capabilities">
-          <span class="section-kicker">Capabilities</span>
-          <h2>Serious files, native shell, real VisiData on macOS.</h2>
-          <p>iData keeps the desktop experience clean while preserving the real VisiData engine underneath.</p>
-        </section>
+      <section class="product" id="product" aria-labelledby="product-title">
+        <div class="frame product-grid">
+          <figure class="product-figure">
+            <h2 class="visually-hidden" id="product-title">The real iData interface</h2>
+            <div class="product-media">
+              <img
+                src="./assets/idata-app-english-v0.2.20.png"
+                alt="The real iData v0.2.20 interface in English, showing Open Data and the VisiData Quick Start guide."
+                width="1584"
+                height="1208"
+              />
+            </div>
+            <figcaption>Actual iData v0.2.20 interface, shown in English.</figcaption>
+          </figure>
 
-        <section class="feature-grid reveal">
-          <article class="feature-card glass-card">
-            <span class="feature-kicker">Native shell</span>
-            <h3>Native shell</h3>
-            <p>Clean windowing, recent files, update plumbing, and a desktop experience that respects macOS conventions.</p>
-          </article>
-          <article class="feature-card glass-card">
-            <span class="feature-kicker">VisiData engine</span>
-            <h3>VisiData engine</h3>
-            <p>No imitation layer: the page clearly positions iData as a wrapper around the real data workflow experts already trust.</p>
-          </article>
-          <article class="feature-card glass-card">
-            <span class="feature-kicker">GZIP Supported</span>
-            <h3>Open gzipped datasets without manual extraction.</h3>
-            <p>Keeps large compressed tables in a direct native macOS flow, so you can start in iData immediately instead of unpacking first.</p>
-          </article>
-        </section>
+          <aside class="annotations" aria-label="Product highlights">
+            <div class="annotation">
+              <span class="annotation-index">01</span>
+              <p>Native file opening</p>
+            </div>
+            <div class="annotation">
+              <span class="annotation-index">02</span>
+              <p>Real VisiData commands</p>
+            </div>
+            <div class="annotation">
+              <span class="annotation-index">03</span>
+              <p>.gz / .bgz streaming</p>
+            </div>
+          </aside>
+        </div>
+      </section>
 
-        <section class="release-panel glass-card reveal" id="release">
-          <div class="release-copy">
-            <span class="section-kicker">Release</span>
-            <h2>Latest release, clearly.</h2>
-            <p>
-              Version, publish date, install asset, and brew path in one place.
+      <section class="release" id="install" aria-labelledby="release-heading">
+        <div class="frame release-grid">
+          <div class="release-column">
+            <p class="section-label">Latest release</p>
+            <h2 id="release-heading" data-release-version>v0.2.20</h2>
+            <p class="release-date">Published <time data-release-date datetime="2026-08-06">Aug 6, 2026</time></p>
+            <p class="release-summary">
+              A native macOS shell for the real VisiData engine, packaged as a universal app.
             </p>
-            <div class="release-actions">
-              <a class="button button-secondary" href="https://github.com/laleoarrow/homebrew-tap" target="_blank" rel="noreferrer">
-                Brew tap
-              </a>
-              <a class="button button-primary" id="download-latest" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
-                Download latest release
-              </a>
-              <a class="button button-secondary" id="view-release-notes" href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
-                View release notes
-              </a>
-            </div>
+            <a class="button button-primary release-download" data-download-latest href="https://github.com/laleoarrow/iData/releases/latest" target="_blank" rel="noreferrer">
+              <i class="ph ph-download-simple" aria-hidden="true"></i>
+              Download <span data-release-version>v0.2.20</span>
+            </a>
+            <p class="release-meta">Universal DMG · macOS 14+</p>
           </div>
 
-          <div class="release-card glass-subpanel">
-            <div class="release-row">
-              <span class="release-label">Version</span>
-              <strong id="release-version">Latest release</strong>
+          <div class="install-column">
+            <p class="section-label">Install</p>
+            <h2>Homebrew</h2>
+            <p class="install-copy">Install the cask and keep iData easy to update.</p>
+            <div class="command command-large" aria-label="Homebrew install command">
+              <span class="command-prompt" aria-hidden="true">$</span>
+              <code>brew install --cask laleoarrow/tap/idata</code>
+              <button
+                class="copy-button"
+                type="button"
+                data-copy-text="brew install --cask laleoarrow/tap/idata"
+                aria-label="Copy Homebrew command"
+              >
+                <i class="ph ph-copy" aria-hidden="true"></i>
+              </button>
             </div>
-            <div class="release-row">
-              <span class="release-label">Published</span>
-              <strong id="release-date">Checking GitHub…</strong>
-            </div>
-            <div class="release-row">
-              <span class="release-label">Primary asset</span>
-              <strong id="release-asset">Looking for downloadable builds…</strong>
-            </div>
-            <div class="release-row">
-              <span class="release-label">Install path</span>
-              <strong><code>brew install --cask laleoarrow/tap/idata</code></strong>
-            </div>
+            <p class="dependency-note">
+              VisiData is installed separately; iData provides setup guidance on first launch.
+            </p>
+            <a class="text-link" id="view-release-notes" href="https://github.com/laleoarrow/iData/releases/tag/v0.2.20" target="_blank" rel="noreferrer">
+              Read the release notes
+              <i class="ph ph-arrow-right" aria-hidden="true"></i>
+            </a>
           </div>
-        </section>
+        </div>
+      </section>
+    </main>
 
-        <section class="summary-strip reveal" aria-label="Quick summary">
-          <div class="summary-item glass-chip">Native macOS wrapper</div>
-          <div class="summary-item glass-chip">VisiData-native workflow</div>
-          <div class="summary-item glass-chip">Compressed-stream aware</div>
-          <div class="summary-item glass-chip">Release metadata in-page</div>
-          <div class="summary-item glass-chip">Premium motion system</div>
-        </section>
-      </main>
-    </div>
-    <div class="flow-lines" aria-hidden="true">
-      <div class="flow-line flow-line-1"></div>
-      <div class="flow-line flow-line-2"></div>
-      <div class="flow-line flow-line-3"></div>
-      <div class="flow-line flow-line-4"></div>
-      <div class="flow-line flow-line-5"></div>
-      <div class="flow-line flow-line-6"></div>
-      <div class="flow-line flow-line-7"></div>
-      <div class="flow-line flow-line-8"></div>
-    </div>
+    <footer class="site-footer">
+      <div class="frame footer-inner">
+        <p>Requires macOS 14 or later.</p>
+        <a href="https://github.com/laleoarrow/iData" target="_blank" rel="noreferrer">
+          Open source on GitHub
+          <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+        </a>
+        <a id="footer-release-notes" href="https://github.com/laleoarrow/iData/releases/tag/v0.2.20" target="_blank" rel="noreferrer">Release notes</a>
+        <p>© <span id="copyright-year">2026</span> iData Project</p>
+      </div>
+    </footer>
+
+    <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true"></div>
     <script src="./app.js"></script>
   </body>
 </html>

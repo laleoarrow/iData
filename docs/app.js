@@ -1,38 +1,15 @@
-const revealNodes = document.querySelectorAll('.reveal');
-
-const revealObserver = new IntersectionObserver(
-  (entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('is-visible');
-        revealObserver.unobserve(entry.target);
-      }
-    });
-  },
-  { threshold: 0.14, rootMargin: '0px 0px -8% 0px' }
-);
-
-revealNodes.forEach((node, index) => {
-  node.dataset.delay = String(index % 4);
-  revealObserver.observe(node);
-});
-
-const releaseBadge = document.getElementById('release-badge');
-const releasePublished = document.getElementById('release-published');
-const releaseVersion = document.getElementById('release-version');
-const releaseDate = document.getElementById('release-date');
-const releaseAsset = document.getElementById('release-asset');
-const latestDownloadLink = document.getElementById('download-latest');
-const releaseNotesLink = document.getElementById('view-release-notes');
+const releaseVersionNodes = document.querySelectorAll('[data-release-version]');
+const releaseDateNodes = document.querySelectorAll('[data-release-date]');
+const latestDownloadLinks = document.querySelectorAll('[data-download-latest]');
+const releaseNotesLinks = [
+  document.getElementById('view-release-notes'),
+  document.getElementById('footer-release-notes'),
+].filter(Boolean);
 
 const formatDate = (value) => {
-  if (!value) {
-    return 'Not available';
-  }
-
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return 'Not available';
+    return null;
   }
 
   return new Intl.DateTimeFormat('en', {
@@ -42,64 +19,123 @@ const formatDate = (value) => {
   }).format(date);
 };
 
-const findPreferredAsset = (assets) => {
-  if (!Array.isArray(assets) || assets.length === 0) {
+const preferredReleaseAsset = (assets) => {
+  if (!Array.isArray(assets)) {
     return null;
   }
 
   return (
     assets.find((asset) => asset.name?.endsWith('.dmg')) ||
     assets.find((asset) => asset.name?.endsWith('.zip')) ||
-    assets[0]
+    null
   );
 };
 
-const applyReleaseData = (release) => {
-  if (!release) {
-    throw new Error('Missing release payload');
+const applyRelease = (release) => {
+  const version = release.tag_name || release.name;
+  const publishedDate = formatDate(release.published_at);
+  const asset = preferredReleaseAsset(release.assets);
+
+  if (version) {
+    releaseVersionNodes.forEach((node) => {
+      node.textContent = version;
+    });
   }
 
-  const preferredAsset = findPreferredAsset(release.assets);
-  const publishedLabel = formatDate(release.published_at);
-  const versionLabel = release.tag_name || release.name || 'Latest release';
-  const assetLabel = preferredAsset ? preferredAsset.name : 'See release assets on GitHub';
-  const assetHref = preferredAsset?.browser_download_url || release.html_url;
+  if (publishedDate) {
+    releaseDateNodes.forEach((node) => {
+      node.textContent = publishedDate;
+      if (node.tagName === 'TIME') {
+        node.dateTime = release.published_at;
+      }
+    });
+  }
 
-  releaseBadge.textContent = preferredAsset?.name?.endsWith('.dmg')
-    ? `${versionLabel} · DMG ready`
-    : versionLabel;
-  releasePublished.textContent = `Published ${publishedLabel}`;
-  releaseVersion.textContent = versionLabel;
-  releaseDate.textContent = publishedLabel;
-  releaseAsset.textContent = assetLabel;
+  if (asset?.browser_download_url) {
+    latestDownloadLinks.forEach((link) => {
+      link.href = asset.browser_download_url;
+    });
+  }
 
   if (release.html_url) {
-    releaseNotesLink.href = release.html_url;
+    releaseNotesLinks.forEach((link) => {
+      link.href = release.html_url;
+    });
   }
-
-  if (assetHref) {
-    latestDownloadLink.href = assetHref;
-  }
-};
-
-const applyReleaseFallback = () => {
-  releaseBadge.textContent = 'Latest release';
-  releasePublished.textContent = 'GitHub release feed';
-  releaseVersion.textContent = 'Latest release';
-  releaseDate.textContent = 'Check GitHub releases';
-  releaseAsset.textContent = 'Open GitHub to view available assets';
 };
 
 fetch('https://api.github.com/repos/laleoarrow/iData/releases/latest')
   .then((response) => (response.ok ? response.json() : null))
   .then((release) => {
-    if (!release) {
-      applyReleaseFallback();
-      return;
+    if (release) {
+      applyRelease(release);
     }
-
-    applyReleaseData(release);
   })
   .catch(() => {
-    applyReleaseFallback();
+    // The page ships with a current static release fallback.
   });
+
+const copyToast = document.querySelector('.copy-toast');
+let toastTimer;
+
+const showCopyToast = (message) => {
+  if (!copyToast) {
+    return;
+  }
+
+  window.clearTimeout(toastTimer);
+  copyToast.textContent = message;
+  copyToast.classList.add('is-visible');
+  toastTimer = window.setTimeout(() => {
+    copyToast.classList.remove('is-visible');
+  }, 1800);
+};
+
+const writeClipboard = async (text) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
+};
+
+document.querySelectorAll('[data-copy-text]').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const text = button.dataset.copyText;
+    const icon = button.querySelector('i');
+
+    try {
+      await writeClipboard(text);
+      button.classList.add('is-copied');
+      button.setAttribute('aria-label', 'Homebrew command copied');
+      if (icon) {
+        icon.className = 'ph ph-check';
+      }
+      showCopyToast('Homebrew command copied');
+
+      window.setTimeout(() => {
+        button.classList.remove('is-copied');
+        button.setAttribute('aria-label', 'Copy Homebrew command');
+        if (icon) {
+          icon.className = 'ph ph-copy';
+        }
+      }, 1800);
+    } catch {
+      showCopyToast('Copy failed — select the command manually');
+    }
+  });
+});
+
+const copyrightYear = document.getElementById('copyright-year');
+if (copyrightYear) {
+  copyrightYear.textContent = String(new Date().getFullYear());
+}
