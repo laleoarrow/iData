@@ -1,3 +1,42 @@
+@font-face {
+  font-family: "Phosphor";
+  src: url("./assets/phosphor-regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+.ph {
+  display: inline-block;
+  font-family: "Phosphor" !important;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  line-height: 1;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ph.ph-arrow-right::before {
+  content: "\e06c";
+}
+
+.ph.ph-arrow-up-right::before {
+  content: "\e092";
+}
+
+.ph.ph-check::before {
+  content: "\e182";
+}
+
+.ph.ph-copy::before {
+  content: "\e1ca";
+}
+
+.ph.ph-download-simple::before {
+  content: "\e20c";
+}
+
 :root {
   color-scheme: dark;
   --background: #050607;

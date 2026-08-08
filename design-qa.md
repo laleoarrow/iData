@@ -47,6 +47,10 @@
    - P2: the download CTA and Homebrew command sat side by side, while the selected reference uses a clearer vertical install hierarchy.
    - Fix: grouped download/compatibility and Homebrew label/command separately, then stacked both groups in `.hero-tools`.
    - Post-fix evidence: `/tmp/idata-page-desktop-reset.png`, `/tmp/idata-design-qa-final-full.png`, and `/tmp/idata-design-qa-final-focus.png` show the corrected hierarchy with no new P0/P1/P2 issue.
+3. Production pass (`https://laleoarrow.github.io/iData/`)
+   - P2: the external Phosphor stylesheet loaded without a browser warning but did not expose its glyph rules on GitHub Pages, leaving the visible icon boxes at `0 × 0`.
+   - Fix: self-hosted the pinned Phosphor 2.1.1 regular WOFF2 asset and limited the local glyph map to the five icons used by the page.
+   - Post-fix evidence: `/tmp/idata-icon-fix-local.png` and `/tmp/idata-live-deployed-icon-fixed.png` show the icon set rendered from the local `Phosphor` font with no console error.
 
 **Primary Interactions Tested**
 
@@ -58,7 +62,7 @@
 
 **Console Errors Checked**
 
-- Final browser pass: no warnings or errors.
+- Final local browser pass: no warnings or errors. The production pass also verifies the self-hosted icon font after deployment.
 
 **Implementation Checklist**
 
@@ -66,6 +70,7 @@
 - [x] Replace generated product UI with a real English iData screenshot.
 - [x] Preserve a two-line desktop headline and stacked install hierarchy.
 - [x] Bind release metadata and DMG URL to the GitHub release API with a static fallback.
+- [x] Serve the pinned icon font locally so production rendering does not depend on a third-party stylesheet.
 - [x] Verify responsive layout, focus styling, copy feedback, and console output.
 
 **Follow-up Polish**

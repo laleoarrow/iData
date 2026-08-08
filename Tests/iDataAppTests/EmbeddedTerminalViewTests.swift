@@ -878,9 +878,8 @@ struct EmbeddedTerminalViewTests {
         try await harness.load()
         try await harness.clearMessages()
 
-        try await Task.sleep(for: .milliseconds(950))
-        try await harness.setCellMetrics(width: 8, height: 18)
-        try await Task.sleep(for: .milliseconds(450))
+        try await harness.scheduleCellMetrics(width: 8, height: 18, afterMilliseconds: 950)
+        try await Task.sleep(for: .milliseconds(1_500))
 
         let messages = try await harness.messages()
         let sawResize = messages.contains { message in
@@ -1520,6 +1519,12 @@ private final class TerminalHTMLHarness: NSObject, WKNavigationDelegate {
 
     func setCellMetrics(width: Int, height: Int) async throws {
         _ = try await evaluate("window.__setCellMetrics(\(width), \(height));")
+    }
+
+    func scheduleCellMetrics(width: Int, height: Int, afterMilliseconds delay: Int) async throws {
+        _ = try await evaluate(
+            "window.setTimeout(() => window.__setCellMetrics(\(width), \(height)), \(delay));"
+        )
     }
 
     func clearMessages() async throws {
